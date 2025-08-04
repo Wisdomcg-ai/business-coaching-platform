@@ -92,7 +92,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="bg-gray-50 px-5 py-3">
                   <div className="text-sm">
-                    <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+                   <a href="/assessment" className="font-medium text-blue-600 hover:text-blue-500">
                       Take Assessment →
                     </a>
                   </div>
