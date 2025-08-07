@@ -1,332 +1,174 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react';
 
 export default function AssessmentPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [currentStep, setCurrentStep] = useState(1)
-  const [responses, setResponses] = useState({
-    // Revenue Stage
-    currentRevenue: '',
-    
-    // 6 Engine Rooms (0-100% each)
-    visionLeadership: 50,
-    productInnovation: 50,
-    leadGeneration: 50,
-    salesConversion: 50,
-    deliverySuccess: 50,
-    operations: 50,
-    
-    // Strategic Wheel Readiness (1-5 scale)
-    visionPurpose: 3,
-    strategyMarket: 3,
-    peopleCulture: 3,
-    systemsExecution: 3,
-    moneyMetrics: 3,
-    communications: 3,
-    
-    // Success Disciplines (1-5 scale)
-    decisionMaking: 3,
-    technologyAI: 3,
-    growthMindset: 3,
-    leadership: 3,
-    personalMastery: 3,
-    operationalExcellence: 3,
-    resourceOptimization: 3,
-    financialAcumen: 3,
-    accountability: 3,
-    customerExperience: 3,
-    resilience: 3,
-    timeManagement: 3
-  })
-  
-  const router = useRouter()
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [responses, setResponses] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    const checkUser = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/auth/login')
-        return
-      }
-      
-      setUser(user)
-      setLoading(false)
+  const questions = [
+    {
+      id: 'revenue_stage',
+      question: "What's your current annual revenue?",
+      options: [
+        { value: 'under_250k', label: 'Under $250K (Foundation Stage)' },
+        { value: '250k_1m', label: '$250K - $1M (Traction Stage)' },
+        { value: '1m_3m', label: '$1M - $3M (Scaling Stage)' },
+        { value: '3m_5m', label: '$3M - $5M (Optimization Stage)' },
+        { value: '5m_10m', label: '$5M - $10M (Leadership Stage)' },
+        { value: '10m_plus', label: '$10M+ (Mastery Stage)' }
+      ]
+    },
+    {
+      id: 'profit_margin',
+      question: "What's your current profit margin?",
+      options: [
+        { value: 'losing_money', label: 'Losing money' },
+        { value: 'breaking_even', label: 'Breaking even (0-5%)' },
+        { value: 'small_profit', label: 'Small profit (5-10%)' },
+        { value: 'healthy_profit', label: 'Healthy profit (10-15%)' },
+        { value: 'strong_profit', label: 'Strong profit (15-20%)' },
+        { value: 'exceptional_profit', label: 'Exceptional profit (20%+)' }
+      ]
+    },
+    {
+      id: 'owner_salary',
+      question: "Are you paying yourself a market-rate salary consistently?",
+      options: [
+        { value: 'rarely_take_money', label: 'No - rarely take money out' },
+        { value: 'when_cash_allows', label: 'Sometimes - when cash flow allows' },
+        { value: 'below_market', label: 'Yes - regular salary below market' },
+        { value: 'market_rate', label: 'Yes - full market-rate salary' },
+        { value: 'salary_plus_profit', label: 'Yes - salary plus profit distributions' }
+      ]
+    },
+    {
+      id: 'team_size',
+      question: "How many people work in your business?",
+      options: [
+        { value: 'just_me', label: 'Just me' },
+        { value: '2_5_people', label: '2-5 people' },
+        { value: '6_15_people', label: '6-15 people' },
+        { value: '16_50_people', label: '16-50 people' },
+        { value: '50_plus', label: '50+ people' }
+      ]
+    },
+    {
+      id: 'business_dependency',
+      question: "How dependent is the business on you personally?",
+      options: [
+        { value: 'completely_dependent', label: 'Completely - stops without me' },
+        { value: 'very_dependent', label: 'Very - needs me for most decisions' },
+        { value: 'somewhat_dependent', label: 'Somewhat - can run for short periods' },
+        { value: 'minimal_dependency', label: 'Minimal - runs well without me' }
+      ]
+    },
+    {
+      id: 'revenue_predictability',
+      question: "How predictable is your monthly revenue?",
+      options: [
+        { value: 'unpredictable', label: 'Completely unpredictable - varies wildly' },
+        { value: 'somewhat_predictable', label: 'Somewhat predictable - within 50%' },
+        { value: 'very_predictable', label: 'Very predictable - within 25%' },
+        { value: 'extremely_predictable', label: 'Extremely predictable - recurring revenue' }
+      ]
     }
+  ];
 
-    checkUser()
-  }, [router])
+  const totalQuestions = questions.length;
+  const currentQuestionData = questions[currentQuestion];
+  const progress = ((currentQuestion + 1) / totalQuestions) * 100;
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleAnswer = (questionId: string, value: string) => {
     setResponses(prev => ({
       ...prev,
-      [field]: value
-    }))
-  }
+      [questionId]: value
+    }));
+  };
 
-  const calculateScores = () => {
-    // Engine Rooms Average
-    const engineRoomsAvg = Math.round(
-      (responses.visionLeadership + responses.productInnovation + 
-       responses.leadGeneration + responses.salesConversion + 
-       responses.deliverySuccess + responses.operations) / 6
-    )
-
-    // Strategic Wheel Average
-    const strategicWheelAvg = Math.round(
-      (responses.visionPurpose + responses.strategyMarket + 
-       responses.peopleCulture + responses.systemsExecution + 
-       responses.moneyMetrics + responses.communications) / 6 * 20
-    ) // Convert 1-5 to percentage
-
-    // Success Disciplines Average
-    const disciplinesAvg = Math.round(
-      (responses.decisionMaking + responses.technologyAI + responses.growthMindset +
-       responses.leadership + responses.personalMastery + responses.operationalExcellence +
-       responses.resourceOptimization + responses.financialAcumen + responses.accountability +
-       responses.customerExperience + responses.resilience + responses.timeManagement) / 12 * 20
-    ) // Convert 1-5 to percentage
-
-    return {
-      engineRooms: engineRoomsAvg,
-      strategicWheel: strategicWheelAvg,
-      successDisciplines: disciplinesAvg,
-      overall: Math.round((engineRoomsAvg + strategicWheelAvg + disciplinesAvg) / 3)
+  const handleNext = () => {
+    if (currentQuestion < totalQuestions - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+    } else {
+      alert('Assessment completed! Your responses: ' + JSON.stringify(responses, null, 2));
+      window.location.href = '/dashboard';
     }
-  }
+  };
 
-  const handleSubmit = async () => {
-    const scores = calculateScores()
-    
-    try {
-      const supabase = createClient()
-      
-      // Save assessment to database
-      const { error } = await supabase
-        .from('assessments')
-        .insert({
-          business_id: null, // We'll add business logic later
-          completed_by: user.id,
-          responses: responses,
-          scores: scores,
-          completion_percentage: 100,
-          completed_at: new Date().toISOString()
-        })
-
-      if (error) throw error
-
-      // Redirect to results
-      router.push('/assessment/results')
-    } catch (error) {
-      console.error('Error saving assessment:', error)
-      alert('Error saving assessment. Please try again.')
+  const handleBack = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1);
     }
-  }
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">Diagnostic Assessment</h1>
-          <p className="text-gray-600">Step {currentStep} of 4</p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Business Foundation Assessment
+          </h1>
+          <p className="text-gray-600">
+            Understanding your current position and fundamentals
+          </p>
         </div>
-      </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {currentStep === 1 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Revenue Stage</h2>
-            <p className="text-gray-600 mb-6">What is your current annual revenue?</p>
-            
-            <div className="space-y-3">
-              {['0-1M', '1M-3M', '3M-5M', '5M-10M', '10M+'].map((stage) => (
-                <label key={stage} className="flex items-center">
-                  <input
-                    type="radio"
-                    name="revenue"
-                    value={stage}
-                    checked={responses.currentRevenue === stage}
-                    onChange={(e) => handleInputChange('currentRevenue', e.target.value)}
-                    className="mr-3"
-                  />
-                  <span className="text-lg">${stage}</span>
-                </label>
-              ))}
-            </div>
-            
-            <button
-              onClick={() => setCurrentStep(2)}
-              disabled={!responses.currentRevenue}
-              className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              Next: Engine Rooms →
-            </button>
+        <div className="mb-8">
+          <div className="flex justify-between text-sm text-gray-600 mb-2">
+            <span>Question {currentQuestion + 1} of {totalQuestions}</span>
+            <span>{Math.round(progress)}% Complete</span>
           </div>
-        )}
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        </div>
 
-        {currentStep === 2 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">6 Engine Rooms Assessment</h2>
-            <p className="text-gray-600 mb-6">Rate each area from 0-100% based on how well it's working in your business:</p>
-            
-            <div className="space-y-6">
-              {[
-                { key: 'visionLeadership', label: 'Vision & Leadership' },
-                { key: 'productInnovation', label: 'Product Innovation' },
-                { key: 'leadGeneration', label: 'Lead Generation' },
-                { key: 'salesConversion', label: 'Sales & Conversion' },
-                { key: 'deliverySuccess', label: 'Delivery & Success' },
-                { key: 'operations', label: 'Operations (Team, Finance, Systems)' }
-              ].map((item) => (
-                <div key={item.key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {item.label}: {responses[item.key as keyof typeof responses]}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={responses[item.key as keyof typeof responses]}
-                    onChange={(e) => handleInputChange(item.key, parseInt(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex justify-between mt-6">
-              <button
-                onClick={() => setCurrentStep(1)}
-                className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={() => setCurrentStep(3)}
-                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-              >
-                Next: Strategic Wheel →
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">
+            {currentQuestionData.question}
+          </h2>
 
-        {currentStep === 3 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Strategic Wheel Readiness</h2>
-            <p className="text-gray-600 mb-6">Rate each component from 1-5 (1=Needs Work, 5=Excellent):</p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { key: 'visionPurpose', label: 'Vision & Purpose' },
-                { key: 'strategyMarket', label: 'Strategy & Market' },
-                { key: 'peopleCulture', label: 'People & Culture' },
-                { key: 'systemsExecution', label: 'Systems & Execution' },
-                { key: 'moneyMetrics', label: 'Money & Metrics' },
-                { key: 'communications', label: 'Communications & Alignment' }
-              ].map((item) => (
-                <div key={item.key}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {item.label}
-                  </label>
-                  <select
-                    value={responses[item.key as keyof typeof responses]}
-                    onChange={(e) => handleInputChange(item.key, parseInt(e.target.value))}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value={1}>1 - Needs Major Work</option>
-                    <option value={2}>2 - Needs Some Work</option>
-                    <option value={3}>3 - Average</option>
-                    <option value={4}>4 - Good</option>
-                    <option value={5}>5 - Excellent</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex justify-between mt-6">
-              <button
-                onClick={() => setCurrentStep(2)}
-                className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700"
+          <div className="space-y-3">
+            {currentQuestionData.options.map((option) => (
+              <label 
+                key={option.value}
+                className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
               >
-                ← Back
-              </button>
-              <button
-                onClick={() => setCurrentStep(4)}
-                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-              >
-                Next: Success Disciplines →
-              </button>
-            </div>
+                <input
+                  type="radio"
+                  name={currentQuestionData.id}
+                  value={option.value}
+                  checked={responses[currentQuestionData.id] === option.value}
+                  onChange={(e) => handleAnswer(currentQuestionData.id, e.target.value)}
+                  className="mr-3"
+                />
+                <span className="text-gray-900">{option.label}</span>
+              </label>
+            ))}
           </div>
-        )}
+        </div>
 
-        {currentStep === 4 && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Success Disciplines Evaluation</h2>
-            <p className="text-gray-600 mb-6">Rate your current strength in each discipline (1-5):</p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { key: 'decisionMaking', label: 'Decision-Making' },
-                { key: 'technologyAI', label: 'Technology & AI' },
-                { key: 'growthMindset', label: 'Growth Mindset' },
-                { key: 'leadership', label: 'Leadership Development' },
-                { key: 'personalMastery', label: 'Personal Mastery' },
-                { key: 'operationalExcellence', label: 'Operational Excellence' },
-                { key: 'resourceOptimization', label: 'Resource Optimization' },
-                { key: 'financialAcumen', label: 'Financial Acumen' },
-                { key: 'accountability', label: 'Accountability' },
-                { key: 'customerExperience', label: 'Customer Experience' },
-                { key: 'resilience', label: 'Resilience & Renewal' },
-                { key: 'timeManagement', label: 'Time Management' }
-              ].map((item) => (
-                <div key={item.key} className="flex items-center justify-between p-3 border rounded">
-                  <label className="text-sm font-medium text-gray-700">
-                    {item.label}
-                  </label>
-                  <select
-                    value={responses[item.key as keyof typeof responses]}
-                    onChange={(e) => handleInputChange(item.key, parseInt(e.target.value))}
-                    className="ml-2 p-1 border border-gray-300 rounded"
-                  >
-                    <option value={1}>1</option>
-                    <option value={2}>2</option>
-                    <option value={3}>3</option>
-                    <option value={4}>4</option>
-                    <option value={5}>5</option>
-                  </select>
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex justify-between mt-6">
-              <button
-                onClick={() => setCurrentStep(3)}
-                className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
-              >
-                Complete Assessment ✓
-              </button>
-            </div>
-          </div>
-        )}
-      </main>
+        <div className="flex justify-between">
+          <button
+            onClick={handleBack}
+            disabled={currentQuestion === 0}
+            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Back
+          </button>
+          
+          <button
+            onClick={handleNext}
+            disabled={!responses[currentQuestionData.id]}
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {currentQuestion === totalQuestions - 1 ? 'Complete Assessment' : 'Next'}
+          </button>
+        </div>
+      </div>
     </div>
-  )
+  );
 }
