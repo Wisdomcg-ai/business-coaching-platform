@@ -1,321 +1,285 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+interface ComponentStatus {
+  vision_purpose: boolean;
+  strategy_market: boolean;
+  people_culture: boolean;
+  systems_execution: boolean;
+  money_metrics: boolean;
+  communications_alignment: boolean;
+}
 
 export default function StrategicWheel() {
-  const [currentSection, setCurrentSection] = useState<number | null>(null)
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
-  const supabase = createClientComponentClient()
+  const [currentSection, setCurrentSection] = useState<number | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+  const [completionStatus, setCompletionStatus] = useState<ComponentStatus>({
+    vision_purpose: false,
+    strategy_market: false,
+    people_culture: false,
+    systems_execution: false,
+    money_metrics: false,
+    communications_alignment: false
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/login')
-      } else {
-        setUser(user)
-      }
-      setLoading(false)
-    }
-    checkUser()
-  }, [router, supabase])
+    checkUser();
+    checkCompletionStatus();
+  }, []);
 
-  const sections = [
-    {
-      id: 'vision',
-      title: 'Vision & Purpose',
-      icon: '💡',
-      description: 'Define why your business exists and where it\'s going',
-      color: '#E0F2FE', // light blue
-      darkColor: '#0284C7'
-    },
-    {
-      id: 'strategy',
-      title: 'Strategy & Market', 
-      icon: '🎯',
-      description: 'Identify your target market and competitive advantage',
-      color: '#FEF3C7', // light yellow
-      darkColor: '#D97706'
-    },
-    {
-      id: 'people',
-      title: 'People & Culture',
-      icon: '👥',
-      description: 'Build your team and define your culture',
-      color: '#D1FAE5', // light green
-      darkColor: '#059669'
-    },
-    {
-      id: 'systems',
-      title: 'Systems & Execution',
-      icon: '⚙️',
-      description: 'Design your core processes and execution rhythm',
-      color: '#DBEAFE', // light blue
-      darkColor: '#2563EB'
-    },
-    {
-      id: 'money',
-      title: 'Money & Metrics',
-      icon: '📊',
-      description: 'Set financial goals and key performance indicators',
-      color: '#FED7AA', // light orange
-      darkColor: '#EA580C'
-    },
-    {
-      id: 'communications',
-      title: 'Communications & Alignment',
-      icon: '💬',
-      description: 'Establish team alignment and meeting rhythms',
-      color: '#E9D5FF', // light purple
-      darkColor: '#9333EA'
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/auth/login');
+    } else {
+      setUser(user);
     }
-  ]
+  };
+
+  const checkCompletionStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('business_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.business_id) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: wheel } = await supabase
+        .from('strategic_wheels')
+        .select('*')
+        .eq('business_id', profile.business_id)
+        .single();
+
+      if (wheel) {
+        // Check each component - fix vision_purpose check
+        const hasVisionPurpose = wheel.vision_purpose && 
+          (typeof wheel.vision_purpose === 'object' && Object.keys(wheel.vision_purpose).length > 0);
+        
+        const hasStrategyMarket = wheel.strategy_market && 
+          (typeof wheel.strategy_market === 'object' && Object.keys(wheel.strategy_market).length > 0);
+        
+        const hasPeopleCulture = wheel.people_culture && 
+          (typeof wheel.people_culture === 'object' && Object.keys(wheel.people_culture).length > 0);
+        
+        const hasSystemsExecution = wheel.systems_execution && 
+          (typeof wheel.systems_execution === 'object' && Object.keys(wheel.systems_execution).length > 0);
+        
+        const hasMoneyMetrics = wheel.money_metrics && 
+          (typeof wheel.money_metrics === 'object' && Object.keys(wheel.money_metrics).length > 0);
+        
+        const hasCommunications = wheel.communications_alignment && 
+          (typeof wheel.communications_alignment === 'object' && Object.keys(wheel.communications_alignment).length > 0);
+
+        console.log('Vision Purpose data:', wheel.vision_purpose);
+        console.log('Has Vision Purpose:', hasVisionPurpose);
+
+        setCompletionStatus({
+          vision_purpose: hasVisionPurpose,
+          strategy_market: hasStrategyMarket,
+          people_culture: hasPeopleCulture,
+          systems_execution: hasSystemsExecution,
+          money_metrics: hasMoneyMetrics,
+          communications_alignment: hasCommunications
+        });
+      }
+    } catch (error) {
+      console.error('Error checking completion:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCompletionPercentage = () => {
+    const completed = Object.values(completionStatus).filter(Boolean).length;
+    return Math.round((completed / 6) * 100);
+  };
+
+  const getStatusText = (isComplete: boolean) => {
+    return isComplete ? '✓ Completed' : 'Not started';
+  };
+
+  const getStatusColor = (isComplete: boolean) => {
+    return isComplete ? 'text-green-600' : 'text-gray-400';
+  };
+
+  const components = [
+    {
+      id: 1,
+      title: 'Vision & Purpose',
+      description: 'Define why your business exists and where it\'s going',
+      icon: '💡',
+      link: '/strategic-wheel/vision-purpose',
+      field: 'vision_purpose' as keyof ComponentStatus
+    },
+    {
+      id: 2,
+      title: 'Strategy & Market',
+      description: 'Identify your target market and competitive advantage',
+      icon: '🎯',
+      link: '/strategic-wheel/strategy-market',
+      field: 'strategy_market' as keyof ComponentStatus
+    },
+    {
+      id: 3,
+      title: 'People & Culture',
+      description: 'Build your team and define your culture',
+      icon: '👥',
+      link: '/strategic-wheel/people-culture',
+      field: 'people_culture' as keyof ComponentStatus
+    },
+    {
+      id: 4,
+      title: 'Systems & Execution',
+      description: 'Design your core processes and execution rhythm',
+      icon: '⚙️',
+      link: '/strategic-wheel/systems-execution',
+      field: 'systems_execution' as keyof ComponentStatus
+    },
+    {
+      id: 5,
+      title: 'Money & Metrics',
+      description: 'Set financial goals and key performance indicators',
+      icon: '📊',
+      link: '/strategic-wheel/money-metrics',
+      field: 'money_metrics' as keyof ComponentStatus
+    },
+    {
+      id: 6,
+      title: 'Communications & Alignment',
+      description: 'Establish team alignment and meeting rhythms',
+      icon: '💬',
+      link: '/strategic-wheel/communications-alignment',
+      field: 'communications_alignment' as keyof ComponentStatus
+    }
+  ];
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>
-  }
-
-  // SVG Wheel Component
-  const StrategicWheelDiagram = () => {
-    const centerX = 150
-    const centerY = 150
-    const outerRadius = 130
-    const innerRadius = 55
-    
-    // Calculate path for each segment
-    const createPath = (startAngle: number, endAngle: number) => {
-      const start = (startAngle * Math.PI) / 180
-      const end = (endAngle * Math.PI) / 180
-      
-      const x1 = centerX + outerRadius * Math.cos(start)
-      const y1 = centerY + outerRadius * Math.sin(start)
-      const x2 = centerX + outerRadius * Math.cos(end)
-      const y2 = centerY + outerRadius * Math.sin(end)
-      
-      const x3 = centerX + innerRadius * Math.cos(start)
-      const y3 = centerY + innerRadius * Math.sin(start)
-      const x4 = centerX + innerRadius * Math.cos(end)
-      const y4 = centerY + innerRadius * Math.sin(end)
-      
-      return `
-        M ${x3} ${y3}
-        L ${x1} ${y1}
-        A ${outerRadius} ${outerRadius} 0 0 1 ${x2} ${y2}
-        L ${x4} ${y4}
-        A ${innerRadius} ${innerRadius} 0 0 0 ${x3} ${y3}
-      `
-    }
-    
-    // Calculate text position for each segment
-    const getTextPosition = (index: number) => {
-      const angle = -90 + (index * 60) + 30 // Center of each segment
-      const radius = (outerRadius + innerRadius) / 2
-      const radian = (angle * Math.PI) / 180
-      
-      return {
-        x: centerX + radius * Math.cos(radian),
-        y: centerY + radius * Math.sin(radian)
-      }
-    }
-
     return (
-      <svg 
-        width="300" 
-        height="300" 
-        viewBox="0 0 300 300" 
-        className="w-full h-full max-w-xs mx-auto"
-      >
-        {/* Segments */}
-        {sections.map((section, index) => {
-          const startAngle = -90 + (index * 60)
-          const endAngle = startAngle + 60
-          const textPos = getTextPosition(index)
-          
-          return (
-            <g key={section.id}>
-              {/* Segment Path */}
-              <path
-                d={createPath(startAngle, endAngle)}
-                fill={section.color}
-                stroke="#fff"
-                strokeWidth="2"
-                className="cursor-pointer transition-all hover:opacity-80"
-                onClick={() => router.push(`/strategic-wheel/${section.id}`)}
-              />
-              
-              {/* Icon */}
-              <text
-                x={textPos.x}
-                y={textPos.y - 8}
-                textAnchor="middle"
-                className="text-xl pointer-events-none"
-              >
-                {section.icon}
-              </text>
-              
-              {/* Title */}
-              <text
-                x={textPos.x}
-                y={textPos.y + 8}
-                textAnchor="middle"
-                className="text-[10px] font-semibold pointer-events-none"
-                fill="#111"
-              >
-                {section.title.split('&')[0]}
-              </text>
-              {section.title.includes('&') && (
-                <text
-                  x={textPos.x}
-                  y={textPos.y + 20}
-                  textAnchor="middle"
-                  className="text-[10px] font-semibold pointer-events-none"
-                  fill="#111"
-                >
-                  {'&' + section.title.split('&')[1]}
-                </text>
-              )}
-            </g>
-          )
-        })}
-        
-        {/* Center Circle */}
-        <circle
-          cx={centerX}
-          cy={centerY}
-          r={innerRadius}
-          fill="white"
-          stroke="#ddd"
-          strokeWidth="2"
-        />
-        
-        {/* Center Text */}
-        <text
-          x={centerX}
-          y={centerY - 5}
-          textAnchor="middle"
-          className="text-sm font-bold"
-          fill="#111"
-        >
-          Strategic
-        </text>
-        <text
-          x={centerX}
-          y={centerY + 10}
-          textAnchor="middle"
-          className="text-sm font-bold"
-          fill="#111"
-        >
-          Wheel
-        </text>
-      </svg>
-    )
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <Link 
-                href="/dashboard"
-                className="text-gray-600 hover:text-gray-900"
-              >
-                ← Back
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">Strategic Wheel Planning</h1>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+              ← Back to Dashboard
+            </Link>
+            <div className="text-2xl font-bold text-blue-600">
+              {getCompletionPercentage()}% Complete
             </div>
           </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Introduction */}
-        <div className="bg-white rounded-lg shadow-md p-8 mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Build Your Strategic Foundation
-          </h2>
-          <p className="text-lg text-gray-600 mb-6">
-            The Strategic Wheel is your comprehensive business planning framework. 
-            Work through each of the 6 components to create a complete strategic plan for your business.
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Strategic Wheel</h1>
+          <p className="text-gray-600">Build your comprehensive business strategy across 6 key components</p>
           
-          {/* Strategic Wheel Diagram */}
-          <div className="mb-6">
-            <StrategicWheelDiagram />
-          </div>
-
-          <div className="text-center text-gray-600">
-            Click on any segment to start planning that component
+          {/* Progress Bar */}
+          <div className="mt-4 bg-gray-200 rounded-full h-3">
+            <div 
+              className="bg-blue-600 h-3 rounded-full transition-all duration-500"
+              style={{ width: `${getCompletionPercentage()}%` }}
+            />
           </div>
         </div>
 
-        {/* Section Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sections.map((section, index) => (
+        {/* Components Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {components.map((component) => (
             <Link
-              key={section.id}
-              href={`/strategic-wheel/${section.id}`}
-              className={`block p-6 bg-white rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105 ${
-                index === 0 ? 'ring-2 ring-blue-500' : ''
+              key={component.id}
+              href={component.link}
+              className={`bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow ${
+                completionStatus[component.field] ? 'border-2 border-green-500' : 'border-2 border-transparent'
               }`}
-              onMouseEnter={() => setCurrentSection(index)}
-              onMouseLeave={() => setCurrentSection(null)}
             >
-              <div className="flex items-start gap-4">
-                <div 
-                  className="w-12 h-12 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: section.color }}
-                >
-                  <span className="text-2xl">{section.icon}</span>
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1">
-                    {section.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    {section.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
-                      {index === 0 ? 'Start here' : `Component ${index + 1}`}
-                    </span>
-                    <span className="text-blue-600">→</span>
-                  </div>
-                </div>
+              <div className="flex items-start justify-between mb-3">
+                <span className="text-3xl">{component.icon}</span>
+                {completionStatus[component.field] && (
+                  <span className="text-green-600 text-2xl">✓</span>
+                )}
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {component.title}
+              </h3>
+              <p className="text-sm text-gray-600 mb-3">
+                {component.description}
+              </p>
+              <div className="flex justify-end">
+                <span className="text-blue-600 hover:text-blue-700">
+                  {completionStatus[component.field] ? 'Edit →' : 'Start →'}
+                </span>
               </div>
             </Link>
           ))}
         </div>
 
-        {/* Progress Summary */}
-        <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Progress</h3>
+        {/* Progress List */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold mb-4">Your Progress</h2>
           <div className="space-y-3">
-            {sections.map((section, index) => (
-              <div key={section.id} className="flex items-center gap-3">
-                <div 
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
-                  style={{ backgroundColor: section.color }}
-                >
-                  {index + 1}
+            {components.map((component) => (
+              <div key={component.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    completionStatus[component.field] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {component.id}
+                  </div>
+                  <span className="font-medium">{component.title}</span>
                 </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-700">{section.title}</div>
-                </div>
-                <div className="text-sm text-gray-500">Not started</div>
+                <span className={`text-sm ${getStatusColor(completionStatus[component.field])}`}>
+                  {getStatusText(completionStatus[component.field])}
+                </span>
               </div>
             ))}
           </div>
         </div>
-      </main>
+
+        {/* Next Steps */}
+        {getCompletionPercentage() === 100 && (
+          <div className="mt-8 bg-green-50 border-2 border-green-500 rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-green-800 mb-2">
+              🎉 Congratulations! Strategic Wheel Complete!
+            </h2>
+            <p className="text-green-700 mb-4">
+              You've completed all 6 components of your Strategic Wheel. Next steps:
+            </p>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => router.push('/success-disciplines')}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Continue to Success Disciplines →
+              </button>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="px-6 py-3 border border-green-600 text-green-600 rounded-lg hover:bg-green-50"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }
