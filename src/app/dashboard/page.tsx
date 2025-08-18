@@ -3,9 +3,22 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Trophy, Target, Users, TrendingUp, Calendar, CheckCircle, Building2, ArrowRight } from 'lucide-react';
+import { 
+  Trophy, Target, Users, TrendingUp, Calendar, CheckCircle, 
+  Building2, ArrowRight, AlertCircle, RefreshCw, Activity,
+  BarChart3, Lightbulb, Clock
+} from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/types/database';
+import { 
+  getDashboardData, 
+  getRecommendations,
+  getHealthStatusColor,
+  getRevenueStageColor,
+  type DashboardData 
+} from '@/lib/dashboard-service';
+import ProgressChart from '@/components/dashboard/ProgressChart';
+import AssessmentHistory from '@/components/dashboard/AssessmentHistory';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -13,15 +26,23 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const [businessName, setBusinessName] = useState('');
-  const [assessmentScore, setAssessmentScore] = useState<number | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    assessments: [],
+    latestAssessment: null,
+    totalAssessments: 0,
+    averageScore: 0,
+    scoreImprovement: 0,
+    healthTrend: 'stable'
+  });
+  const [recommendations, setRecommendations] = useState<string[]>([]);
   const [strategicWheelProgress, setStrategicWheelProgress] = useState(0);
 
   useEffect(() => {
-    checkUser();
-    loadDashboardData();
+    loadAllData();
   }, []);
 
-  const checkUser = async () => {
+  const loadAllData = async () => {
+    setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -30,7 +51,7 @@ export default function Dashboard() {
         return;
       }
 
-      // Get user profile
+      // Load user profile
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name')
@@ -41,7 +62,7 @@ export default function Dashboard() {
         setUserName(profile.full_name);
       }
 
-      // Get business info
+      // Load business info
       const { data: business } = await supabase
         .from('businesses')
         .select('name')
@@ -51,32 +72,16 @@ export default function Dashboard() {
       if (business?.name) {
         setBusinessName(business.name);
       }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const loadDashboardData = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // Load dashboard data
+      const data = await getDashboardData(session.user.id);
+      setDashboardData(data);
+      
+      // Get recommendations based on latest assessment
+      const recs = getRecommendations(data.latestAssessment);
+      setRecommendations(recs);
 
-      // Get latest assessment score
-      const { data: assessment } = await supabase
-        .from('assessments')
-        .select('total_score')
-        .eq('completed_by', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (assessment) {
-        setAssessmentScore(Math.round((assessment.total_score / 290) * 100));
-      }
-
-      // Get strategic wheel progress
+      // Load strategic wheel progress
       const { data: strategicWheel } = await supabase
         .from('strategic_wheels')
         .select('*')
@@ -84,7 +89,6 @@ export default function Dashboard() {
         .single();
 
       if (strategicWheel) {
-        // Calculate completion based on filled sections
         const sections = [
           strategicWheel.vision_purpose,
           strategicWheel.strategy_market,
@@ -102,6 +106,8 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -110,10 +116,28 @@ export default function Dashboard() {
     router.push('/');
   };
 
+  const getTrendIcon = () => {
+    if (dashboardData.healthTrend === 'improving') {
+      return <TrendingUp className="w-5 h-5 text-green-600" />;
+    } else if (dashboardData.healthTrend === 'declining') {
+      return <TrendingUp className="w-5 h-5 text-red-600 rotate-180" />;
+    }
+    return <Activity className="w-5 h-5 text-gray-600" />;
+  };
+
+  const getTrendText = () => {
+    if (dashboardData.healthTrend === 'improving') return 'Improving';
+    if (dashboardData.healthTrend === 'declining') return 'Declining';
+    return 'Stable';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-gray-600 animate-spin mx-auto mb-2" />
+          <p className="text-gray-600">Loading your dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -155,51 +179,148 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <Trophy className="w-10 h-10 text-yellow-500" />
-              <span className="text-2xl font-bold text-gray-900">
-                {assessmentScore || 0}%
-              </span>
+        {/* Current Status Summary */}
+        {dashboardData.latestAssessment && (
+          <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Current Business Status</h2>
+              <div className="flex items-center gap-2">
+                {getTrendIcon()}
+                <span className="text-sm font-medium text-gray-600">{getTrendText()}</span>
+              </div>
             </div>
-            <p className="text-gray-600 mt-2">Health Score</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <Trophy className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-gray-900">
+                  {dashboardData.latestAssessment.percentage}%
+                </p>
+                <p className="text-sm text-gray-600 mt-1">Health Score</p>
+                {dashboardData.scoreImprovement !== 0 && (
+                  <p className={`text-xs mt-1 ${dashboardData.scoreImprovement > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {dashboardData.scoreImprovement > 0 ? '+' : ''}{dashboardData.scoreImprovement}% overall
+                  </p>
+                )}
+              </div>
+              
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <BarChart3 className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                <p className={`text-sm font-medium px-2 py-1 rounded-full inline-block ${getHealthStatusColor(dashboardData.latestAssessment.health_status)}`}>
+                  {dashboardData.latestAssessment.health_status}
+                </p>
+                <p className="text-sm text-gray-600 mt-2">Health Status</p>
+              </div>
+              
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <Building2 className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+                <p className={`text-sm font-medium px-2 py-1 rounded-full inline-block ${getRevenueStageColor(dashboardData.latestAssessment.revenue_stage)}`}>
+                  {dashboardData.latestAssessment.revenue_stage}
+                </p>
+                <p className="text-sm text-gray-600 mt-2">Revenue Stage</p>
+              </div>
+              
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <Clock className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                <p className="text-lg font-bold text-gray-900">
+                  {dashboardData.totalAssessments}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">Assessments</p>
+                <p className="text-xs text-gray-500 mt-1">Avg: {dashboardData.averageScore}%</p>
+              </div>
+            </div>
           </div>
+        )}
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <Target className="w-10 h-10 text-blue-500" />
-              <span className="text-2xl font-bold text-gray-900">0</span>
+        {/* Recommendations Section */}
+        {recommendations.length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-8 border border-blue-200">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                  Top Recommendations for Growth
+                </h3>
+                <div className="space-y-2">
+                  {recommendations.map((rec, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <span className="text-blue-600 font-semibold">{index + 1}.</span>
+                      <p className="text-sm text-gray-700">{rec}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <p className="text-gray-600 mt-2">Active Goals</p>
           </div>
+        )}
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <TrendingUp className="w-10 h-10 text-green-500" />
-              <span className="text-2xl font-bold text-gray-900">--</span>
-            </div>
-            <p className="text-gray-600 mt-2">Growth Rate</p>
-          </div>
+        {/* Progress Chart and Assessment History */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <ProgressChart assessments={dashboardData.assessments} />
+          <AssessmentHistory assessments={dashboardData.assessments} />
+        </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <CheckCircle className="w-10 h-10 text-purple-500" />
-              <span className="text-2xl font-bold text-gray-900">0</span>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Link
+            href="/assessment"
+            className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <Target className="w-6 h-6 text-blue-600" />
+              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
             </div>
-            <p className="text-gray-600 mt-2">Tasks Complete</p>
-          </div>
+            <h4 className="font-medium text-gray-900">
+              {dashboardData.totalAssessments > 0 ? 'Retake' : 'Start'} Assessment
+            </h4>
+            <p className="text-xs text-gray-500 mt-1">
+              {dashboardData.totalAssessments > 0 ? 'Track your progress' : 'Get your baseline'}
+            </p>
+          </Link>
+
+          <Link
+            href="/strategic-wheel"
+            className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <Users className="w-6 h-6 text-green-600" />
+              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
+            </div>
+            <h4 className="font-medium text-gray-900">Strategic Planning</h4>
+            <p className="text-xs text-gray-500 mt-1">{strategicWheelProgress}% complete</p>
+          </Link>
+
+          <Link
+            href="/business-profile"
+            className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all group"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <Building2 className="w-6 h-6 text-purple-600" />
+              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+            </div>
+            <h4 className="font-medium text-gray-900">Business Profile</h4>
+            <p className="text-xs text-gray-500 mt-1">Complete for AI insights</p>
+          </Link>
+
+          <button className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all group text-left">
+            <div className="flex items-center justify-between mb-2">
+              <Calendar className="w-6 h-6 text-orange-600" />
+              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-orange-600 transition-colors" />
+            </div>
+            <h4 className="font-medium text-gray-900">90-Day Goals</h4>
+            <p className="text-xs text-gray-500 mt-1">Coming soon</p>
+          </button>
         </div>
 
         {/* Methodology Cards */}
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Continue Your Journey</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Diagnostic Assessment Card */}
+          {/* Keep your existing methodology cards here */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
             <div className="flex items-center justify-between mb-4">
               <Target className="w-8 h-8 text-blue-600" />
               <span className="text-sm font-medium text-blue-600">
-                {assessmentScore ? `${assessmentScore}% Complete` : 'Not Started'}
+                {dashboardData.latestAssessment ? `${dashboardData.latestAssessment.percentage}% Score` : 'Not Started'}
               </span>
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -212,12 +333,11 @@ export default function Dashboard() {
               href="/assessment"
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              {assessmentScore ? 'Update' : 'Start'} Assessment
+              {dashboardData.totalAssessments > 0 ? 'Update' : 'Start'} Assessment
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
-          {/* Strategic Wheel Card */}
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
             <div className="flex items-center justify-between mb-4">
               <Users className="w-8 h-8 text-green-600" />
@@ -240,7 +360,6 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          {/* 90-Day Goals Card */}
           <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-200">
             <div className="flex items-center justify-between mb-4">
               <Calendar className="w-8 h-8 text-orange-600" />
@@ -258,29 +377,6 @@ export default function Dashboard() {
               Set Goals
               <ArrowRight className="w-4 h-4" />
             </button>
-          </div>
-
-          {/* Business Profile Card */}
-          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
-            <div className="flex items-center justify-between mb-4">
-              <Building2 className="w-8 h-8 text-purple-600" />
-              <span className="text-sm font-medium text-purple-600">
-                NEW
-              </span>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Business Profile
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Complete your comprehensive business profile to unlock AI-powered insights
-            </p>
-            <Link
-              href="/business-profile"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              Complete Profile
-              <ArrowRight className="w-4 h-4" />
-            </Link>
           </div>
         </div>
 

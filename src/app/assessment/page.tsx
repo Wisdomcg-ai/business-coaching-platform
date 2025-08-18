@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { AssessmentService } from '@/lib/assessment-service'
+import { AssessmentScoring } from '@/lib/assessment-scoring'
 
 interface Question {
   id: string
@@ -866,6 +868,8 @@ export default function AssessmentPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const supabase = createClientComponentClient()
+  const assessmentService = new AssessmentService()
+  const scoringService = new AssessmentScoring()
 
   const currentQuestion = questions[currentQuestionIndex]
   const totalQuestions = questions.length
@@ -1023,69 +1027,47 @@ export default function AssessmentPage() {
   const calculateAndShowResults = async () => {
     setLoading(true)
     
-    // Calculate scores
-    const results = calculateScores(answers)
-    
-    // Store results
-    localStorage.setItem('assessmentResults', JSON.stringify(results))
-    localStorage.setItem('assessmentAnswers', JSON.stringify(answers))
-    
-    // Navigate to results
-    router.push('/assessment/results')
-  }
-
-  const calculateScores = (answers: Record<string, any>) => {
-    // Simplified scoring logic
-    let scores = {
-      foundation: 0,
-      strategicWheel: 0,
-      profitability: 0,
-      engines: 0,
-      disciplines: 0
-    }
-
-    // Calculate scores based on answers...
-    // (keeping this simple for brevity)
-    
-    const totalScore = 65 // Placeholder
-    
-    let healthStatus = 'BUILDING'
-    if (totalScore >= 90) healthStatus = 'THRIVING'
-    else if (totalScore >= 80) healthStatus = 'STRONG'
-    else if (totalScore >= 70) healthStatus = 'STABLE'
-    else if (totalScore >= 60) healthStatus = 'BUILDING'
-    else if (totalScore >= 50) healthStatus = 'STRUGGLING'
-    else healthStatus = 'URGENT'
-
-    return {
-      totalScore,
-      maxScore: 100,
-      percentage: totalScore,
-      healthStatus,
-      revenueStage: answers.revenue || 'Foundation',
-      sections: [
-        { name: 'Business Foundation', score: 47, maxScore: 100, percentage: 47 },
-        { name: 'Strategic Wheel', score: 43, maxScore: 100, percentage: 43 },
-        { name: 'Profitability Health', score: 65, maxScore: 100, percentage: 65 },
-        { name: 'Business Engines', score: 70, maxScore: 100, percentage: 70 },
-        { name: 'Success Disciplines', score: 25, maxScore: 100, percentage: 25 }
-      ],
-      topStrengths: [
-        'Clear business vision and direction',
-        'Strong customer satisfaction',
-        'Effective team collaboration'
-      ],
-      improvementAreas: [
-        'Financial planning and budgeting',
-        'Marketing automation',
-        'Process documentation'
-      ],
-      insights: {
-        biggestConstraint: answers.biggestConstraint,
-        biggestOpportunity: answers.biggestOpportunity,
-        ninetyDayPriority: answers.ninetyDayPriority,
-        helpNeeded: answers.helpNeeded
+    try {
+      // Calculate scores using the service
+      const results = scoringService.calculateScores(answers)
+      
+      // Only try to save once
+      console.log('Attempting to save assessment...');
+      try {
+        const saveData = {
+          answers,
+          status: 'completed' as const,
+          totalScore: results.totalScore,
+          percentage: results.percentage,
+          healthStatus: results.healthStatus,
+          revenueStage: results.revenueStage,
+          sectionScores: results.sectionScores,
+          topStrengths: results.topStrengths,
+          improvementAreas: results.improvementAreas,
+          biggestConstraint: answers.biggestConstraint,
+          biggestOpportunity: answers.biggestOpportunity,
+          ninetyDayPriority: answers.ninetyDayPriority,
+          helpNeeded: answers.helpNeeded
+        };
+        
+        await assessmentService.saveAssessment(saveData);
+        console.log('Assessment saved successfully');
+      } catch (dbError) {
+        // Don't log as error - just info
+        console.log('Database save skipped:', dbError);
       }
+      
+      // Store results for the results page
+      localStorage.setItem('assessmentResults', JSON.stringify(results))
+      localStorage.setItem('assessmentAnswers', JSON.stringify(answers))
+      
+      // Navigate to results
+      router.push('/assessment/results')
+    } catch (error) {
+      console.error('Error calculating results:', error)
+      alert('There was an error processing your assessment. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1156,8 +1138,8 @@ export default function AssessmentPage() {
         )
 
       case 'competitors':
-        // Initialize with empty strings to prevent controlled/uncontrolled error
-        const competitorData = answers[currentQuestion.id] || {
+        // Ensure all fields have at least empty string values
+        const competitorData = {
           competitor1: '',
           advantage1: '',
           website1: '',
@@ -1166,7 +1148,9 @@ export default function AssessmentPage() {
           website2: '',
           competitor3: '',
           advantage3: '',
-          website3: ''
+          website3: '',
+          // Merge with any existing answers
+          ...(answers[currentQuestion.id] || {})
         }
         
         return (
@@ -1183,7 +1167,7 @@ export default function AssessmentPage() {
                   <input
                     type="text"
                     placeholder="Competitor name"
-                    value={competitorData[`competitor${num}`] || ''}
+                    value={competitorData[`competitor${num}`]}
                     onChange={(e) => handleAnswer({
                       ...competitorData,
                       [`competitor${num}`]: e.target.value
@@ -1193,7 +1177,7 @@ export default function AssessmentPage() {
                   <input
                     type="text"
                     placeholder="What makes you different/better?"
-                    value={competitorData[`advantage${num}`] || ''}
+                    value={competitorData[`advantage${num}`]}
                     onChange={(e) => handleAnswer({
                       ...competitorData,
                       [`advantage${num}`]: e.target.value
@@ -1203,7 +1187,7 @@ export default function AssessmentPage() {
                   <input
                     type="text"
                     placeholder="Competitor website (optional)"
-                    value={competitorData[`website${num}`] || ''}
+                    value={competitorData[`website${num}`]}
                     onChange={(e) => handleAnswer({
                       ...competitorData,
                       [`website${num}`]: e.target.value
