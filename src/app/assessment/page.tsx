@@ -1,1408 +1,1033 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { AssessmentService } from '@/lib/assessment-service'
-import { AssessmentScoring } from '@/lib/assessment-scoring'
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Database } from '@/types/database.types';
+import { saveAssessment } from '@/lib/assessment-service';
+import { ChevronRight, ChevronLeft, Check, AlertCircle } from 'lucide-react';
 
 interface Question {
-  id: string
-  text: string
-  type: 'single' | 'multiple' | 'text' | 'number' | 'scale' | 'discipline_group' | 'yes_no_group' | 'competitors'
-  options?: string[]
-  disciplineQuestions?: Array<{
-    id: string
-    text: string
-  }>
-  yesNoQuestions?: Array<{
-    id: string
-    text: string
-  }>
-  section: string
-  subsection?: string
+  id: string;
+  text: string;
+  type: 'radio' | 'checkbox' | 'text' | 'multiselect' | 'yesno-group';
+  options?: { value: string; label: string; points?: number }[];
+  questions?: { id: string; text: string }[]; // For grouped yes/no questions
+  section: string;
+  subsection?: string;
 }
 
-// Define sections for progress tracking
-const sections = [
-  { name: 'Business Foundation', questions: 6 },
-  { name: 'Strategic Wheel', questions: 14 },
-  { name: 'Profitability Health', questions: 6 },
-  { name: 'Business Engines', questions: 23 },
-  { name: 'Success Disciplines', questions: 12 },
-  { name: 'Strategic Priorities', questions: 5 }
-]
-
 const questions: Question[] = [
-  // Section 1: Business Foundation (6 questions)
+  // SECTION 1: BUSINESS FOUNDATION (6 questions)
   {
-    id: 'revenue',
+    id: 'q1',
     text: "What's your current annual revenue?",
-    type: 'single',
+    type: 'radio',
+    section: 'Business Foundation',
     options: [
-      'Under $250K',
-      '$250K - $1M',
-      '$1M - $3M',
-      '$3M - $5M',
-      '$5M - $10M',
-      '$10M+'
-    ],
-    section: 'Business Foundation'
+      { value: 'under_250k', label: 'Under $250K (Foundation Stage)', points: 2 },
+      { value: '250k_1m', label: '$250K - $1M (Traction Stage)', points: 4 },
+      { value: '1m_3m', label: '$1M - $3M (Scaling Stage)', points: 6 },
+      { value: '3m_5m', label: '$3M - $5M (Optimization Stage)', points: 8 },
+      { value: '5m_10m', label: '$5M - $10M (Leadership Stage)', points: 9 },
+      { value: 'over_10m', label: '$10M+ (Mastery Stage)', points: 10 }
+    ]
   },
   {
-    id: 'profitMargin',
+    id: 'q2',
     text: "What's your current profit margin?",
-    type: 'single',
+    type: 'radio',
+    section: 'Business Foundation',
     options: [
-      'Losing money',
-      'Breaking even (0-5%)',
-      'Small profit (5-10%)',
-      'Healthy profit (10-15%)',
-      'Strong profit (15-20%)',
-      'Exceptional profit (20%+)'
-    ],
-    section: 'Business Foundation'
+      { value: 'losing', label: 'Losing money', points: 0 },
+      { value: 'breakeven', label: 'Breaking even (0-5%)', points: 2 },
+      { value: 'small_5_10', label: 'Small profit (5-10%)', points: 4 },
+      { value: 'healthy_10_15', label: 'Healthy profit (10-15%)', points: 6 },
+      { value: 'strong_15_20', label: 'Strong profit (15-20%)', points: 8 },
+      { value: 'exceptional_20_plus', label: 'Exceptional profit (20%+)', points: 10 }
+    ]
   },
   {
-    id: 'ownerSalary',
+    id: 'q3',
     text: 'Are you paying yourself a market-rate salary consistently?',
-    type: 'single',
+    type: 'radio',
+    section: 'Business Foundation',
     options: [
-      'No - rarely take money out',
-      'Sometimes - when cash flow allows',
-      'Yes - regular salary below market',
-      'Yes - full market-rate salary',
-      'Yes - salary plus profit distributions'
-    ],
-    section: 'Business Foundation'
+      { value: 'no_rarely', label: 'No - rarely take money out', points: 0 },
+      { value: 'sometimes', label: 'Sometimes - when cash flow allows', points: 2 },
+      { value: 'yes_below', label: 'Yes - regular salary below market', points: 3 },
+      { value: 'yes_full', label: 'Yes - full market-rate salary', points: 4 },
+      { value: 'yes_plus_profit', label: 'Yes - salary plus profit distributions', points: 5 }
+    ]
   },
   {
-    id: 'teamSize',
+    id: 'q4',
     text: 'How many people work in your business?',
-    type: 'single',
+    type: 'radio',
+    section: 'Business Foundation',
     options: [
-      'Just me',
-      '2-5 people',
-      '6-15 people',
-      '16-50 people',
-      '50+ people'
-    ],
-    section: 'Business Foundation'
+      { value: 'just_me', label: 'Just me', points: 1 },
+      { value: '2_5', label: '2-5 people', points: 2 },
+      { value: '6_15', label: '6-15 people', points: 3 },
+      { value: '16_50', label: '16-50 people', points: 4 },
+      { value: '50_plus', label: '50+ people', points: 5 }
+    ]
   },
   {
-    id: 'businessDependency',
+    id: 'q5',
     text: 'How dependent is the business on you personally?',
-    type: 'single',
+    type: 'radio',
+    section: 'Business Foundation',
     options: [
-      'Completely - stops without me',
-      'Very - needs me for most decisions',
-      'Somewhat - can run for short periods',
-      'Minimal - runs well without me'
-    ],
-    section: 'Business Foundation'
+      { value: 'completely', label: 'Completely - stops without me', points: 0 },
+      { value: 'very', label: 'Very - needs me for most decisions', points: 2 },
+      { value: 'somewhat', label: 'Somewhat - can run for short periods', points: 4 },
+      { value: 'minimal', label: 'Minimal - runs well without me', points: 5 }
+    ]
   },
   {
-    id: 'revenuePredictability',
+    id: 'q6',
     text: 'How predictable is your monthly revenue?',
-    type: 'single',
+    type: 'radio',
+    section: 'Business Foundation',
     options: [
-      'Completely unpredictable - varies wildly',
-      'Somewhat predictable - within 50%',
-      'Very predictable - within 25%',
-      'Extremely predictable - recurring revenue'
-    ],
-    section: 'Business Foundation'
+      { value: 'unpredictable', label: 'Completely unpredictable - varies wildly', points: 0 },
+      { value: 'somewhat_50', label: 'Somewhat predictable - within 50%', points: 3 },
+      { value: 'very_25', label: 'Very predictable - within 25%', points: 7 },
+      { value: 'extremely_recurring', label: 'Extremely predictable - recurring revenue', points: 10 }
+    ]
   },
 
-  // Section 2: Strategic Wheel (14 questions)
+  // SECTION 2: STRATEGIC WHEEL (14 questions)
   {
-    id: 'visionClarity',
+    id: 'q7',
     text: 'How clear and compelling is your business vision?',
-    type: 'single',
-    options: [
-      'Very unclear - no defined direction',
-      'Somewhat clear - general idea',
-      'Clear - team understands it',
-      'Crystal clear - guides all decisions'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Vision & Purpose'
+    subsection: 'Vision & Purpose',
+    options: [
+      { value: 'very_unclear', label: 'Very unclear - no defined direction', points: 0 },
+      { value: 'somewhat_clear', label: 'Somewhat clear - general idea', points: 3 },
+      { value: 'clear', label: 'Clear - team understands it', points: 7 },
+      { value: 'crystal_clear', label: 'Crystal clear - guides all decisions', points: 10 }
+    ]
   },
   {
-    id: 'teamBuyIn',
+    id: 'q8',
     text: 'Does your team understand and believe in your purpose?',
-    type: 'single',
-    options: [
-      'No understanding or buy-in',
-      'Some understanding, limited buy-in',
-      'Good understanding and buy-in',
-      'Complete alignment and passion'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Vision & Purpose'
+    subsection: 'Vision & Purpose',
+    options: [
+      { value: 'no_understanding', label: 'No understanding or buy-in', points: 0 },
+      { value: 'some_understanding', label: 'Some understanding, limited buy-in', points: 3 },
+      { value: 'good_understanding', label: 'Good understanding and buy-in', points: 7 },
+      { value: 'complete_alignment', label: 'Complete alignment and passion', points: 10 }
+    ]
   },
   {
-    id: 'targetMarket',
+    id: 'q9',
     text: 'How well-defined is your target market and positioning?',
-    type: 'single',
-    options: [
-      'Serve anyone who will pay',
-      'General target market defined',
-      'Specific ideal customer profile',
-      'Laser-focused with clear differentiation'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Strategy & Market'
+    subsection: 'Strategy & Market',
+    options: [
+      { value: 'anyone', label: 'Serve anyone who will pay', points: 0 },
+      { value: 'general', label: 'General target market defined', points: 3 },
+      { value: 'specific', label: 'Specific ideal customer profile', points: 7 },
+      { value: 'laser_focused', label: 'Laser-focused with clear differentiation', points: 10 }
+    ]
   },
   {
-    id: 'competitiveAdvantage',
+    id: 'q10',
     text: 'Do you have a sustainable competitive advantage?',
-    type: 'single',
-    options: [
-      'Compete mainly on price',
-      'Some differentiation',
-      'Clear unique value proposition',
-      'Dominant market position'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Strategy & Market'
+    subsection: 'Strategy & Market',
+    options: [
+      { value: 'price_only', label: 'Compete mainly on price', points: 0 },
+      { value: 'some_differentiation', label: 'Some differentiation', points: 3 },
+      { value: 'clear_value', label: 'Clear unique value proposition', points: 7 },
+      { value: 'dominant', label: 'Dominant market position', points: 10 }
+    ]
   },
   {
-    id: 'uniqueSellingProps',
+    id: 'q11',
     text: 'Have you clearly defined and do you actively use your Unique Selling Propositions (USPs)?',
-    type: 'single',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Strategy & Market',
     options: [
-      "Don't know what makes us different",
-      'Have some ideas but not clearly defined',
-      'USPs defined but not consistently used in marketing',
-      'Clear USPs used across all marketing materials',
-      'Powerful USPs that immediately resonate with ideal clients'
-    ],
-    section: 'Strategic Wheel',
-    subsection: 'Strategy & Market'
+      { value: 'dont_know', label: "Don't know what makes us different", points: 0 },
+      { value: 'some_ideas', label: 'Have some ideas but not clearly defined', points: 3 },
+      { value: 'defined_not_used', label: 'USPs defined but not consistently used in marketing', points: 5 },
+      { value: 'clear_used', label: 'Clear USPs used across all marketing materials', points: 8 },
+      { value: 'powerful', label: 'Powerful USPs that immediately resonate with ideal clients', points: 10 }
+    ]
   },
   {
-    id: 'competitors',
-    text: 'Who are your top 3 competitors and what makes you different?',
-    type: 'competitors',
-    section: 'Strategic Wheel',
-    subsection: 'Strategy & Market'
-  },
-  {
-    id: 'teamCulture',
+    id: 'q13',
     text: 'How strong is your team and culture?',
-    type: 'single',
-    options: [
-      'Struggling with people issues',
-      'Adequate team, developing culture',
-      'Good team, positive culture',
-      'A-players with exceptional culture'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'People & Culture'
+    subsection: 'People & Culture',
+    options: [
+      { value: 'struggling', label: 'Struggling with people issues', points: 0 },
+      { value: 'adequate', label: 'Adequate team, developing culture', points: 3 },
+      { value: 'good', label: 'Good team, positive culture', points: 7 },
+      { value: 'excellent', label: 'A-players with exceptional culture', points: 10 }
+    ]
   },
   {
-    id: 'coreValues',
+    id: 'q14',
     text: 'How well-defined and lived are your core values?',
-    type: 'single',
-    options: [
-      'No defined core values',
-      "Values exist but aren't used",
-      'Values guide some decisions',
-      'Values drive all decisions and hiring'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'People & Culture'
+    subsection: 'People & Culture',
+    options: [
+      { value: 'none', label: 'No defined core values', points: 0 },
+      { value: 'exist_unused', label: "Values exist but aren't used", points: 3 },
+      { value: 'guide_some', label: 'Values guide some decisions', points: 7 },
+      { value: 'drive_all', label: 'Values drive all decisions and hiring', points: 10 }
+    ]
   },
   {
-    id: 'businessExecution',
+    id: 'q15',
     text: 'How systematic is your business execution?',
-    type: 'single',
-    options: [
-      'Ad hoc, reactive approach',
-      'Some systems, inconsistent execution',
-      'Good systems, reliable execution',
-      'Exceptional systems and execution'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Systems & Execution'
+    subsection: 'Systems & Execution',
+    options: [
+      { value: 'adhoc', label: 'Ad hoc, reactive approach', points: 0 },
+      { value: 'some_systems', label: 'Some systems, inconsistent execution', points: 3 },
+      { value: 'good_systems', label: 'Good systems, reliable execution', points: 7 },
+      { value: 'exceptional', label: 'Exceptional systems and execution', points: 10 }
+    ]
   },
   {
-    id: 'meetingRhythms',
+    id: 'q16',
     text: 'Do you have effective meeting rhythms?',
-    type: 'single',
-    options: [
-      'Irregular, unproductive meetings',
-      'Some meetings, limited value',
-      'Weekly team meetings with agendas',
-      'Daily huddles, weekly tactical, monthly strategic'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Systems & Execution'
+    subsection: 'Systems & Execution',
+    options: [
+      { value: 'irregular', label: 'Irregular, unproductive meetings', points: 0 },
+      { value: 'some_meetings', label: 'Some meetings, limited value', points: 3 },
+      { value: 'weekly', label: 'Weekly team meetings with agendas', points: 7 },
+      { value: 'comprehensive', label: 'Daily huddles, weekly tactical, monthly strategic', points: 10 }
+    ]
   },
   {
-    id: 'performanceTracking',
+    id: 'q17',
     text: 'How well do you track business performance with a dashboard?',
-    type: 'single',
-    options: [
-      "Don't track metrics systematically",
-      'Track basic metrics monthly',
-      'Weekly dashboard review',
-      'Real-time dashboard reviewed daily'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Money & Metrics'
+    subsection: 'Money & Metrics',
+    options: [
+      { value: 'dont_track', label: "Don't track metrics systematically", points: 0 },
+      { value: 'monthly', label: 'Track basic metrics monthly', points: 3 },
+      { value: 'weekly', label: 'Weekly dashboard review', points: 7 },
+      { value: 'daily', label: 'Real-time dashboard reviewed daily', points: 10 }
+    ]
   },
   {
-    id: 'oneNumber',
+    id: 'q18',
     text: 'Have you identified your "1 Number" that drives everything?',
-    type: 'single',
-    options: [
-      'No idea what this means',
-      'Track many metrics, no focus',
-      'Have identified key metric',
-      '"1 Number" drives all decisions'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Money & Metrics'
+    subsection: 'Money & Metrics',
+    options: [
+      { value: 'no_idea', label: 'No idea what this means', points: 0 },
+      { value: 'many_metrics', label: 'Track many metrics, no focus', points: 3 },
+      { value: 'identified', label: 'Have identified key metric', points: 7 },
+      { value: 'drives_all', label: '"1 Number" drives all decisions', points: 10 }
+    ]
   },
   {
-    id: 'teamAlignment',
+    id: 'q19',
     text: 'How aligned is your team around priorities?',
-    type: 'single',
-    options: [
-      'Little to no alignment',
-      'Some alignment, poor communication',
-      'Good alignment and communication',
-      'Perfect alignment and rhythm'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Communications'
+    subsection: 'Communications & Alignment',
+    options: [
+      { value: 'no_alignment', label: 'Little to no alignment', points: 0 },
+      { value: 'some_alignment', label: 'Some alignment, poor communication', points: 3 },
+      { value: 'good_alignment', label: 'Good alignment and communication', points: 7 },
+      { value: 'perfect', label: 'Perfect alignment and rhythm', points: 10 }
+    ]
   },
   {
-    id: 'teamCommunications',
+    id: 'q20',
     text: 'How organized are your team communications?',
-    type: 'single',
-    options: [
-      'Scattered across email, texts, calls, and apps',
-      'Multiple channels but manageable',
-      'Streamlined to 2-3 main channels',
-      'One primary platform for all team communication'
-    ],
+    type: 'radio',
     section: 'Strategic Wheel',
-    subsection: 'Communications'
+    subsection: 'Communications & Alignment',
+    options: [
+      { value: 'scattered', label: 'Scattered across email, texts, calls, and apps - very inefficient', points: 0 },
+      { value: 'multiple', label: 'Multiple channels but manageable', points: 3 },
+      { value: 'streamlined', label: 'Streamlined to 2-3 main channels', points: 7 },
+      { value: 'unified', label: 'One primary platform for all team communication', points: 10 }
+    ]
   },
 
-  // Section 3: Profitability Health (6 questions)
+  // SECTION 3: PROFITABILITY HEALTH (6 questions)
   {
-    id: 'profitBarriers',
-    text: 'What prevents you from achieving your target profit margin?',
-    type: 'multiple',
-    options: [
-      'Prices are too low for the value delivered',
-      'Costs are not well controlled',
-      "Don't know true profit by product/service",
-      'Too many discounts given',
-      'Inefficient operations increase costs',
-      'High customer acquisition costs',
-      'Poor cash flow management',
-      'Overhead too high for revenue'
-    ],
-    section: 'Profitability Health'
-  },
-  {
-    id: 'lastPriceIncrease',
+    id: 'q22',
     text: 'When did you last increase prices?',
-    type: 'single',
+    type: 'radio',
+    section: 'Profitability Health',
     options: [
-      'Never or over 2 years ago',
-      '1-2 years ago',
-      '6-12 months ago',
-      'Within last 6 months'
-    ],
-    section: 'Profitability Health'
+      { value: 'never_2years', label: 'Never or over 2 years ago', points: 0 },
+      { value: '1_2_years', label: '1-2 years ago', points: 3 },
+      { value: '6_12_months', label: '6-12 months ago', points: 7 },
+      { value: 'within_6', label: 'Within last 6 months', points: 10 }
+    ]
   },
   {
-    id: 'pricingConfidence',
+    id: 'q23',
     text: 'How confident are you in your pricing strategy?',
-    type: 'single',
+    type: 'radio',
+    section: 'Profitability Health',
     options: [
-      'Very unsure - often discount or apologize',
-      'Somewhat confident - occasional doubts',
-      'Confident - rarely questioned',
-      'Very confident - optimal pricing achieved'
-    ],
-    section: 'Profitability Health'
+      { value: 'very_unsure', label: 'Very unsure - often discount or apologize', points: 0 },
+      { value: 'somewhat', label: 'Somewhat confident - occasional doubts', points: 3 },
+      { value: 'confident', label: 'Confident - rarely questioned', points: 7 },
+      { value: 'very_confident', label: 'Very confident - optimal pricing achieved', points: 10 }
+    ]
   },
   {
-    id: 'expenseReview',
+    id: 'q24',
     text: 'How often do you review and audit your business expenses?',
-    type: 'single',
+    type: 'radio',
+    section: 'Profitability Health',
     options: [
-      'Never or only when cash is tight',
-      'Annually',
-      'Quarterly',
-      'Monthly with action taken on findings'
-    ],
-    section: 'Profitability Health'
+      { value: 'never_tight', label: 'Never or only when cash is tight', points: 0 },
+      { value: 'annually', label: 'Annually', points: 3 },
+      { value: 'quarterly', label: 'Quarterly', points: 7 },
+      { value: 'monthly', label: 'Monthly with action taken on findings', points: 10 }
+    ]
   },
   {
-    id: 'subscriptionAudit',
+    id: 'q25',
     text: 'Do you regularly review and cancel unused subscriptions/services?',
-    type: 'single',
+    type: 'radio',
+    section: 'Profitability Health',
     options: [
-      "No - probably paying for things we don't use",
-      'Occasionally when I notice something',
-      'Annual review of all subscriptions',
-      'Quarterly audit with immediate cancellations'
-    ],
-    section: 'Profitability Health'
+      { value: 'no_probably', label: "No - probably paying for things we don't use", points: 0 },
+      { value: 'occasionally', label: 'Occasionally when I notice something', points: 3 },
+      { value: 'annual', label: 'Annual review of all subscriptions', points: 7 },
+      { value: 'quarterly', label: 'Quarterly audit with immediate cancellations', points: 10 }
+    ]
   },
   {
-    id: 'supplierNegotiation',
+    id: 'q26',
     text: 'When did you last negotiate with suppliers for better pricing?',
-    type: 'single',
+    type: 'radio',
+    section: 'Profitability Health',
     options: [
-      'Never or over 2 years ago',
-      'Within the last 2 years',
-      'Within the last year',
-      'Within the last 6 months'
-    ],
-    section: 'Profitability Health'
+      { value: 'never_2years', label: 'Never or over 2 years ago', points: 0 },
+      { value: 'within_2years', label: 'Within the last 2 years', points: 3 },
+      { value: 'within_year', label: 'Within the last year', points: 7 },
+      { value: 'within_6months', label: 'Within the last 6 months', points: 10 }
+    ]
   },
 
-  // Section 4: Business Engines (23 questions total)
-  // Attract Engine
+  // SECTION 4: BUSINESS ENGINES - ATTRACT ENGINE
   {
-    id: 'monthlyLeads',
+    id: 'q27',
     text: 'How many qualified leads do you generate monthly?',
-    type: 'single',
-    options: [
-      'Under 20 leads',
-      '20-50 leads',
-      '50-100 leads',
-      '100+ leads'
-    ],
+    type: 'radio',
     section: 'Business Engines',
-    subsection: 'Attract Engine'
+    subsection: 'Attract Engine',
+    options: [
+      { value: 'under_20', label: 'Under 20 leads', points: 2 },
+      { value: '20_50', label: '20-50 leads', points: 5 },
+      { value: '50_100', label: '50-100 leads', points: 8 },
+      { value: 'over_100', label: '100+ leads', points: 10 }
+    ]
   },
   {
-    id: 'marketingChannels',
+    id: 'q28',
     text: 'How many reliable marketing channels generate leads?',
-    type: 'single',
-    options: [
-      'No consistent channels',
-      '1-2 inconsistent sources',
-      '3-4 regular sources',
-      '5+ systematic channels'
-    ],
+    type: 'radio',
     section: 'Business Engines',
-    subsection: 'Attract Engine'
+    subsection: 'Attract Engine',
+    options: [
+      { value: 'none', label: 'No consistent channels', points: 0 },
+      { value: '1_2', label: '1-2 inconsistent sources', points: 3 },
+      { value: '3_4', label: '3-4 regular sources', points: 7 },
+      { value: '5_plus', label: '5+ systematic channels', points: 10 }
+    ]
   },
   {
-    id: 'marketingProcess',
-    text: 'Do you have a documented marketing process?',
-    type: 'single',
-    options: [
-      'No process at all',
-      "Have a process but don't follow it",
-      'Have a process and follow it sometimes',
-      'Have a documented process and follow it consistently'
-    ],
+    id: 'q30',
+    text: 'How systematic is your lead generation? (Answer Yes or No to each)',
+    type: 'yesno-group',
     section: 'Business Engines',
-    subsection: 'Attract Engine'
-  },
-  {
-    id: 'attract_systems',
-    text: 'How systematic is your lead generation?',
-    type: 'yes_no_group',
-    yesNoQuestions: [
-      { id: 'q1', text: 'We have a referral system generating 30%+ of business' },
-      { id: 'q2', text: 'We email our database/leads regularly to nurture relationships' },
-      { id: 'q3', text: 'We track ROI for each marketing channel' },
-      { id: 'q4', text: 'We know our cost per lead and customer acquisition cost' }
-    ],
-    section: 'Business Engines',
-    subsection: 'Attract Engine'
+    subsection: 'Attract Engine',
+    questions: [
+      { id: 'q30a', text: 'We have a referral system generating 30%+ of business' },
+      { id: 'q30b', text: 'We email our database/leads regularly to nurture relationships' },
+      { id: 'q30c', text: 'We track ROI for each marketing channel' },
+      { id: 'q30d', text: 'We know our cost per lead and customer acquisition cost' }
+    ]
   },
 
-  // Convert Engine
+  // CONVERT ENGINE
   {
-    id: 'conversionRate',
+    id: 'q31',
     text: "What's your lead-to-customer conversion rate?",
-    type: 'single',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Convert Engine',
     options: [
-      "Under 15% or don't track",
-      '15-25%',
-      '25-40%',
-      'Over 40%'
-    ],
-    section: 'Business Engines',
-    subsection: 'Convert Engine'
+      { value: 'under_15', label: "Under 15% or don't track", points: 2 },
+      { value: '15_25', label: '15-25%', points: 5 },
+      { value: '25_40', label: '25-40%', points: 8 },
+      { value: 'over_40', label: 'Over 40%', points: 10 }
+    ]
   },
   {
-    id: 'salesProcess',
-    text: 'Do you have a documented sales process that you follow?',
-    type: 'single',
-    options: [
-      'No process at all',
-      "Have a process but don't follow it",
-      'Have a process and follow it sometimes',
-      'Have a process and follow it consistently'
-    ],
+    id: 'q33',
+    text: 'How effective is your sales capability? (Answer Yes or No to each)',
+    type: 'yesno-group',
     section: 'Business Engines',
-    subsection: 'Convert Engine'
+    subsection: 'Convert Engine',
+    questions: [
+      { id: 'q33a', text: 'We follow up multiple times with interested prospects' },
+      { id: 'q33b', text: "We contact prospects who didn't sign after receiving proposals" },
+      { id: 'q33c', text: 'We have ready answers for common objections' },
+      { id: 'q33d', text: 'We always ask for the business rather than waiting' }
+    ]
   },
   {
-    id: 'sales_capability',
-    text: 'How effective is your sales capability?',
-    type: 'yes_no_group',
-    yesNoQuestions: [
-      { id: 'q1', text: 'We follow up multiple times with interested prospects' },
-      { id: 'q2', text: 'We contact prospects who didn\'t sign after receiving proposals' },
-      { id: 'q3', text: 'We have ready answers for common objections' },
-      { id: 'q4', text: 'We always ask for the business rather than waiting' }
-    ],
+    id: 'q34',
+    text: 'Do you maximize transaction value? (Answer Yes or No to each)',
+    type: 'yesno-group',
     section: 'Business Engines',
-    subsection: 'Convert Engine'
-  },
-  {
-    id: 'transaction_value',
-    text: 'Do you maximize transaction value?',
-    type: 'yes_no_group',
-    yesNoQuestions: [
-      { id: 'q1', text: 'We offer different price points (basic, standard, premium)' },
-      { id: 'q2', text: 'We regularly offer additional products/services to clients' },
-      { id: 'q3', text: 'We can confidently explain our pricing without apologizing' },
-      { id: 'q4', text: 'Our prices are based on value, not just costs' }
-    ],
-    section: 'Business Engines',
-    subsection: 'Convert Engine'
+    subsection: 'Convert Engine',
+    questions: [
+      { id: 'q34a', text: 'We offer different price points (basic, standard, premium)' },
+      { id: 'q34b', text: 'We regularly offer additional products/services to clients' },
+      { id: 'q34c', text: 'We can confidently explain our pricing without apologizing' },
+      { id: 'q34d', text: 'Our prices are based on value, not just costs' }
+    ]
   },
 
-  // Deliver - Customer
+  // DELIVER ENGINE - CUSTOMER EXPERIENCE
   {
-    id: 'customerDelight',
+    id: 'q35',
     text: 'What percentage of customers are delighted with your delivery?',
-    type: 'single',
-    options: [
-      'Under 60%',
-      '60-75%',
-      '75-90%',
-      'Over 90%'
-    ],
+    type: 'radio',
     section: 'Business Engines',
-    subsection: 'Deliver - Customer'
+    subsection: 'Deliver Engine - Customer',
+    options: [
+      { value: 'under_60', label: 'Under 60%', points: 0 },
+      { value: '60_75', label: '60-75%', points: 3 },
+      { value: '75_90', label: '75-90%', points: 7 },
+      { value: 'over_90', label: 'Over 90%', points: 10 }
+    ]
   },
   {
-    id: 'deliveryProcess',
-    text: 'Do you have a documented delivery process that you follow?',
-    type: 'single',
-    options: [
-      'No process at all',
-      "Have a process but don't follow it",
-      'Have a process and follow it sometimes',
-      'Have a documented process and follow it consistently'
-    ],
+    id: 'q39',
+    text: 'How exceptional is your customer journey? (Answer Yes or No to each)',
+    type: 'yesno-group',
     section: 'Business Engines',
-    subsection: 'Deliver - Customer'
-  },
-  {
-    id: 'satisfactionTracking',
-    text: 'How do you measure and track customer satisfaction?',
-    type: 'single',
-    options: [
-      "Don't measure systematically",
-      'Occasional informal feedback',
-      'Regular satisfaction surveys',
-      'Comprehensive feedback system with action plans'
-    ],
-    section: 'Business Engines',
-    subsection: 'Deliver - Customer'
-  },
-  {
-    id: 'customer_journey',
-    text: 'How exceptional is your customer journey?',
-    type: 'yes_no_group',
-    yesNoQuestions: [
-      { id: 'q1', text: 'Our onboarding experience impresses new customers' },
-      { id: 'q2', text: "We've mapped every customer touchpoint" },
-      { id: 'q3', text: 'Customers can easily reach us when needed' },
-      { id: 'q4', text: 'We systematically review and improve the experience' }
-    ],
-    section: 'Business Engines',
-    subsection: 'Deliver - Customer'
+    subsection: 'Deliver Engine - Customer',
+    questions: [
+      { id: 'q39a', text: 'Our onboarding experience impresses new customers' },
+      { id: 'q39b', text: "We've mapped every customer touchpoint" },
+      { id: 'q39c', text: 'Customers can easily reach us when needed' },
+      { id: 'q39d', text: 'We systematically review and improve the experience' }
+    ]
   },
 
-  // Deliver - People
+  // DELIVER ENGINE - PEOPLE & TEAM
   {
-    id: 'talentStrategy',
+    id: 'q40',
     text: 'How strategic is your approach to talent?',
-    type: 'single',
-    options: [
-      'Reactive hiring when desperate',
-      'Basic hiring process',
-      'Good hiring with defined criteria',
-      'Systematic recruitment of A-players'
-    ],
+    type: 'radio',
     section: 'Business Engines',
-    subsection: 'Deliver - People'
+    subsection: 'Deliver Engine - People',
+    options: [
+      { value: 'reactive', label: 'Reactive hiring when desperate', points: 0 },
+      { value: 'basic', label: 'Basic hiring process', points: 3 },
+      { value: 'good', label: 'Good hiring with defined criteria', points: 7 },
+      { value: 'systematic', label: 'Systematic recruitment of A-players', points: 10 }
+    ]
   },
   {
-    id: 'performanceManagement',
-    text: 'Do you have a performance management system?',
-    type: 'single',
-    options: [
-      'No formal performance management',
-      'Occasional informal feedback',
-      'Regular reviews without clear criteria',
-      'Systematic reviews against core values and job KPIs'
-    ],
+    id: 'q42',
+    text: 'How effectively do you develop and leverage your team? (Answer Yes or No to each)',
+    type: 'yesno-group',
     section: 'Business Engines',
-    subsection: 'Deliver - People'
-  },
-  {
-    id: 'team_development',
-    text: 'How effectively do you develop and leverage your team?',
-    type: 'yes_no_group',
-    yesNoQuestions: [
-      { id: 'q1', text: 'Every role has documented responsibilities and KPIs' },
-      { id: 'q2', text: 'We invest in team training and development' },
-      { id: 'q3', text: 'We strategically outsource non-core activities' },
-      { id: 'q4', text: 'Team is accountable for results' }
-    ],
-    section: 'Business Engines',
-    subsection: 'Deliver - People'
+    subsection: 'Deliver Engine - People',
+    questions: [
+      { id: 'q42a', text: 'Every role has documented responsibilities and KPIs' },
+      { id: 'q42b', text: 'We invest in team training and development' },
+      { id: 'q42c', text: 'We strategically outsource non-core activities' },
+      { id: 'q42d', text: 'Team is accountable for results' }
+    ]
   },
 
-  // Deliver - Systems
+  // DELIVER ENGINE - SYSTEMS & PROCESS
   {
-    id: 'processDocumentation',
+    id: 'q43',
     text: 'How comprehensive is your process documentation?',
-    type: 'single',
-    options: [
-      "Most processes exist only in people's heads",
-      'Some processes documented',
-      'Most key processes documented',
-      'All processes documented and optimized'
-    ],
+    type: 'radio',
     section: 'Business Engines',
-    subsection: 'Deliver - Systems'
+    subsection: 'Deliver Engine - Systems',
+    options: [
+      { value: 'in_heads', label: "Most processes exist only in people's heads", points: 0 },
+      { value: 'some_documented', label: 'Some processes documented', points: 3 },
+      { value: 'most_documented', label: 'Most key processes documented', points: 7 },
+      { value: 'all_optimized', label: 'All processes documented and optimized', points: 10 }
+    ]
   },
   {
-    id: 'systemAudits',
-    text: 'How often do you audit if systems are being followed?',
-    type: 'single',
-    options: [
-      'Never audit compliance',
-      'Only when problems arise',
-      'Annual system audits',
-      'Quarterly audits with improvements'
-    ],
+    id: 'q45',
+    text: 'How advanced is your operational infrastructure? (Answer Yes or No to each)',
+    type: 'yesno-group',
     section: 'Business Engines',
-    subsection: 'Deliver - Systems'
-  },
-  {
-    id: 'operational_infrastructure',
-    text: 'How advanced is your operational infrastructure?',
-    type: 'yes_no_group',
-    yesNoQuestions: [
-      { id: 'q1', text: 'We have robust data backup and security systems' },
-      { id: 'q2', text: 'We have documented customer retention/delight processes' },
-      { id: 'q3', text: 'Our technology infrastructure is current and integrated' },
-      { id: 'q4', text: 'We measure process efficiency and cycle times' }
-    ],
-    section: 'Business Engines',
-    subsection: 'Deliver - Systems'
+    subsection: 'Deliver Engine - Systems',
+    questions: [
+      { id: 'q45a', text: 'We have robust data backup and security systems' },
+      { id: 'q45b', text: 'We have documented customer retention/delight processes' },
+      { id: 'q45c', text: 'Our technology infrastructure is current and integrated' },
+      { id: 'q45d', text: 'We measure process efficiency and cycle times' }
+    ]
   },
 
-  // Finance Engine
+  // FINANCE ENGINE
   {
-    id: 'budgetForecast',
+    id: 'q46',
     text: 'Do you have a comprehensive P&L budget/forecast?',
-    type: 'single',
-    options: [
-      'No budget or forecast',
-      'Basic revenue/expense tracking',
-      'Annual budget created',
-      'Detailed budget with monthly variance analysis'
-    ],
+    type: 'radio',
     section: 'Business Engines',
-    subsection: 'Finance Engine'
+    subsection: 'Finance Engine',
+    options: [
+      { value: 'no_budget', label: 'No budget or forecast', points: 0 },
+      { value: 'basic', label: 'Basic revenue/expense tracking', points: 3 },
+      { value: 'annual', label: 'Annual budget created', points: 7 },
+      { value: 'detailed', label: 'Detailed budget with monthly variance analysis', points: 10 }
+    ]
   },
   {
-    id: 'cashFlowForecast',
-    text: 'Do you maintain cash flow forecasts?',
-    type: 'single',
-    options: [
-      'No cash flow forecasting',
-      'Check bank balance when needed',
-      'Monthly cash flow review',
-      '13-week rolling cash flow forecast'
-    ],
+    id: 'q49',
+    text: 'How well do you manage profitability and working capital? (Answer Yes or No to each)',
+    type: 'yesno-group',
     section: 'Business Engines',
-    subsection: 'Finance Engine'
-  },
-  {
-    id: 'pricingUnderstanding',
-    text: 'Which statement best describes your understanding of pricing?',
-    type: 'single',
-    options: [
-      "I'm not sure of the difference between markup and margin",
-      "I understand the difference but don't use it strategically",
-      'I calculate both and understand their impact',
-      'I optimize pricing using both markup and margin analysis'
-    ],
-    section: 'Business Engines',
-    subsection: 'Finance Engine'
-  },
-  {
-    id: 'working_capital',
-    text: 'How well do you manage profitability and working capital?',
-    type: 'yes_no_group',
-    yesNoQuestions: [
-      { id: 'q1', text: 'We maintain sufficient cash reserves (3+ months expenses)' },
-      { id: 'q2', text: 'We actively manage our cash conversion cycle' },
-      { id: 'q3', text: 'We know which products/services are most profitable' },
-      { id: 'q4', text: 'We have increased prices in the last 12 months' }
-    ],
-    section: 'Business Engines',
-    subsection: 'Finance Engine'
+    subsection: 'Finance Engine',
+    questions: [
+      { id: 'q49a', text: 'We maintain sufficient cash reserves (3+ months expenses)' },
+      { id: 'q49b', text: 'We actively manage our cash conversion cycle' },
+      { id: 'q49c', text: 'We know which products/services are most profitable' },
+      { id: 'q49d', text: 'We have increased prices in the last 12 months' }
+    ]
   },
 
-  // Section 5: Success Disciplines (12 questions - one per discipline)
+  // SECTION 5: SUCCESS DISCIPLINES - Each discipline gets 5 yes/no questions on one page
   {
-    id: 'discipline_decision',
+    id: 'q50',
     text: 'Decision-Making Frameworks',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'I have clear criteria for different types of decisions' },
-      { id: 'q2', text: 'I make small decisions quickly without overthinking' },
-      { id: 'q3', text: 'I know which decisions need deep analysis vs quick action' },
-      { id: 'q4', text: 'I rarely procrastinate on important decisions' },
-      { id: 'q5', text: 'I have defined decision-making authority levels' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Decision-Making',
+    questions: [
+      { id: 'q50a', text: 'I have clear criteria for different types of decisions' },
+      { id: 'q50b', text: 'I make small decisions quickly without overthinking' },
+      { id: 'q50c', text: 'I know which decisions need deep analysis vs quick action' },
+      { id: 'q50d', text: 'I rarely procrastinate on important decisions' },
+      { id: 'q50e', text: 'I have defined decision-making authority levels' }
+    ]
   },
   {
-    id: 'discipline_technology',
+    id: 'q51',
     text: 'Technology & AI Integration',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'We use technology effectively for marketing automation' },
-      { id: 'q2', text: 'We track and manage all customer interactions systematically' },
-      { id: 'q3', text: 'We use AI for content creation or customer service' },
-      { id: 'q4', text: 'We use AI for data analysis or insights' },
-      { id: 'q5', text: 'We regularly evaluate new technology opportunities' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Technology & AI',
+    questions: [
+      { id: 'q51a', text: 'We use technology effectively for marketing automation' },
+      { id: 'q51b', text: 'We track and manage all customer interactions systematically' },
+      { id: 'q51c', text: 'We use AI for content creation or customer service' },
+      { id: 'q51d', text: 'We use AI for data analysis or insights' },
+      { id: 'q51e', text: 'We regularly evaluate new technology opportunities' }
+    ]
   },
   {
-    id: 'discipline_growth',
+    id: 'q52',
     text: 'Growth Mindset & Learning',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'I dedicate time weekly to learning new business skills' },
-      { id: 'q2', text: 'I read business books or listen to podcasts regularly' },
-      { id: 'q3', text: 'Our team has learning and development plans' },
-      { id: 'q4', text: 'We document and share lessons from wins and failures' },
-      { id: 'q5', text: 'We have a culture of continuous improvement' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Growth Mindset',
+    questions: [
+      { id: 'q52a', text: 'I dedicate time weekly to learning new business skills' },
+      { id: 'q52b', text: 'I read business books or listen to podcasts regularly' },
+      { id: 'q52c', text: 'Our team has learning and development plans' },
+      { id: 'q52d', text: 'We document and share lessons from wins and failures' },
+      { id: 'q52e', text: 'We have a culture of continuous improvement' }
+    ]
   },
   {
-    id: 'discipline_leadership',
+    id: 'q53',
     text: 'Leadership Development',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'Others naturally follow my vision and direction' },
-      { id: 'q2', text: "I'm developing other leaders in the business" },
-      { id: 'q3', text: 'I delegate effectively and empower my team' },
-      { id: 'q4', text: 'I regularly assess and improve my leadership skills' },
-      { id: 'q5', text: 'I spend time working ON the business, not just IN it' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Leadership',
+    questions: [
+      { id: 'q53a', text: 'Others naturally follow my vision and direction' },
+      { id: 'q53b', text: "I'm developing other leaders in the business" },
+      { id: 'q53c', text: 'I delegate effectively and empower my team' },
+      { id: 'q53d', text: 'I regularly assess and improve my leadership skills' },
+      { id: 'q53e', text: 'I spend time working ON the business, not just IN it' }
+    ]
   },
   {
-    id: 'discipline_personal',
+    id: 'q54',
     text: 'Personal Mastery',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'I have a morning ritual including planning and goals review' },
-      { id: 'q2', text: 'I can maintain deep focus for 2+ hours on important work' },
-      { id: 'q3', text: 'I take at least 30 minutes daily for exercise/physical activity' },
-      { id: 'q4', text: 'I plan each day in advance with specific outcomes' },
-      { id: 'q5', text: 'I consistently maintain high energy throughout the workday' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Personal Mastery',
+    questions: [
+      { id: 'q54a', text: 'I have a morning ritual including planning and goals review' },
+      { id: 'q54b', text: 'I can maintain deep focus for 2+ hours on important work' },
+      { id: 'q54c', text: 'I take at least 30 minutes daily for exercise/physical activity' },
+      { id: 'q54d', text: 'I plan each day in advance with specific outcomes' },
+      { id: 'q54e', text: 'I consistently maintain high energy throughout the workday' }
+    ]
   },
   {
-    id: 'discipline_operational',
+    id: 'q55',
     text: 'Operational Excellence',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'We have standard operating procedures that everyone follows' },
-      { id: 'q2', text: 'Our business could operate effectively without me for 6 weeks' },
-      { id: 'q3', text: 'We regularly review and optimize our systems' },
-      { id: 'q4', text: 'We measure and improve operational efficiency metrics' },
-      { id: 'q5', text: 'We have quality control systems in place' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Operational Excellence',
+    questions: [
+      { id: 'q55a', text: 'We have standard operating procedures that everyone follows' },
+      { id: 'q55b', text: 'Our business could operate effectively without me for 6 weeks' },
+      { id: 'q55c', text: 'We regularly review and optimize our systems' },
+      { id: 'q55d', text: 'We measure and improve operational efficiency metrics' },
+      { id: 'q55e', text: 'We have quality control systems in place' }
+    ]
   },
   {
-    id: 'discipline_resource',
+    id: 'q56',
     text: 'Resource Optimization',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'We maximize utilization of physical assets and space' },
-      { id: 'q2', text: 'Our people are deployed in their highest-value roles' },
-      { id: 'q3', text: "We've eliminated or outsourced non-core activities" },
-      { id: 'q4', text: 'We regularly review and optimize all resource allocation' },
-      { id: 'q5', text: 'We track ROI on all major investments and decisions' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Resource Optimization',
+    questions: [
+      { id: 'q56a', text: 'We maximize utilization of physical assets and space' },
+      { id: 'q56b', text: 'Our people are deployed in their highest-value roles' },
+      { id: 'q56c', text: "We've eliminated or outsourced non-core activities" },
+      { id: 'q56d', text: 'We regularly review and optimize all resource allocation' },
+      { id: 'q56e', text: 'We track ROI on all major investments and decisions' }
+    ]
   },
   {
-    id: 'discipline_financial',
+    id: 'q57',
     text: 'Financial Acumen',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'I review financial metrics weekly' },
-      { id: 'q2', text: 'I understand my profit per customer/job/unit sold' },
-      { id: 'q3', text: 'We track budget vs actual with variance analysis' },
-      { id: 'q4', text: 'I make decisions based on financial impact' },
-      { id: 'q5', text: 'We actively manage cash flow to avoid surprises' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Financial Acumen',
+    questions: [
+      { id: 'q57a', text: 'I review financial metrics weekly' },
+      { id: 'q57b', text: 'I understand my profit per customer/job/unit sold' },
+      { id: 'q57c', text: 'We track budget vs actual with variance analysis' },
+      { id: 'q57d', text: 'I make decisions based on financial impact' },
+      { id: 'q57e', text: 'We actively manage cash flow to avoid surprises' }
+    ]
   },
   {
-    id: 'discipline_accountability',
-    text: 'Accountability & Performance',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'Every team member has clear KPIs and scorecards' },
-      { id: 'q2', text: 'We conduct regular performance reviews' },
-      { id: 'q3', text: 'People consistently do what they say they will do' },
-      { id: 'q4', text: 'I hold myself accountable to my commitments' },
-      { id: 'q5', text: 'We have a culture of ownership and responsibility' }
-    ],
-    section: 'Success Disciplines'
+    id: 'q58',
+    text: 'Accountability & Performance Management',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Accountability',
+    questions: [
+      { id: 'q58a', text: 'Every team member has clear KPIs and scorecards' },
+      { id: 'q58b', text: 'We conduct regular performance reviews' },
+      { id: 'q58c', text: 'People consistently do what they say they will do' },
+      { id: 'q58d', text: 'I hold myself accountable to my commitments' },
+      { id: 'q58e', text: 'We have a culture of ownership and responsibility' }
+    ]
   },
   {
-    id: 'discipline_customer',
+    id: 'q59',
     text: 'Customer Experience',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'Customers are delighted and become advocates' },
-      { id: 'q2', text: 'We systematically gather and act on customer feedback' },
-      { id: 'q3', text: 'We maintain strong relationships beyond the initial transaction' },
-      { id: 'q4', text: 'We exceed expectations at every touchpoint' },
-      { id: 'q5', text: 'We have a customer success process, not just customer service' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Customer Experience',
+    questions: [
+      { id: 'q59a', text: 'Customers are delighted and become advocates (referrals/reviews)' },
+      { id: 'q59b', text: 'We systematically gather and act on customer feedback' },
+      { id: 'q59c', text: 'We maintain strong relationships beyond the initial transaction' },
+      { id: 'q59d', text: 'We exceed expectations at every touchpoint' },
+      { id: 'q59e', text: 'We have a customer success process, not just customer service' }
+    ]
   },
   {
-    id: 'discipline_resilience',
+    id: 'q60',
     text: 'Resilience & Renewal',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'I have scheduled breaks and renewal time' },
-      { id: 'q2', text: 'I work less than 50 hours per week consistently' },
-      { id: 'q3', text: "I've scheduled time off in the next 12 months" },
-      { id: 'q4', text: 'I bounce back quickly from setbacks' },
-      { id: 'q5', text: 'I maintain work-life integration that energizes me' }
-    ],
-    section: 'Success Disciplines'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Resilience & Renewal',
+    questions: [
+      { id: 'q60a', text: 'I have scheduled breaks and renewal time' },
+      { id: 'q60b', text: 'I work less than 50 hours per week consistently' },
+      { id: 'q60c', text: "I've scheduled time off in the next 12 months" },
+      { id: 'q60d', text: 'I bounce back quickly from setbacks' },
+      { id: 'q60e', text: 'I maintain work-life integration that energizes me' }
+    ]
   },
   {
-    id: 'discipline_time',
+    id: 'q61',
     text: 'Time Management & Effectiveness',
-    type: 'discipline_group',
-    disciplineQuestions: [
-      { id: 'q1', text: 'I use a prioritization system (urgent/important matrix)' },
-      { id: 'q2', text: 'I maintain and work from organized to-do lists daily' },
-      { id: 'q3', text: 'I calendar-block my most important activities' },
-      { id: 'q4', text: 'I have a "Stop Doing List" to eliminate low-value activities' },
-      { id: 'q5', text: 'I protect my time by saying no to non-essential requests' }
-    ],
-    section: 'Success Disciplines'
-  },
-
-  // Section 6: Strategic Priorities (5 questions)
-  {
-    id: 'biggestConstraint',
-    text: "What's the single biggest constraint holding your business back?",
-    type: 'text',
-    section: 'Strategic Priorities'
-  },
-  {
-    id: 'biggestOpportunity',
-    text: "What's your biggest opportunity for growth right now?",
-    type: 'text',
-    section: 'Strategic Priorities'
-  },
-  {
-    id: 'ninetyDayPriority',
-    text: 'If you could fix ONE thing in the next 90 days for maximum impact, what would it be?',
-    type: 'text',
-    section: 'Strategic Priorities'
-  },
-  {
-    id: 'helpNeeded',
-    text: 'Where do you need the most help to achieve your goals?',
-    type: 'text',
-    section: 'Strategic Priorities'
-  },
-  {
-    id: 'financialTargets',
-    text: 'What are your 12-month financial targets?',
-    type: 'text',
-    section: 'Strategic Priorities'
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Time Management',
+    questions: [
+      { id: 'q61a', text: 'I use a prioritization system (urgent/important matrix or similar)' },
+      { id: 'q61b', text: 'I maintain and work from organized to-do lists daily' },
+      { id: 'q61c', text: 'I calendar-block my most important activities' },
+      { id: 'q61d', text: 'I have a "Stop Doing List" to eliminate low-value activities' },
+      { id: 'q61e', text: 'I protect my time by saying no to non-essential requests' }
+    ]
   }
-]
+];
 
 export default function AssessmentPage() {
-  const router = useRouter()
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [answers, setAnswers] = useState<Record<string, any>>({})
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const supabase = createClientComponentClient()
-  const assessmentService = new AssessmentService()
-  const scoringService = new AssessmentScoring()
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const supabase = createClientComponentClient<Database>();
 
-  const currentQuestion = questions[currentQuestionIndex]
-  const totalQuestions = questions.length
-  const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100
+  const currentQuestion = questions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  
+  // Get unique sections and current section info
+  const sections = ['Business Foundation', 'Strategic Wheel', 'Profitability Health', 'Business Engines', 'Success Disciplines'];
+  const currentSection = currentQuestion.section;
+  const currentSectionIndex = sections.indexOf(currentSection);
+  const questionsInSection = questions.filter(q => q.section === currentSection).length;
+  const currentQuestionInSection = questions.filter((q, i) => q.section === currentSection && i <= currentQuestionIndex).length;
 
-  // Get current section info
-  const getCurrentSectionInfo = () => {
-    let questionCount = 0
-    let currentSectionIndex = 0
-    let questionsInCurrentSection = 0
-    
-    for (let i = 0; i < sections.length; i++) {
-      if (currentQuestionIndex < questionCount + sections[i].questions) {
-        currentSectionIndex = i
-        questionsInCurrentSection = currentQuestionIndex - questionCount + 1
-        break
-      }
-      questionCount += sections[i].questions
-    }
-    
-    return {
-      sectionNumber: currentSectionIndex + 1,
-      sectionName: sections[currentSectionIndex].name,
-      questionInSection: questionsInCurrentSection,
-      totalInSection: sections[currentSectionIndex].questions,
-      sectionProgress: (questionsInCurrentSection / sections[currentSectionIndex].questions) * 100
-    }
-  }
-
-  const sectionInfo = getCurrentSectionInfo()
-
-  // Load saved answers on mount
+  // Add keyboard navigation
   useEffect(() => {
-    loadSavedAnswers()
-  }, [])
-
-  const loadSavedAnswers = async () => {
-    try {
-      const savedAnswers = localStorage.getItem('assessmentAnswers')
-      if (savedAnswers) {
-        setAnswers(JSON.parse(savedAnswers))
-      }
-    } catch (error) {
-      console.error('Error loading saved answers:', error)
-    }
-  }
-
-  // Auto-save answers
-  const autoSave = async () => {
-    try {
-      localStorage.setItem('assessmentAnswers', JSON.stringify(answers))
-      setSaving(true)
-      setTimeout(() => setSaving(false), 1000)
-    } catch (error) {
-      console.error('Error auto-saving:', error)
-    }
-  }
-
-  // Validate discipline group - ALL 5 questions must be answered
-  const validateDisciplineGroup = (disciplineAnswers: any) => {
-    if (!disciplineAnswers) return false
-    
-    const questions = ['q1', 'q2', 'q3', 'q4', 'q5']
-    for (const q of questions) {
-      if (disciplineAnswers[q] === undefined || disciplineAnswers[q] === null || disciplineAnswers[q] === '') {
-        return false
-      }
-    }
-    return true
-  }
-
-  // Validate yes/no group - ALL questions must be answered
-  const validateYesNoGroup = (yesNoAnswers: any, questionCount: number) => {
-    if (!yesNoAnswers) return false
-    
-    for (let i = 1; i <= questionCount; i++) {
-      const q = `q${i}`
-      if (yesNoAnswers[q] === undefined || yesNoAnswers[q] === null || yesNoAnswers[q] === '') {
-        return false
-      }
-    }
-    return true
-  }
-
-  // Validate competitors - at least 2 required
-  const validateCompetitors = (competitorAnswers: any) => {
-    if (!competitorAnswers) return false
-    
-    let validCount = 0
-    for (let i = 1; i <= 3; i++) {
-      if (competitorAnswers[`competitor${i}`] && 
-          competitorAnswers[`competitor${i}`].trim() !== '' &&
-          competitorAnswers[`advantage${i}`] && 
-          competitorAnswers[`advantage${i}`].trim() !== '') {
-        validCount++
-      }
-    }
-    return validCount >= 2
-  }
-
-  const handleAnswer = (value: any) => {
-    setAnswers(prev => ({
-      ...prev,
-      [currentQuestion.id]: value
-    }))
-  }
-
-  const handleNext = async () => {
-    // Validate current answer
-    if (currentQuestion.type === 'discipline_group') {
-      if (!validateDisciplineGroup(answers[currentQuestion.id])) {
-        alert('Please answer all 5 questions (Yes or No) before proceeding')
-        return
-      }
-    } else if (currentQuestion.type === 'yes_no_group') {
-      const questionCount = currentQuestion.yesNoQuestions?.length || 4
-      if (!validateYesNoGroup(answers[currentQuestion.id], questionCount)) {
-        alert(`Please answer all ${questionCount} questions (Yes or No) before proceeding`)
-        return
-      }
-    } else if (currentQuestion.type === 'competitors') {
-      if (!validateCompetitors(answers[currentQuestion.id])) {
-        alert('Please provide at least 2 competitors with their advantages')
-        return
-      }
-    } else if (!answers[currentQuestion.id] || 
-               (currentQuestion.type === 'multiple' && answers[currentQuestion.id]?.length === 0)) {
-      alert('Please answer the current question before proceeding')
-      return
-    }
-
-    // Auto-save on next
-    await autoSave()
-
-    if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex(prev => prev + 1)
-    } else {
-      // Assessment complete
-      calculateAndShowResults()
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1)
-    }
-  }
-
-  const handleSaveAndExit = async () => {
-    await autoSave()
-    alert('Your progress has been saved. You can continue later.')
-    router.push('/dashboard')
-  }
-
-  const calculateAndShowResults = async () => {
-    setLoading(true)
-    
-    try {
-      // Calculate scores using the service
-      const results = scoringService.calculateScores(answers)
-      
-      // Only try to save once
-      console.log('Attempting to save assessment...');
-      try {
-        const saveData = {
-          answers,
-          status: 'completed' as const,
-          totalScore: results.totalScore,
-          percentage: results.percentage,
-          healthStatus: results.healthStatus,
-          revenueStage: results.revenueStage,
-          sectionScores: results.sectionScores,
-          topStrengths: results.topStrengths,
-          improvementAreas: results.improvementAreas,
-          biggestConstraint: answers.biggestConstraint,
-          biggestOpportunity: answers.biggestOpportunity,
-          ninetyDayPriority: answers.ninetyDayPriority,
-          helpNeeded: answers.helpNeeded
-        };
-        
-        await assessmentService.saveAssessment(saveData);
-        console.log('Assessment saved successfully');
-      } catch (dbError) {
-        // Don't log as error - just info
-        console.log('Database save skipped:', dbError);
-      }
-      
-      // Store results for the results page
-      localStorage.setItem('assessmentResults', JSON.stringify(results))
-      localStorage.setItem('assessmentAnswers', JSON.stringify(answers))
-      
-      // Navigate to results
-      router.push('/assessment/results')
-    } catch (error) {
-      console.error('Error calculating results:', error)
-      alert('There was an error processing your assessment. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const renderQuestion = () => {
-    switch (currentQuestion.type) {
-      case 'single':
-        return (
-          <div className="space-y-3">
-            {currentQuestion.options?.map((option) => (
-              <label
-                key={option}
-                className={`block p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                  answers[currentQuestion.id] === option
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={currentQuestion.id}
-                  value={option}
-                  checked={answers[currentQuestion.id] === option}
-                  onChange={(e) => handleAnswer(e.target.value)}
-                  className="sr-only"
-                />
-                <span className="text-gray-700">{option}</span>
-              </label>
-            ))}
-          </div>
-        )
-
-      case 'multiple':
-        return (
-          <div className="space-y-3">
-            <p className="text-sm text-blue-600 font-medium mb-3 bg-blue-50 p-2 rounded">
-              ✓ Select all that apply (you can choose multiple options)
-            </p>
-            {currentQuestion.options?.map((option) => {
-              const isSelected = answers[currentQuestion.id]?.includes(option)
-              return (
-                <label
-                  key={option}
-                  className={`block p-4 rounded-lg border-2 cursor-pointer transition-all flex items-start ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    value={option}
-                    checked={isSelected}
-                    onChange={(e) => {
-                      const currentAnswers = answers[currentQuestion.id] || []
-                      if (e.target.checked) {
-                        handleAnswer([...currentAnswers, option])
-                      } else {
-                        handleAnswer(currentAnswers.filter((a: string) => a !== option))
-                      }
-                    }}
-                    className="mt-1 mr-3"
-                  />
-                  <span className="text-gray-700">{option}</span>
-                </label>
-              )
-            })}
-          </div>
-        )
-
-      case 'competitors':
-        // Ensure all fields have at least empty string values
-        const competitorData = {
-          competitor1: '',
-          advantage1: '',
-          website1: '',
-          competitor2: '',
-          advantage2: '',
-          website2: '',
-          competitor3: '',
-          advantage3: '',
-          website3: '',
-          // Merge with any existing answers
-          ...(answers[currentQuestion.id] || {})
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        if (currentQuestion.type === 'yesno-group') {
+          // Check if all sub-questions are answered
+          const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
+          if (allAnswered) {
+            if (currentQuestionIndex < questions.length - 1) {
+              goToNext();
+            } else {
+              handleSubmit();
+            }
+          }
+        } else if (answers[currentQuestion.id]) {
+          if (currentQuestionIndex < questions.length - 1) {
+            goToNext();
+          } else {
+            handleSubmit();
+          }
         }
-        
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-blue-600 font-medium bg-blue-50 p-2 rounded">
-              Please provide at least 2 competitors (3rd is optional)
-            </p>
-            {[1, 2, 3].map(num => (
-              <div key={num} className={`p-4 rounded-lg border-2 ${num <= 2 ? 'border-blue-200 bg-blue-50/50' : 'border-gray-200'}`}>
-                <h4 className="font-medium text-gray-700 mb-3">
-                  Competitor {num} {num <= 2 && <span className="text-red-500">*</span>}
-                </h4>
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Competitor name"
-                    value={competitorData[`competitor${num}`]}
-                    onChange={(e) => handleAnswer({
-                      ...competitorData,
-                      [`competitor${num}`]: e.target.value
-                    })}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="What makes you different/better?"
-                    value={competitorData[`advantage${num}`]}
-                    onChange={(e) => handleAnswer({
-                      ...competitorData,
-                      [`advantage${num}`]: e.target.value
-                    })}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Competitor website (optional)"
-                    value={competitorData[`website${num}`]}
-                    onChange={(e) => handleAnswer({
-                      ...competitorData,
-                      [`website${num}`]: e.target.value
-                    })}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )
+      }
+    };
 
-      case 'discipline_group':
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-blue-600 font-medium mb-4 bg-blue-50 p-3 rounded">
-              Answer all 5 questions below (Yes or No required for each)
-            </p>
-            {currentQuestion.disciplineQuestions?.map((dq) => {
-              const currentAnswers = answers[currentQuestion.id] || {}
-              const questionAnswered = currentAnswers[dq.id] !== undefined && currentAnswers[dq.id] !== ''
-              
-              return (
-                <div key={dq.id} className={`p-4 rounded-lg border-2 transition-all ${
-                  questionAnswered ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'
-                }`}>
-                  <p className="text-gray-700 mb-3">{dq.text}</p>
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => handleAnswer({
-                        ...currentAnswers,
-                        [dq.id]: 'yes'
-                      })}
-                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                        currentAnswers[dq.id] === 'yes'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => handleAnswer({
-                        ...currentAnswers,
-                        [dq.id]: 'no'
-                      })}
-                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                        currentAnswers[dq.id] === 'no'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
+    window.addEventListener('keypress', handleKeyPress);
+    return () => window.removeEventListener('keypress', handleKeyPress);
+  }, [currentQuestionIndex, answers, currentQuestion]);
 
-      case 'yes_no_group':
-        return (
-          <div className="space-y-4">
-            <p className="text-sm text-blue-600 font-medium mb-4 bg-blue-50 p-3 rounded">
-              Answer all {currentQuestion.yesNoQuestions?.length} questions below (Yes or No required for each)
-            </p>
-            {currentQuestion.yesNoQuestions?.map((q) => {
-              const currentAnswers = answers[currentQuestion.id] || {}
-              const questionAnswered = currentAnswers[q.id] !== undefined && currentAnswers[q.id] !== ''
-              
-              return (
-                <div key={q.id} className={`p-4 rounded-lg border-2 transition-all ${
-                  questionAnswered ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'
-                }`}>
-                  <p className="text-gray-700 mb-3">{q.text}</p>
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => handleAnswer({
-                        ...currentAnswers,
-                        [q.id]: 'yes'
-                      })}
-                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                        currentAnswers[q.id] === 'yes'
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => handleAnswer({
-                        ...currentAnswers,
-                        [q.id]: 'no'
-                      })}
-                      className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                        currentAnswers[q.id] === 'no'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      No
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
+  function handleAnswer(value: string, points?: number) {
+    setAnswers({
+      ...answers,
+      [currentQuestion.id]: { 
+        value, 
+        points: points || 0,
+        question: currentQuestion.text 
+      }
+    });
+  }
 
-      case 'text':
-        return (
-          <textarea
-            value={answers[currentQuestion.id] || ''}
-            onChange={(e) => handleAnswer(e.target.value)}
-            className="w-full p-4 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none"
-            rows={4}
-            placeholder="Type your answer here..."
-          />
-        )
+  function handleYesNoGroup(questionId: string, value: 'yes' | 'no') {
+    const points = value === 'yes' ? 1.25 : 0; // Each yes/no in a group worth 1.25 points (5 questions = max 6.25)
+    setAnswers({
+      ...answers,
+      [questionId]: { 
+        value, 
+        points,
+        question: currentQuestion.questions?.find(q => q.id === questionId)?.text || ''
+      }
+    });
+  }
 
-      default:
-        return null
+  function goToPrevious() {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
+  }
+
+  function goToNext() {
+    if (currentQuestion.type === 'yesno-group') {
+      // Check if all sub-questions are answered
+      const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
+      if (allAnswered && currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+      }
+    } else if (answers[currentQuestion.id] && currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  }
+
+  function isCurrentQuestionAnswered(): boolean {
+    if (currentQuestion.type === 'yesno-group') {
+      return currentQuestion.questions?.every(q => answers[q.id]) || false;
+    }
+    return !!answers[currentQuestion.id];
+  }
+
+  async function handleSubmit() {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+
+      // Calculate scores
+      const totalScore = Object.values(answers).reduce((sum: number, answer: any) => 
+        sum + (answer.points || 0), 0
+      );
+
+      // Get revenue stage from first question
+      const revenueStage = answers['q1']?.value || 'unknown';
+
+      // Save assessment
+      const assessmentId = await saveAssessment({
+        userId: user.id,
+        answers,
+        totalScore,
+        maxScore: 290,
+        completionPercentage: 100,
+        revenueStage
+      });
+
+      // Redirect to results page
+      router.push(`/assessment/${assessmentId}`);
+    } catch (err) {
+      console.error('Error submitting assessment:', err);
+      setError('Failed to save assessment. Please try again.');
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white py-12">
-      <div className="max-w-3xl mx-auto px-4">
-        
-        {/* Header with Save & Exit */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Business Assessment</h1>
-          <button
-            onClick={handleSaveAndExit}
-            className="text-gray-600 hover:text-gray-800 flex items-center gap-2"
-          >
-            <span>💾</span> Save & Exit
-          </button>
-        </div>
-
-        {/* Progress Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          {/* Section Progress */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-blue-600">
-                Section {sectionInfo.sectionNumber} of 6: {sectionInfo.sectionName}
-              </span>
-              <span className="text-sm text-gray-600">
-                Question {sectionInfo.questionInSection} of {sectionInfo.totalInSection}
-              </span>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Header with exit button */}
+      <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Business Development Assessment</h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Comprehensive evaluation of your business health and opportunities
+              </p>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${sectionInfo.sectionProgress}%` }}
-              />
-            </div>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="text-gray-500 hover:text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-100"
+            >
+              Exit
+            </button>
           </div>
 
-          {/* Overall Progress */}
-          <div>
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Overall: Question {currentQuestionIndex + 1} of {totalQuestions}</span>
-              <span>{Math.round(progress)}% Complete</span>
+          {/* Progress Information */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-600">
+                Section {currentSectionIndex + 1} of {sections.length}: <span className="font-medium">{currentSection}</span>
+              </span>
+              <span className="text-gray-900 font-medium">
+                {currentQuestionIndex + 1} of {questions.length}
+              </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-300"
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
+            <div className="flex items-center justify-center text-xs text-gray-500 mt-1">
+              <span>{Math.round(progress)}% Complete</span>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Auto-save indicator */}
-        {saving && (
-          <div className="mb-4 text-sm text-green-600 flex items-center gap-2">
-            <span>✓</span> Saving your progress...
+      {/* Question Content */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Question Header */}
+          <div className="bg-gradient-to-r from-blue-500 to-purple-500 px-8 py-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white/90 text-sm font-medium">
+                {currentQuestion.subsection || currentSection}
+              </span>
+              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">
+                {currentQuestionIndex + 1}/{questions.length}
+              </span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-white">
+              {currentQuestion.text}
+            </h2>
           </div>
-        )}
 
-        {/* Question Card */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            {currentQuestion.text}
-          </h2>
-          
-          {renderQuestion()}
-        </div>
+          {/* Answer Options */}
+          <div className="p-8">
+            {currentQuestion.type === 'radio' && currentQuestion.options && (
+              <div className="space-y-3">
+                {currentQuestion.options.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleAnswer(option.value, option.points)}
+                    className={`w-full text-left p-5 rounded-xl border-2 transition-all duration-200 group ${
+                      answers[currentQuestion.id]?.value === option.value
+                        ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg transform scale-[1.02]'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center transition-all ${
+                        answers[currentQuestion.id]?.value === option.value
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-400 group-hover:border-gray-500'
+                      }`}>
+                        {answers[currentQuestion.id]?.value === option.value && (
+                          <div className="w-3 h-3 bg-white rounded-full" />
+                        )}
+                      </div>
+                      <span className={`text-lg ${
+                        answers[currentQuestion.id]?.value === option.value
+                          ? 'text-gray-900 font-medium'
+                          : 'text-gray-700'
+                      }`}>
+                        {option.label}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
-        {/* Navigation */}
-        <div className="flex justify-between">
-          <button
-            onClick={handlePrevious}
-            disabled={currentQuestionIndex === 0}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              currentQuestionIndex === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Previous
-          </button>
+            {currentQuestion.type === 'yesno-group' && currentQuestion.questions && (
+              <div className="space-y-4">
+                {currentQuestion.questions.map((q) => (
+                  <div key={q.id} className="flex items-center justify-between py-4 px-5 rounded-xl bg-gray-50/70 hover:bg-gray-100/70 transition-all border border-gray-200/50">
+                    <p className="text-gray-700 text-lg flex-1 pr-6">{q.text}</p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleYesNoGroup(q.id, 'yes')}
+                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                          answers[q.id]?.value === 'yes'
+                            ? 'bg-green-500 text-white shadow-md transform scale-105'
+                            : 'bg-white border-2 border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-600'
+                        }`}
+                      >
+                        YES
+                      </button>
+                      <button
+                        onClick={() => handleYesNoGroup(q.id, 'no')}
+                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                          answers[q.id]?.value === 'no'
+                            ? 'bg-red-500 text-white shadow-md transform scale-105'
+                            : 'bg-white border-2 border-gray-300 text-gray-600 hover:border-red-400 hover:text-red-600'
+                        }`}
+                      >
+                        NO
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
-          <button
-            onClick={handleNext}
-            disabled={loading}
-            className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 transition-colors"
-          >
-            {loading ? 'Processing...' : currentQuestionIndex === totalQuestions - 1 ? 'Complete Assessment' : 'Next'}
-          </button>
+            {/* Error Message */}
+            {error && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+                <AlertCircle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+                <p className="text-red-700">{error}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <div className="px-8 py-6 bg-gray-50 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={goToPrevious}
+                disabled={currentQuestionIndex === 0}
+                className={`flex items-center px-6 py-3 rounded-lg font-medium transition-all ${
+                  currentQuestionIndex === 0
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:shadow'
+                }`}
+              >
+                <ChevronLeft className="w-5 h-5 mr-2" />
+                Previous
+              </button>
+
+              <span className="text-sm text-gray-500">
+                Press <kbd className="px-2 py-1 bg-white rounded border border-gray-300 text-xs">Enter</kbd> to continue
+              </span>
+
+              {currentQuestionIndex === questions.length - 1 ? (
+                <button
+                  onClick={handleSubmit}
+                  disabled={!isCurrentQuestionAnswered() || isSubmitting}
+                  className={`flex items-center px-8 py-3 rounded-lg font-medium transition-all ${
+                    !isCurrentQuestionAnswered() || isSubmitting
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transform hover:-translate-y-0.5'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      Complete Assessment
+                      <Check className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={goToNext}
+                  disabled={!isCurrentQuestionAnswered()}
+                  className={`flex items-center px-6 py-3 rounded-lg font-medium transition-all ${
+                    !isCurrentQuestionAnswered()
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transform hover:-translate-y-0.5'
+                  }`}
+                >
+                  Next
+                  <ChevronRight className="w-5 h-5 ml-2" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

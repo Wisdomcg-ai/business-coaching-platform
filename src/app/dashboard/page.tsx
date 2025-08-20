@@ -2,141 +2,155 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { 
-  Trophy, Target, Users, TrendingUp, Calendar, CheckCircle, 
-  Building2, ArrowRight, AlertCircle, RefreshCw, Activity,
-  BarChart3, Lightbulb, Clock
-} from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import type { Database } from '@/types/database';
+import { Database } from '@/types/database.types';
+import { calculateSectionScores } from '@/lib/assessment-scoring';
 import { 
-  getDashboardData, 
-  getRecommendations,
-  getHealthStatusColor,
-  getRevenueStageColor,
-  type DashboardData 
-} from '@/lib/dashboard-service';
-import ProgressChart from '@/components/dashboard/ProgressChart';
-import AssessmentHistory from '@/components/dashboard/AssessmentHistory';
+  LayoutDashboard, 
+  FileText, 
+  Target, 
+  TrendingUp, 
+  Users, 
+  Settings,
+  ChevronRight,
+  Plus,
+  Calendar,
+  BarChart3,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  ArrowUpRight,
+  Eye
+} from 'lucide-react';
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type Assessment = Database['public']['Tables']['assessments']['Row'];
+
+interface SectionScore {
+  name: string;
+  score: number;
+  maxScore: number;
+  percentage: number;
+}
 
 export default function Dashboard() {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [latestScores, setLatestScores] = useState<SectionScore[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClientComponentClient<Database>();
-  const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState('');
-  const [businessName, setBusinessName] = useState('');
-  const [dashboardData, setDashboardData] = useState<DashboardData>({
-    assessments: [],
-    latestAssessment: null,
-    totalAssessments: 0,
-    averageScore: 0,
-    scoreImprovement: 0,
-    healthTrend: 'stable'
-  });
-  const [recommendations, setRecommendations] = useState<string[]>([]);
-  const [strategicWheelProgress, setStrategicWheelProgress] = useState(0);
 
   useEffect(() => {
-    loadAllData();
+    checkUser();
   }, []);
 
-  const loadAllData = async () => {
-    setLoading(true);
+  async function checkUser() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!session) {
+      if (!user) {
         router.push('/auth/login');
         return;
       }
 
-      // Load user profile
-      const { data: profile } = await supabase
+      // Get profile
+      const { data: profileData } = await supabase
         .from('profiles')
-        .select('full_name')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profile?.full_name) {
-        setUserName(profile.full_name);
-      }
-
-      // Load business info
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('name')
-        .eq('owner_id', session.user.id)
-        .single();
-
-      if (business?.name) {
-        setBusinessName(business.name);
-      }
-
-      // Load dashboard data
-      const data = await getDashboardData(session.user.id);
-      setDashboardData(data);
-      
-      // Get recommendations based on latest assessment
-      const recs = getRecommendations(data.latestAssessment);
-      setRecommendations(recs);
-
-      // Load strategic wheel progress
-      const { data: strategicWheel } = await supabase
-        .from('strategic_wheels')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('id', user.id)
         .single();
 
-      if (strategicWheel) {
-        const sections = [
-          strategicWheel.vision_purpose,
-          strategicWheel.strategy_market,
-          strategicWheel.people_culture,
-          strategicWheel.systems_execution,
-          strategicWheel.money_metrics,
-          strategicWheel.communications_alignment
-        ];
-        
-        const completedSections = sections.filter(section => 
-          section && Object.keys(section).length > 0
-        ).length;
-        
-        setStrategicWheelProgress(Math.round((completedSections / 6) * 100));
+      if (profileData) {
+        setProfile(profileData);
       }
+
+      // Get assessments
+      const { data: assessmentData } = await supabase
+        .from('assessments')
+        .select('*')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false });
+
+      if (assessmentData) {
+        setAssessments(assessmentData);
+        
+        // Calculate scores for the latest assessment
+        if (assessmentData.length > 0 && assessmentData[0].answers) {
+          const scores = calculateSectionScores(assessmentData[0].answers);
+          setLatestScores(scores);
+        }
+      }
+
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleLogout = async () => {
+  async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/');
-  };
+  }
 
-  const getTrendIcon = () => {
-    if (dashboardData.healthTrend === 'improving') {
-      return <TrendingUp className="w-5 h-5 text-green-600" />;
-    } else if (dashboardData.healthTrend === 'declining') {
-      return <TrendingUp className="w-5 h-5 text-red-600 rotate-180" />;
+  function getHealthStatus(scores: SectionScore[]) {
+    if (scores.length === 0) return { status: 'No Data', color: 'gray' };
+    
+    const avgPercentage = scores.reduce((sum, score) => sum + score.percentage, 0) / scores.length;
+    
+    if (avgPercentage >= 80) return { status: 'Thriving', color: 'emerald' };
+    if (avgPercentage >= 60) return { status: 'Stable', color: 'green' };
+    if (avgPercentage >= 40) return { status: 'Building', color: 'yellow' };
+    return { status: 'Needs Attention', color: 'red' };
+  }
+
+  function getActionableInsights() {
+    const insights = [];
+    
+    if (latestScores.length > 0) {
+      const lowestScore = [...latestScores].sort((a, b) => a.percentage - b.percentage)[0];
+      if (lowestScore && lowestScore.percentage < 60) {
+        insights.push({
+          type: 'warning',
+          title: `${lowestScore.name} needs attention`,
+          description: `Currently at ${lowestScore.percentage}%. Focus here for quick wins.`,
+          action: 'Create Action Plan'
+        });
+      }
+      
+      const highestScore = [...latestScores].sort((a, b) => b.percentage - a.percentage)[0];
+      if (highestScore && highestScore.percentage >= 80) {
+        insights.push({
+          type: 'success',
+          title: `${highestScore.name} is a strength`,
+          description: `Performing at ${highestScore.percentage}%. Leverage this advantage.`,
+          action: 'View Details'
+        });
+      }
     }
-    return <Activity className="w-5 h-5 text-gray-600" />;
-  };
+    
+    if (assessments.length === 0) {
+      insights.push({
+        type: 'info',
+        title: 'Complete your first assessment',
+        description: 'Get a comprehensive view of your business health.',
+        action: 'Start Assessment'
+      });
+    }
+    
+    return insights;
+  }
 
-  const getTrendText = () => {
-    if (dashboardData.healthTrend === 'improving') return 'Improving';
-    if (dashboardData.healthTrend === 'declining') return 'Declining';
-    return 'Stable';
-  };
+  const healthStatus = getHealthStatus(latestScores);
+  const insights = getActionableInsights();
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-gray-600 animate-spin mx-auto mb-2" />
-          <p className="text-gray-600">Loading your dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -145,252 +159,221 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-8">
-              <h1 className="text-xl font-bold text-gray-900">Business Coaching Platform</h1>
-              <nav className="hidden md:flex space-x-8">
-                <Link href="/dashboard" className="text-gray-900 hover:text-gray-600">Dashboard</Link>
-                <Link href="/assessment" className="text-gray-600 hover:text-gray-900">Assessment</Link>
-                <Link href="/strategic-wheel" className="text-gray-600 hover:text-gray-900">Strategic Wheel</Link>
-                <Link href="/business-profile" className="text-gray-600 hover:text-gray-900">Business Profile</Link>
-              </nav>
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Business Coaching Platform
+              </h1>
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Logout
-            </button>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">
+                Welcome, {profile?.full_name || profile?.email || 'User'}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back{userName ? `, ${userName}` : ''}!
-          </h1>
-          <p className="text-gray-600 mt-2">
-            {businessName ? `${businessName} Dashboard` : 'Your Business Dashboard'}
-          </p>
-        </div>
-
-        {/* Current Status Summary */}
-        {dashboardData.latestAssessment && (
-          <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Current Business Status</h2>
-              <div className="flex items-center gap-2">
-                {getTrendIcon()}
-                <span className="text-sm font-medium text-gray-600">{getTrendText()}</span>
-              </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Health Status Card */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Business Health Status</h2>
+              <p className="text-gray-600 mt-1">Based on your latest assessment</p>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <Trophy className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-gray-900">
-                  {dashboardData.latestAssessment.percentage}%
-                </p>
-                <p className="text-sm text-gray-600 mt-1">Health Score</p>
-                {dashboardData.scoreImprovement !== 0 && (
-                  <p className={`text-xs mt-1 ${dashboardData.scoreImprovement > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {dashboardData.scoreImprovement > 0 ? '+' : ''}{dashboardData.scoreImprovement}% overall
-                  </p>
-                )}
-              </div>
-              
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <BarChart3 className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                <p className={`text-sm font-medium px-2 py-1 rounded-full inline-block ${getHealthStatusColor(dashboardData.latestAssessment.health_status)}`}>
-                  {dashboardData.latestAssessment.health_status}
-                </p>
-                <p className="text-sm text-gray-600 mt-2">Health Status</p>
-              </div>
-              
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <Building2 className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                <p className={`text-sm font-medium px-2 py-1 rounded-full inline-block ${getRevenueStageColor(dashboardData.latestAssessment.revenue_stage)}`}>
-                  {dashboardData.latestAssessment.revenue_stage}
-                </p>
-                <p className="text-sm text-gray-600 mt-2">Revenue Stage</p>
-              </div>
-              
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <Clock className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                <p className="text-lg font-bold text-gray-900">
-                  {dashboardData.totalAssessments}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">Assessments</p>
-                <p className="text-xs text-gray-500 mt-1">Avg: {dashboardData.averageScore}%</p>
-              </div>
+            <div className={`px-6 py-3 rounded-full bg-${healthStatus.color}-100 text-${healthStatus.color}-700 font-semibold text-lg`}>
+              {healthStatus.status}
             </div>
           </div>
-        )}
 
-        {/* Recommendations Section */}
-        {recommendations.length > 0 && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-8 border border-blue-200">
-            <div className="flex items-start gap-3">
-              <Lightbulb className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  Top Recommendations for Growth
-                </h3>
-                <div className="space-y-2">
-                  {recommendations.map((rec, index) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <span className="text-blue-600 font-semibold">{index + 1}.</span>
-                      <p className="text-sm text-gray-700">{rec}</p>
-                    </div>
-                  ))}
+          {/* Score Overview */}
+          {latestScores.length > 0 && (
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+              {latestScores.map((score, index) => (
+                <div key={index} className="text-center">
+                  <div className="text-2xl font-bold text-gray-900">{score.percentage}%</div>
+                  <div className="text-xs text-gray-600 mt-1">{score.name}</div>
+                  <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full bg-${score.percentage >= 60 ? 'green' : 'yellow'}-500 transition-all duration-500`}
+                      style={{ width: `${score.percentage}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          </div>
-        )}
-
-        {/* Progress Chart and Assessment History */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <ProgressChart assessments={dashboardData.assessments} />
-          <AssessmentHistory assessments={dashboardData.assessments} />
+          )}
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Link
-            href="/assessment"
-            className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all group"
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <button
+            onClick={() => router.push('/assessment')}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200"
           >
-            <div className="flex items-center justify-between mb-2">
-              <Target className="w-6 h-6 text-blue-600" />
-              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
-            </div>
-            <h4 className="font-medium text-gray-900">
-              {dashboardData.totalAssessments > 0 ? 'Retake' : 'Start'} Assessment
-            </h4>
-            <p className="text-xs text-gray-500 mt-1">
-              {dashboardData.totalAssessments > 0 ? 'Track your progress' : 'Get your baseline'}
-            </p>
-          </Link>
+            <Plus className="w-8 h-8 mb-3" />
+            <h3 className="font-semibold mb-1">New Assessment</h3>
+            <p className="text-sm opacity-90">Start comprehensive evaluation</p>
+          </button>
 
-          <Link
-            href="/strategic-wheel"
-            className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all group"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <Users className="w-6 h-6 text-green-600" />
-              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
-            </div>
-            <h4 className="font-medium text-gray-900">Strategic Planning</h4>
-            <p className="text-xs text-gray-500 mt-1">{strategicWheelProgress}% complete</p>
-          </Link>
+          <button className="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200">
+            <Target className="w-8 h-8 mb-3" />
+            <h3 className="font-semibold mb-1">Set Goals</h3>
+            <p className="text-sm opacity-90">Define 90-day objectives</p>
+          </button>
 
-          <Link
-            href="/business-profile"
-            className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all group"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <Building2 className="w-6 h-6 text-purple-600" />
-              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
-            </div>
-            <h4 className="font-medium text-gray-900">Business Profile</h4>
-            <p className="text-xs text-gray-500 mt-1">Complete for AI insights</p>
-          </Link>
+          <button className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200">
+            <Users className="w-8 h-8 mb-3" />
+            <h3 className="font-semibold mb-1">Team Review</h3>
+            <p className="text-sm opacity-90">Evaluate team performance</p>
+          </button>
 
-          <button className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all group text-left">
-            <div className="flex items-center justify-between mb-2">
-              <Calendar className="w-6 h-6 text-orange-600" />
-              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-orange-600 transition-colors" />
-            </div>
-            <h4 className="font-medium text-gray-900">90-Day Goals</h4>
-            <p className="text-xs text-gray-500 mt-1">Coming soon</p>
+          <button className="bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-xl p-6 shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200">
+            <BarChart3 className="w-8 h-8 mb-3" />
+            <h3 className="font-semibold mb-1">View Analytics</h3>
+            <p className="text-sm opacity-90">Deep dive into metrics</p>
           </button>
         </div>
 
-        {/* Methodology Cards */}
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Continue Your Journey</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Keep your existing methodology cards here */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-            <div className="flex items-center justify-between mb-4">
-              <Target className="w-8 h-8 text-blue-600" />
-              <span className="text-sm font-medium text-blue-600">
-                {dashboardData.latestAssessment ? `${dashboardData.latestAssessment.percentage}% Score` : 'Not Started'}
-              </span>
+        {/* Insights & Recommendations */}
+        {insights.length > 0 && (
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Actionable Insights</h2>
+            <div className="space-y-4">
+              {insights.map((insight, index) => (
+                <div key={index} className={`flex items-start p-4 rounded-lg border ${
+                  insight.type === 'warning' ? 'bg-yellow-50 border-yellow-200' :
+                  insight.type === 'success' ? 'bg-green-50 border-green-200' :
+                  'bg-blue-50 border-blue-200'
+                }`}>
+                  <div className="flex-shrink-0 mr-3">
+                    {insight.type === 'warning' && <AlertCircle className="w-5 h-5 text-yellow-600" />}
+                    {insight.type === 'success' && <CheckCircle className="w-5 h-5 text-green-600" />}
+                    {insight.type === 'info' && <AlertCircle className="w-5 h-5 text-blue-600" />}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">{insight.title}</h3>
+                    <p className="text-sm text-gray-600 mt-1">{insight.description}</p>
+                  </div>
+                  <button className="ml-4 text-sm font-medium text-blue-600 hover:text-blue-700">
+                    {insight.action} →
+                  </button>
+                </div>
+              ))}
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Diagnostic Assessment
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Comprehensive business health check across all key areas
-            </p>
-            <Link
-              href="/assessment"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          </div>
+        )}
+
+        {/* Assessment History */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Assessment History</h2>
+            <button
+              onClick={() => router.push('/assessment')}
+              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
             >
-              {dashboardData.totalAssessments > 0 ? 'Update' : 'Start'} Assessment
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+              View All →
+            </button>
           </div>
 
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-            <div className="flex items-center justify-between mb-4">
-              <Users className="w-8 h-8 text-green-600" />
-              <span className="text-sm font-medium text-green-600">
-                {strategicWheelProgress}% Complete
-              </span>
+          {assessments.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">No assessments yet</p>
+              <button
+                onClick={() => router.push('/assessment')}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Start Your First Assessment
+              </button>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Strategic Wheel
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Build your 6-component strategic foundation for success
-            </p>
-            <Link
-              href="/strategic-wheel"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Continue Planning
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+          ) : (
+            <div className="space-y-3">
+              {assessments.slice(0, 5).map((assessment) => (
+                <div key={assessment.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-2 h-12 rounded-full bg-${assessment.completion_percentage === 100 ? 'green' : 'yellow'}-500`} />
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        Assessment #{assessments.length - assessments.indexOf(assessment)}
+                      </p>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <span className="text-sm text-gray-500 flex items-center">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          {new Date(assessment.created_at).toLocaleDateString()}
+                        </span>
+                        <span className="text-sm text-gray-500 flex items-center">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {assessment.completion_percentage}% complete
+                        </span>
+                        {assessment.health_score && (
+                          <span className="text-sm font-medium text-gray-700 flex items-center">
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            Score: {assessment.health_score}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/assessment/${assessment.id}`)}
+                    className="flex items-center px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    View Results
+                    <ArrowUpRight className="w-3 h-3 ml-1" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Coaching Methodology Progress */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Strategic Wheel</h3>
+              <span className="text-xs text-gray-500">0% Complete</span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">Build your 6-component strategic foundation</p>
+            <button className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+              Coming Soon
+            </button>
           </div>
 
-          <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-200">
+          <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <Calendar className="w-8 h-8 text-orange-600" />
-              <span className="text-sm font-medium text-orange-600">
-                Q{Math.ceil((new Date().getMonth() + 1) / 3)} {new Date().getFullYear()}
-              </span>
+              <h3 className="font-semibold text-gray-900">Success Disciplines</h3>
+              <span className="text-xs text-gray-500">Not Started</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              90-Day Goals
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Set and track your quarterly priorities and key results
-            </p>
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
-              Set Goals
-              <ArrowRight className="w-4 h-4" />
+            <p className="text-sm text-gray-600 mb-4">Select your top 3 focus areas from 12 disciplines</p>
+            <button className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+              Coming Soon
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">90-Day Plan</h3>
+              <span className="text-xs text-gray-500">Locked</span>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">Create your Achievement Engine action plan</p>
+            <button className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+              Complete Assessment First
             </button>
           </div>
         </div>
-
-        {/* Coming Soon Section */}
-        <div className="mt-12 bg-gray-100 rounded-xl p-8 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            More Features Coming Soon
-          </h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            We're building additional modules including Success Disciplines, Achievement Engine, 
-            Daily Excellence Tracker, and more to help you build a thriving business.
-          </p>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
