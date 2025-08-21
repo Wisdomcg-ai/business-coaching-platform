@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
-import type { Database } from '@/types/supabase'
+import type { Database } from '@/types/database.types'
 import { 
   LayoutDashboard, 
   FileText, 
@@ -168,7 +168,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Quick Actions Grid */}
+        {/* Quick Actions Grid - First Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Diagnostic Assessment */}
           <div className="bg-white rounded-xl shadow-lg p-6">
@@ -297,6 +297,33 @@ export default function Dashboard() {
             </Link>
           </div>
 
+          {/* SWOT Analysis Card - NEW! */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-indigo-100 rounded-lg">
+                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+              </div>
+              <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full font-medium">
+                Quarterly
+              </span>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">SWOT Analysis</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Strategic analysis for quarterly planning
+            </p>
+            <Link
+              href="/swot"
+              className="block w-full text-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              View SWOT Analysis
+            </Link>
+          </div>
+        </div>
+
+        {/* Second Row - Coming Soon Items */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Goals & Strategy */}
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="flex items-start justify-between mb-4">
@@ -310,6 +337,72 @@ export default function Dashboard() {
             <h3 className="text-lg font-semibold text-gray-800 mb-2">Goals & Strategy</h3>
             <p className="text-sm text-gray-600 mb-4">
               Set and track your 90-day goals
+            </p>
+            <button
+              disabled
+              className="block w-full text-center px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
+            >
+              Coming Soon
+            </button>
+          </div>
+
+          {/* Strategic Wheel */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-cyan-100 rounded-lg">
+                <Brain className="w-6 h-6 text-cyan-600" />
+              </div>
+              <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded-full font-medium">
+                Coming Soon
+              </span>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Strategic Wheel</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              6-component strategic planning
+            </p>
+            <button
+              disabled
+              className="block w-full text-center px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
+            >
+              Coming Soon
+            </button>
+          </div>
+
+          {/* Success Disciplines */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-pink-100 rounded-lg">
+                <Target className="w-6 h-6 text-pink-600" />
+              </div>
+              <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded-full font-medium">
+                Coming Soon
+              </span>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Success Disciplines</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              12 areas of excellence focus
+            </p>
+            <button
+              disabled
+              className="block w-full text-center px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed"
+            >
+              Coming Soon
+            </button>
+          </div>
+
+          {/* Resources */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-teal-100 rounded-lg">
+                <FileText className="w-6 h-6 text-teal-600" />
+              </div>
+              <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded-full font-medium">
+                Coming Soon
+              </span>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">Resources</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Tools, templates & guides
             </p>
             <button
               disabled
@@ -403,57 +496,6 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-
-        {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Link
-            href="/strategic-wheel"
-            className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-indigo-100 rounded-lg">
-                <Brain className="w-6 h-6 text-indigo-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800">Strategic Wheel</h3>
-                <p className="text-sm text-gray-600">6-component planning</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
-            </div>
-          </Link>
-
-          <Link
-            href="/success-disciplines"
-            className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-pink-100 rounded-lg">
-                <Target className="w-6 h-6 text-pink-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800">Success Disciplines</h3>
-                <p className="text-sm text-gray-600">12 areas of excellence</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
-            </div>
-          </Link>
-
-          <Link
-            href="/resources"
-            className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
-          >
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-teal-100 rounded-lg">
-                <FileText className="w-6 h-6 text-teal-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800">Resources</h3>
-                <p className="text-sm text-gray-600">Tools & templates</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
-            </div>
-          </Link>
-        </div>
       </main>
     </div>
   )

@@ -43,44 +43,39 @@ export default function CoachDashboard() {
         return;
       }
 
-      // First, load all businesses
-      const { data: businesses, error: businessError } = await supabase
+      // Load all businesses with their latest assessment
+      const { data: businesses, error } = await supabase
         .from('businesses')
-        .select('*')
+        .select(`
+          id,
+          business_name,
+          industry,
+          revenue_stage,
+          created_at,
+          assessments (
+            id,
+            health_score,
+            health_status,
+            completed_at
+          )
+        `)
         .order('created_at', { ascending: false });
 
-      if (businessError) {
-        console.error('Error loading businesses:', businessError);
+      if (error) {
+        console.error('Error loading clients:', error);
         return;
       }
 
-      console.log('Loaded businesses:', businesses?.length || 0);
-
-      // Then, load all assessments separately
-      const { data: assessments, error: assessmentError } = await supabase
-        .from('assessments')
-        .select('*')
-        .order('completed_at', { ascending: false });
-
-      if (assessmentError) {
-        console.error('Error loading assessments:', assessmentError);
-      }
-
-      console.log('Loaded assessments:', assessments?.length || 0);
-
-      // Process the data to combine businesses with their latest assessment
+      // Process the data to include latest assessment
       const processedClients = (businesses || []).map(business => {
-        // Find assessments for this business
-        const businessAssessments = (assessments || []).filter(
-          a => a.business_id === business.id
-        );
-        
-        // Get the latest assessment (already sorted by date)
-        const latestAssessment = businessAssessments[0];
+        const assessments = business.assessments || [];
+        const latestAssessment = assessments.sort((a: any, b: any) => 
+          new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+        )[0];
 
         let clientData: ClientData = {
           id: business.id,
-          business_name: business.name || business.business_name || 'Unnamed Business',
+          business_name: business.business_name,
           industry: business.industry,
           revenue_stage: business.revenue_stage,
           created_at: business.created_at
@@ -103,10 +98,9 @@ export default function CoachDashboard() {
         return clientData;
       });
 
-      console.log('Processed clients:', processedClients.length);
       setClients(processedClients);
     } catch (error) {
-      console.error('Unexpected error:', error);
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -116,8 +110,7 @@ export default function CoachDashboard() {
   const getStatusIndicator = (status?: string) => {
     if (!status) return { color: 'bg-gray-200', emoji: '❓', textColor: 'text-gray-600' };
     
-    const upperStatus = status.toUpperCase();
-    switch (upperStatus) {
+    switch (status.toUpperCase()) {
       case 'THRIVING':
         return { color: 'bg-green-500', emoji: '🟢', textColor: 'text-green-600' };
       case 'STRONG':
@@ -159,23 +152,21 @@ export default function CoachDashboard() {
   // Calculate analytics
   const analytics = {
     totalClients: clients.length,
-    averageScore: clients.length > 0 
-      ? clients.reduce((acc, c) => acc + (c.latest_assessment?.health_score || 0), 0) / clients.length 
-      : 0,
-    needingAttention: clients.filter(c => {
-      const status = c.latest_assessment?.health_status?.toUpperCase();
-      return status === 'URGENT' || status === 'STRUGGLING';
-    }).length,
+    averageScore: clients.reduce((acc, c) => acc + (c.latest_assessment?.health_score || 0), 0) / clients.length || 0,
+    needingAttention: clients.filter(c => 
+      c.latest_assessment?.health_status === 'URGENT' || 
+      c.latest_assessment?.health_status === 'STRUGGLING'
+    ).length,
     overdue: clients.filter(c => 
       !c.latest_assessment || c.latest_assessment.days_since > 90
     ).length,
     statusCounts: {
-      thriving: clients.filter(c => c.latest_assessment?.health_status?.toUpperCase() === 'THRIVING').length,
-      strong: clients.filter(c => c.latest_assessment?.health_status?.toUpperCase() === 'STRONG').length,
-      stable: clients.filter(c => c.latest_assessment?.health_status?.toUpperCase() === 'STABLE').length,
-      building: clients.filter(c => c.latest_assessment?.health_status?.toUpperCase() === 'BUILDING').length,
-      struggling: clients.filter(c => c.latest_assessment?.health_status?.toUpperCase() === 'STRUGGLING').length,
-      urgent: clients.filter(c => c.latest_assessment?.health_status?.toUpperCase() === 'URGENT').length,
+      thriving: clients.filter(c => c.latest_assessment?.health_status === 'THRIVING').length,
+      strong: clients.filter(c => c.latest_assessment?.health_status === 'STRONG').length,
+      stable: clients.filter(c => c.latest_assessment?.health_status === 'STABLE').length,
+      building: clients.filter(c => c.latest_assessment?.health_status === 'BUILDING').length,
+      struggling: clients.filter(c => c.latest_assessment?.health_status === 'STRUGGLING').length,
+      urgent: clients.filter(c => c.latest_assessment?.health_status === 'URGENT').length,
       unassessed: clients.filter(c => !c.latest_assessment).length
     }
   };
@@ -298,123 +289,110 @@ export default function CoachDashboard() {
         </div>
 
         {/* Client Grid */}
-        {clients.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-            <p className="text-gray-500 text-lg mb-4">No clients found</p>
-            <p className="text-gray-400 mb-6">Get started by creating test data or adding your first client</p>
-            <button
-              onClick={() => router.push('/test-data')}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
-            >
-              Create Test Clients
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredClients.map((client) => {
-              const indicator = getStatusIndicator(client.latest_assessment?.health_status);
-              const needsAttention = !client.latest_assessment || client.latest_assessment.days_since > 90;
-              
-              return (
-                <div
-                  key={client.id}
-                  className={`bg-white rounded-xl shadow-lg p-6 border-2 transition-all hover:shadow-xl cursor-pointer ${
-                    needsAttention ? 'border-red-200' : 'border-gray-100'
-                  }`}
-                  onClick={() => router.push(`/assessment/results?businessId=${client.id}`)}
-                >
-                  {/* Status Badge */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">
-                        {client.business_name}
-                      </h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {client.industry || 'Industry not specified'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{indicator.emoji}</span>
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredClients.map((client) => {
+            const indicator = getStatusIndicator(client.latest_assessment?.health_status);
+            const needsAttention = !client.latest_assessment || client.latest_assessment.days_since > 90;
+            
+            return (
+              <div
+                key={client.id}
+                className={`bg-white rounded-xl shadow-lg p-6 border-2 transition-all hover:shadow-xl cursor-pointer ${
+                  needsAttention ? 'border-red-200' : 'border-gray-100'
+                }`}
+                onClick={() => router.push(`/assessment/results?businessId=${client.id}`)}
+              >
+                {/* Status Badge */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">
+                      {client.business_name}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {client.industry || 'Industry not specified'}
+                    </p>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{indicator.emoji}</span>
+                  </div>
+                </div>
 
-                  {/* Metrics */}
-                  {client.latest_assessment ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Health Score</span>
-                        <span className="text-lg font-bold text-gray-900">
-                          {client.latest_assessment.health_score.toFixed(1)}%
-                        </span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Status</span>
-                        <span className={`text-sm font-medium ${indicator.textColor}`}>
-                          {client.latest_assessment.health_status}
-                        </span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Last Assessment</span>
-                        <span className={`text-sm font-medium ${
-                          client.latest_assessment.days_since > 90 ? 'text-red-600' :
-                          client.latest_assessment.days_since > 60 ? 'text-orange-600' :
-                          'text-green-600'
-                        }`}>
-                          {client.latest_assessment.days_since === 0 ? 'Today' :
-                           client.latest_assessment.days_since === 1 ? 'Yesterday' :
-                           `${client.latest_assessment.days_since} days ago`}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-red-50 rounded-lg p-3 text-center">
-                      <p className="text-red-600 font-medium">No Assessment</p>
-                      <p className="text-red-500 text-sm mt-1">Needs initial assessment</p>
-                    </div>
-                  )}
-
-                  {/* Revenue Stage */}
-                  <div className="mt-4 pt-4 border-t border-gray-100">
+                {/* Metrics */}
+                {client.latest_assessment ? (
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Revenue Stage</span>
-                      <span className="text-sm font-medium text-gray-900">
-                        {client.revenue_stage || 'Not specified'}
+                      <span className="text-sm text-gray-600">Health Score</span>
+                      <span className="text-lg font-bold text-gray-900">
+                        {client.latest_assessment.health_score.toFixed(1)}%
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Status</span>
+                      <span className={`text-sm font-medium ${indicator.textColor}`}>
+                        {client.latest_assessment.health_status}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Last Assessment</span>
+                      <span className={`text-sm font-medium ${
+                        client.latest_assessment.days_since > 90 ? 'text-red-600' :
+                        client.latest_assessment.days_since > 60 ? 'text-orange-600' :
+                        'text-green-600'
+                      }`}>
+                        {client.latest_assessment.days_since === 0 ? 'Today' :
+                         client.latest_assessment.days_since === 1 ? 'Yesterday' :
+                         `${client.latest_assessment.days_since} days ago`}
                       </span>
                     </div>
                   </div>
+                ) : (
+                  <div className="bg-red-50 rounded-lg p-3 text-center">
+                    <p className="text-red-600 font-medium">No Assessment</p>
+                    <p className="text-red-500 text-sm mt-1">Needs initial assessment</p>
+                  </div>
+                )}
 
-                  {/* Quick Actions */}
-                  <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/business-profile?id=${client.id}`);
-                      }}
-                      className="flex-1 px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                    >
-                      View Profile
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // TODO: Implement scheduling
-                        alert('Scheduling feature coming soon!');
-                      }}
-                      className="flex-1 px-3 py-2 text-sm bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
-                    >
-                      Schedule
-                    </button>
+                {/* Revenue Stage */}
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Revenue Stage</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {client.revenue_stage || 'Not specified'}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
 
-        {/* Empty State for filtered results */}
-        {filteredClients.length === 0 && clients.length > 0 && (
+                {/* Quick Actions */}
+                <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/business-profile?id=${client.id}`);
+                    }}
+                    className="flex-1 px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    View Profile
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // TODO: Implement scheduling
+                      alert('Scheduling feature coming soon!');
+                    }}
+                    className="flex-1 px-3 py-2 text-sm bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
+                  >
+                    Schedule
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Empty State */}
+        {filteredClients.length === 0 && (
           <div className="bg-white rounded-xl shadow-lg p-12 text-center">
             <p className="text-gray-500 text-lg">No clients found matching your criteria</p>
             {searchTerm && (
@@ -433,7 +411,7 @@ export default function CoachDashboard() {
           <div className="mt-8 bg-white rounded-xl shadow-lg p-6 border-2 border-orange-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">⚠️ Requires Attention</h3>
             <div className="space-y-3">
-              {clients.filter(c => c.latest_assessment?.health_status?.toUpperCase() === 'URGENT').map(client => (
+              {clients.filter(c => c.latest_assessment?.health_status === 'URGENT').map(client => (
                 <div key={client.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
                   <span className="font-medium text-red-900">{client.business_name}</span>
                   <span className="text-sm text-red-600">URGENT STATUS</span>
