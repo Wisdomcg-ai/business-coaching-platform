@@ -5,14 +5,16 @@ import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
   const router = useRouter()
-
+  
   useEffect(() => {
     router.push('/auth/login')
   }, [router])
-
+  
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-xl">Redirecting to login...</div>
+      <div className="text-center">
+        <h1 className="text-2xl font-bold">Redirecting to login...</h1>
+      </div>
     </div>
   )
 }

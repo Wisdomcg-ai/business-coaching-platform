@@ -1,4 +1,4 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase'
 import { Database } from '@/types/database.types';
 
 export interface AssessmentData {

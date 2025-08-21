@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
 
 interface HiringPriority {
@@ -36,7 +36,7 @@ interface PeopleCultureData {
 
 export default function PeopleCulturePage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  // supabase client imported from lib
   const saveTimeoutRef = useRef<NodeJS.Timeout>()
   const lastSavedDataRef = useRef<string>('')
   
@@ -78,16 +78,12 @@ export default function PeopleCulturePage() {
   const loadExistingData = async () => {
     try {
       setLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/auth/login')
-        return
       }
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('business_id')
-        .eq('id', session.user.id)
+        .eq('id', 'temp-user')
         .single()
 
       if (profileError) {

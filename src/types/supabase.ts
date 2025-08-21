@@ -414,214 +414,73 @@ export type Database = {
         }
         Relationships: []
       }
-      goal_updates: {
+      monthly_reviews: {
         Row: {
-          created_at: string | null
-          created_by: string | null
-          goal_id: string | null
-          id: string
-          new_status: string | null
-          new_value: number | null
-          notes: string | null
-          old_status: string | null
-          old_value: number | null
-          update_type: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          goal_id?: string | null
-          id?: string
-          new_status?: string | null
-          new_value?: number | null
-          notes?: string | null
-          old_status?: string | null
-          old_value?: number | null
-          update_type?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          goal_id?: string | null
-          id?: string
-          new_status?: string | null
-          new_value?: number | null
-          notes?: string | null
-          old_status?: string | null
-          old_value?: number | null
-          update_type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "goal_updates_goal_id_fkey"
-            columns: ["goal_id"]
-            isOneToOne: false
-            referencedRelation: "goals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      goals: {
-        Row: {
-          blockers: string | null
+          actual_cash_position: number | null
+          actual_gross_profit: number | null
+          actual_gross_profit_percent: number | null
+          actual_net_profit: number | null
+          actual_net_profit_percent: number | null
+          actual_revenue: number | null
+          adjustments_made: string | null
           business_id: string | null
-          category: string | null
+          challenges: string | null
           created_at: string | null
           created_by: string | null
-          current_value: number | null
-          description: string | null
-          end_date: string
-          goal_type: string
+          gross_profit_variance: number | null
           id: string
-          is_critical: boolean | null
-          last_review_date: string | null
-          notes: string | null
-          owner_id: string | null
-          owner_name: string | null
-          parent_goal_id: string | null
-          priority: number | null
-          progress_percentage: number | null
-          start_date: string
-          status: string | null
-          target_metric: string | null
-          target_value: number | null
-          title: string
-          unit_of_measure: string | null
-          updated_at: string | null
+          kpi_actuals: Json | null
+          net_profit_variance: number | null
+          revenue_variance: number | null
+          review_month: string
+          wins: string | null
         }
         Insert: {
-          blockers?: string | null
+          actual_cash_position?: number | null
+          actual_gross_profit?: number | null
+          actual_gross_profit_percent?: number | null
+          actual_net_profit?: number | null
+          actual_net_profit_percent?: number | null
+          actual_revenue?: number | null
+          adjustments_made?: string | null
           business_id?: string | null
-          category?: string | null
+          challenges?: string | null
           created_at?: string | null
           created_by?: string | null
-          current_value?: number | null
-          description?: string | null
-          end_date: string
-          goal_type: string
+          gross_profit_variance?: number | null
           id?: string
-          is_critical?: boolean | null
-          last_review_date?: string | null
-          notes?: string | null
-          owner_id?: string | null
-          owner_name?: string | null
-          parent_goal_id?: string | null
-          priority?: number | null
-          progress_percentage?: number | null
-          start_date: string
-          status?: string | null
-          target_metric?: string | null
-          target_value?: number | null
-          title: string
-          unit_of_measure?: string | null
-          updated_at?: string | null
+          kpi_actuals?: Json | null
+          net_profit_variance?: number | null
+          revenue_variance?: number | null
+          review_month: string
+          wins?: string | null
         }
         Update: {
-          blockers?: string | null
+          actual_cash_position?: number | null
+          actual_gross_profit?: number | null
+          actual_gross_profit_percent?: number | null
+          actual_net_profit?: number | null
+          actual_net_profit_percent?: number | null
+          actual_revenue?: number | null
+          adjustments_made?: string | null
           business_id?: string | null
-          category?: string | null
+          challenges?: string | null
           created_at?: string | null
           created_by?: string | null
-          current_value?: number | null
-          description?: string | null
-          end_date?: string
-          goal_type?: string
+          gross_profit_variance?: number | null
           id?: string
-          is_critical?: boolean | null
-          last_review_date?: string | null
-          notes?: string | null
-          owner_id?: string | null
-          owner_name?: string | null
-          parent_goal_id?: string | null
-          priority?: number | null
-          progress_percentage?: number | null
-          start_date?: string
-          status?: string | null
-          target_metric?: string | null
-          target_value?: number | null
-          title?: string
-          unit_of_measure?: string | null
-          updated_at?: string | null
+          kpi_actuals?: Json | null
+          net_profit_variance?: number | null
+          revenue_variance?: number | null
+          review_month?: string
+          wins?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "goals_business_id_fkey"
+            foreignKeyName: "monthly_reviews_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "goals_parent_goal_id_fkey"
-            columns: ["parent_goal_id"]
-            isOneToOne: false
-            referencedRelation: "goals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      milestones: {
-        Row: {
-          business_id: string | null
-          completed_date: string | null
-          created_at: string | null
-          description: string | null
-          due_date: string
-          goal_id: string | null
-          id: string
-          notes: string | null
-          owner_id: string | null
-          owner_name: string | null
-          sequence_number: number | null
-          status: string | null
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          business_id?: string | null
-          completed_date?: string | null
-          created_at?: string | null
-          description?: string | null
-          due_date: string
-          goal_id?: string | null
-          id?: string
-          notes?: string | null
-          owner_id?: string | null
-          owner_name?: string | null
-          sequence_number?: number | null
-          status?: string | null
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          business_id?: string | null
-          completed_date?: string | null
-          created_at?: string | null
-          description?: string | null
-          due_date?: string
-          goal_id?: string | null
-          id?: string
-          notes?: string | null
-          owner_id?: string | null
-          owner_name?: string | null
-          sequence_number?: number | null
-          status?: string | null
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "milestones_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "milestones_goal_id_fkey"
-            columns: ["goal_id"]
-            isOneToOne: false
-            referencedRelation: "goals"
             referencedColumns: ["id"]
           },
         ]
@@ -649,6 +508,292 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      quarterly_forecasts: {
+        Row: {
+          business_id: string | null
+          created_at: string | null
+          gross_profit_gap: number | null
+          id: string
+          is_active: boolean | null
+          kpi_gaps: Json | null
+          month1_cash: number | null
+          month1_gross_profit: number | null
+          month1_gross_profit_percent: number | null
+          month1_net_profit: number | null
+          month1_net_profit_percent: number | null
+          month1_revenue: number | null
+          month2_cash: number | null
+          month2_gross_profit: number | null
+          month2_gross_profit_percent: number | null
+          month2_net_profit: number | null
+          month2_net_profit_percent: number | null
+          month2_revenue: number | null
+          month3_cash: number | null
+          month3_gross_profit: number | null
+          month3_gross_profit_percent: number | null
+          month3_net_profit: number | null
+          month3_net_profit_percent: number | null
+          month3_revenue: number | null
+          net_profit_gap: number | null
+          quarter_number: number
+          quarter_year: number
+          revenue_gap: number | null
+          revenue_gap_percent: number | null
+          total_gross_profit: number | null
+          total_gross_profit_percent: number | null
+          total_net_profit: number | null
+          total_net_profit_percent: number | null
+          total_revenue: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string | null
+          gross_profit_gap?: number | null
+          id?: string
+          is_active?: boolean | null
+          kpi_gaps?: Json | null
+          month1_cash?: number | null
+          month1_gross_profit?: number | null
+          month1_gross_profit_percent?: number | null
+          month1_net_profit?: number | null
+          month1_net_profit_percent?: number | null
+          month1_revenue?: number | null
+          month2_cash?: number | null
+          month2_gross_profit?: number | null
+          month2_gross_profit_percent?: number | null
+          month2_net_profit?: number | null
+          month2_net_profit_percent?: number | null
+          month2_revenue?: number | null
+          month3_cash?: number | null
+          month3_gross_profit?: number | null
+          month3_gross_profit_percent?: number | null
+          month3_net_profit?: number | null
+          month3_net_profit_percent?: number | null
+          month3_revenue?: number | null
+          net_profit_gap?: number | null
+          quarter_number: number
+          quarter_year: number
+          revenue_gap?: number | null
+          revenue_gap_percent?: number | null
+          total_gross_profit?: number | null
+          total_gross_profit_percent?: number | null
+          total_net_profit?: number | null
+          total_net_profit_percent?: number | null
+          total_revenue?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string | null
+          gross_profit_gap?: number | null
+          id?: string
+          is_active?: boolean | null
+          kpi_gaps?: Json | null
+          month1_cash?: number | null
+          month1_gross_profit?: number | null
+          month1_gross_profit_percent?: number | null
+          month1_net_profit?: number | null
+          month1_net_profit_percent?: number | null
+          month1_revenue?: number | null
+          month2_cash?: number | null
+          month2_gross_profit?: number | null
+          month2_gross_profit_percent?: number | null
+          month2_net_profit?: number | null
+          month2_net_profit_percent?: number | null
+          month2_revenue?: number | null
+          month3_cash?: number | null
+          month3_gross_profit?: number | null
+          month3_gross_profit_percent?: number | null
+          month3_net_profit?: number | null
+          month3_net_profit_percent?: number | null
+          month3_revenue?: number | null
+          net_profit_gap?: number | null
+          quarter_number?: number
+          quarter_year?: number
+          revenue_gap?: number | null
+          revenue_gap_percent?: number | null
+          total_gross_profit?: number | null
+          total_gross_profit_percent?: number | null
+          total_net_profit?: number | null
+          total_net_profit_percent?: number | null
+          total_revenue?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quarterly_forecasts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quarterly_priorities: {
+        Row: {
+          blockers: string | null
+          business_id: string | null
+          created_at: string | null
+          current_value: number | null
+          id: string
+          last_review_date: string | null
+          notes: string | null
+          priority_order: number | null
+          progress_percentage: number | null
+          quarter_number: number
+          quarter_year: number
+          status: string | null
+          strategic_todo_id: string | null
+          success_metric: string | null
+          target_value: number | null
+          unit_of_measure: string | null
+          updated_at: string | null
+          weekly_milestones: Json | null
+          why_critical: string | null
+        }
+        Insert: {
+          blockers?: string | null
+          business_id?: string | null
+          created_at?: string | null
+          current_value?: number | null
+          id?: string
+          last_review_date?: string | null
+          notes?: string | null
+          priority_order?: number | null
+          progress_percentage?: number | null
+          quarter_number: number
+          quarter_year: number
+          status?: string | null
+          strategic_todo_id?: string | null
+          success_metric?: string | null
+          target_value?: number | null
+          unit_of_measure?: string | null
+          updated_at?: string | null
+          weekly_milestones?: Json | null
+          why_critical?: string | null
+        }
+        Update: {
+          blockers?: string | null
+          business_id?: string | null
+          created_at?: string | null
+          current_value?: number | null
+          id?: string
+          last_review_date?: string | null
+          notes?: string | null
+          priority_order?: number | null
+          progress_percentage?: number | null
+          quarter_number?: number
+          quarter_year?: number
+          status?: string | null
+          strategic_todo_id?: string | null
+          success_metric?: string | null
+          target_value?: number | null
+          unit_of_measure?: string | null
+          updated_at?: string | null
+          weekly_milestones?: Json | null
+          why_critical?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quarterly_priorities_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quarterly_priorities_strategic_todo_id_fkey"
+            columns: ["strategic_todo_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_todos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategic_todos: {
+        Row: {
+          actual_completion_date: string | null
+          business_id: string | null
+          created_at: string | null
+          created_by: string | null
+          dependencies: string[] | null
+          description: string | null
+          effort_level: string | null
+          engine: string
+          estimated_duration_days: number | null
+          financial_impact: number | null
+          id: string
+          impact_level: string | null
+          linked_assessment_gap: string | null
+          linked_roadmap_stage: string | null
+          notes: string | null
+          owner_id: string | null
+          owner_name: string | null
+          selected_for_quarter: string | null
+          status: string | null
+          target_completion_date: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          actual_completion_date?: string | null
+          business_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dependencies?: string[] | null
+          description?: string | null
+          effort_level?: string | null
+          engine: string
+          estimated_duration_days?: number | null
+          financial_impact?: number | null
+          id?: string
+          impact_level?: string | null
+          linked_assessment_gap?: string | null
+          linked_roadmap_stage?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          owner_name?: string | null
+          selected_for_quarter?: string | null
+          status?: string | null
+          target_completion_date?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          actual_completion_date?: string | null
+          business_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dependencies?: string[] | null
+          description?: string | null
+          effort_level?: string | null
+          engine?: string
+          estimated_duration_days?: number | null
+          financial_impact?: number | null
+          id?: string
+          impact_level?: string | null
+          linked_assessment_gap?: string | null
+          linked_roadmap_stage?: string | null
+          notes?: string | null
+          owner_id?: string | null
+          owner_name?: string | null
+          selected_for_quarter?: string | null
+          status?: string | null
+          target_completion_date?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategic_todos_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       strategic_wheels: {
         Row: {
@@ -929,56 +1074,133 @@ export type Database = {
           },
         ]
       }
-      weekly_priorities: {
+      vision_targets: {
         Row: {
           business_id: string | null
-          completed_date: string | null
           created_at: string | null
           id: string
-          is_completed: boolean | null
-          milestone_id: string | null
-          owner_id: string | null
-          owner_name: string | null
-          priority_text: string
-          week_start_date: string
+          key_kpis: Json | null
+          monthly_revenue_targets: Json | null
+          one_year_gross_profit_amount: number | null
+          one_year_gross_profit_percent: number | null
+          one_year_net_profit_amount: number | null
+          one_year_net_profit_percent: number | null
+          one_year_revenue: number | null
+          three_year_capabilities: string[] | null
+          three_year_gross_profit_amount: number | null
+          three_year_gross_profit_percent: number | null
+          three_year_net_profit_amount: number | null
+          three_year_net_profit_percent: number | null
+          three_year_revenue: number | null
+          three_year_strategic_position: string | null
+          three_year_team_size: number | null
+          updated_at: string | null
         }
         Insert: {
           business_id?: string | null
-          completed_date?: string | null
           created_at?: string | null
           id?: string
-          is_completed?: boolean | null
-          milestone_id?: string | null
-          owner_id?: string | null
-          owner_name?: string | null
-          priority_text: string
-          week_start_date: string
+          key_kpis?: Json | null
+          monthly_revenue_targets?: Json | null
+          one_year_gross_profit_amount?: number | null
+          one_year_gross_profit_percent?: number | null
+          one_year_net_profit_amount?: number | null
+          one_year_net_profit_percent?: number | null
+          one_year_revenue?: number | null
+          three_year_capabilities?: string[] | null
+          three_year_gross_profit_amount?: number | null
+          three_year_gross_profit_percent?: number | null
+          three_year_net_profit_amount?: number | null
+          three_year_net_profit_percent?: number | null
+          three_year_revenue?: number | null
+          three_year_strategic_position?: string | null
+          three_year_team_size?: number | null
+          updated_at?: string | null
         }
         Update: {
           business_id?: string | null
-          completed_date?: string | null
           created_at?: string | null
           id?: string
-          is_completed?: boolean | null
-          milestone_id?: string | null
-          owner_id?: string | null
-          owner_name?: string | null
-          priority_text?: string
-          week_start_date?: string
+          key_kpis?: Json | null
+          monthly_revenue_targets?: Json | null
+          one_year_gross_profit_amount?: number | null
+          one_year_gross_profit_percent?: number | null
+          one_year_net_profit_amount?: number | null
+          one_year_net_profit_percent?: number | null
+          one_year_revenue?: number | null
+          three_year_capabilities?: string[] | null
+          three_year_gross_profit_amount?: number | null
+          three_year_gross_profit_percent?: number | null
+          three_year_net_profit_amount?: number | null
+          three_year_net_profit_percent?: number | null
+          three_year_revenue?: number | null
+          three_year_strategic_position?: string | null
+          three_year_team_size?: number | null
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "weekly_priorities_business_id_fkey"
+            foreignKeyName: "vision_targets_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_checkins: {
+        Row: {
+          blockers_identified: string | null
+          business_id: string | null
+          created_at: string | null
+          created_by: string | null
+          help_needed: string | null
+          id: string
+          on_track: boolean | null
+          progress_percentage: number | null
+          progress_update: string | null
+          quarterly_priority_id: string | null
+          week_ending_date: string
+        }
+        Insert: {
+          blockers_identified?: string | null
+          business_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          help_needed?: string | null
+          id?: string
+          on_track?: boolean | null
+          progress_percentage?: number | null
+          progress_update?: string | null
+          quarterly_priority_id?: string | null
+          week_ending_date: string
+        }
+        Update: {
+          blockers_identified?: string | null
+          business_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          help_needed?: string | null
+          id?: string
+          on_track?: boolean | null
+          progress_percentage?: number | null
+          progress_update?: string | null
+          quarterly_priority_id?: string | null
+          week_ending_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_checkins_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "weekly_priorities_milestone_id_fkey"
-            columns: ["milestone_id"]
+            foreignKeyName: "weekly_checkins_quarterly_priority_id_fkey"
+            columns: ["quarterly_priority_id"]
             isOneToOne: false
-            referencedRelation: "milestones"
+            referencedRelation: "quarterly_priorities"
             referencedColumns: ["id"]
           },
         ]

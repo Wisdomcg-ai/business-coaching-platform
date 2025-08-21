@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import { Database } from '@/types/database.types';
 import { saveAssessment } from '@/lib/assessment-service';
 import { ChevronRight, ChevronLeft, Check, AlertCircle } from 'lucide-react';
@@ -703,7 +703,6 @@ export default function AssessmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClientComponentClient<Database>();
 
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
@@ -1031,3 +1030,4 @@ export default function AssessmentPage() {
     </div>
   );
 }
+

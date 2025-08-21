@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase'
 import { ArrowLeft, FileText, Calendar, CheckCircle, AlertCircle, TrendingUp, BarChart3 } from 'lucide-react'
 
 interface Assessment {
@@ -24,7 +24,7 @@ export default function AssessmentHistory() {
   const [loading, setLoading] = useState(true)
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  // supabase client imported from lib
 
   useEffect(() => {
     loadAssessments()

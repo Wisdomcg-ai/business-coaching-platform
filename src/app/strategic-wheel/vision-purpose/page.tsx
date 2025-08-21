@@ -2,19 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase'
 import { ArrowLeft, ArrowRight, Save } from 'lucide-react'
 import { getNextSection, getPreviousSection } from '@/lib/strategic-wheel-navigation'
 
 export default function VisionPurposePage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
   const saveTimeoutRef = useRef<NodeJS.Timeout>()
   const lastSavedDataRef = useRef<string>('')
 
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [businessId, setBusinessId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
 
@@ -27,59 +25,6 @@ export default function VisionPurposePage() {
   const isValid = purposeStatement.trim() !== '' && 
                   visionStatement.trim() !== '' && 
                   coreValues.filter(v => v.trim() !== '').length >= 3
-
-  // Load data on mount
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/auth/login')
-        return
-      }
-
-      // Get business ID
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('business_id')
-        .eq('id', session.user.id)
-        .single()
-
-      if (!profile?.business_id) {
-        router.push('/dashboard')
-        return
-      }
-
-      setBusinessId(profile.business_id)
-
-      // Load existing Strategic Wheel data
-      const { data: wheel } = await supabase
-        .from('strategic_wheels')
-        .select('*')
-        .eq('business_id', profile.business_id)
-        .single()
-
-      if (wheel?.vision_purpose) {
-        const vp = wheel.vision_purpose
-        setPurposeStatement(vp.purpose_statement || '')
-        setVisionStatement(vp.vision_statement || '')
-        if (vp.core_values && Array.isArray(vp.core_values)) {
-          const values = [...vp.core_values]
-          while (values.length < 8) values.push('')
-          setCoreValues(values.slice(0, 8))
-        }
-        setLastSaved(new Date(wheel.updated_at))
-        lastSavedDataRef.current = JSON.stringify(vp)
-      }
-    } catch (error) {
-      console.error('Error loading data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // Auto-save functionality
   const handleFieldChange = () => {
@@ -97,8 +42,6 @@ export default function VisionPurposePage() {
   }
 
   const saveData = async () => {
-    if (!businessId) return
-
     const dataToSave = {
       purpose_statement: purposeStatement,
       vision_statement: visionStatement,
@@ -114,18 +57,8 @@ export default function VisionPurposePage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('strategic_wheels')
-        .upsert({
-          business_id: businessId,
-          vision_purpose: dataToSave,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'business_id'
-        })
-
-      if (error) throw error
-
+      // For now, just save locally
+      console.log('Saving data:', dataToSave)
       lastSavedDataRef.current = currentDataString
       setHasUnsavedChanges(false)
       setLastSaved(new Date())

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase'
 import { 
   ArrowLeft, 
   TrendingUp, 
@@ -34,7 +34,7 @@ export default function AssessmentResultsPage() {
   const router = useRouter();
   const [assessment, setAssessment] = useState<AssessmentResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClientComponentClient();
+  // supabase client imported from lib
 
   useEffect(() => {
     loadAssessment();

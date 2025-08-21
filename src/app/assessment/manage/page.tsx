@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Trash2, Plus, AlertTriangle, FileText, Calendar, CheckCircle, XCircle } from 'lucide-react'
 
 interface Assessment {
@@ -20,7 +20,7 @@ export default function ManageAssessments() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  // supabase client imported from lib
 
   useEffect(() => {
     loadAssessments()

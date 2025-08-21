@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase'
 import { getNextSection, getPreviousSection, strategicWheelSections } from '@/lib/strategic-wheel-navigation';
 
 interface StrategyMarketData {
@@ -32,7 +32,7 @@ interface AISuggestions {
 
 export default function StrategyMarketPage() {
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  // supabase client imported from lib
   const [loading, setLoading] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);

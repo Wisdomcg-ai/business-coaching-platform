@@ -1,42 +1,68 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-type Goal = {
+type VisionTargets = {
+  three_year_revenue: number;
+  three_year_gross_profit_percent: number;
+  three_year_net_profit_percent: number;
+  one_year_revenue: number;
+  one_year_gross_profit_percent: number;
+  one_year_net_profit_percent: number;
+};
+
+type QuarterlyForecast = {
+  quarter_year: number;
+  quarter_number: number;
+  total_revenue: number;
+  total_gross_profit_percent: number;
+  total_net_profit_percent: number;
+  revenue_gap: number;
+  revenue_gap_percent: number;
+};
+
+type QuarterlyPriority = {
   id: string;
-  title: string;
-  goal_type: 'annual' | '90_day_rock';
-  status: string;
+  priority_order: number;
+  strategic_todo_id: string;
+  why_critical: string;
+  success_metric: string;
   progress_percentage: number;
-  end_date: string;
-  owner_name: string | null;
-  target_metric: string | null;
-  target_value: number | null;
-  current_value: number | null;
-  category: string | null;
-  priority: number | null;
-  is_critical: boolean;
+  status: string;
+  strategic_todo?: {
+    title: string;
+    engine: string;
+    impact_level: string;
+    owner_name: string;
+  };
 };
 
 export default function GoalsPage() {
   const [loading, setLoading] = useState(true);
-  const [annualGoals, setAnnualGoals] = useState<Goal[]>([]);
-  const [ninetyDayRocks, setNinetyDayRocks] = useState<Goal[]>([]);
   const [businessId, setBusinessId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [visionTargets, setVisionTargets] = useState<VisionTargets | null>(null);
+  const [currentForecast, setCurrentForecast] = useState<QuarterlyForecast | null>(null);
+  const [priorities, setPriorities] = useState<QuarterlyPriority[]>([]);
+  const [todoCount, setTodoCount] = useState<Record<string, number>>({});
   const router = useRouter();
   const supabase = createClient();
 
+  // Get current quarter
+  const getCurrentQuarter = () => {
+    const now = new Date();
+    const quarter = Math.floor(now.getMonth() / 3) + 1;
+    return { year: now.getFullYear(), quarter };
+  };
+
   useEffect(() => {
-    loadGoals();
+    loadGoalData();
   }, []);
 
-  async function loadGoals() {
+  async function loadGoalData() {
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/auth/login');
@@ -44,121 +70,132 @@ export default function GoalsPage() {
       }
 
       // Get user's business
-      const { data: business, error: bizError } = await supabase
+      const { data: business } = await supabase
         .from('businesses')
         .select('id')
         .eq('owner_id', user.id)
         .single();
 
-      if (bizError || !business) {
-        // Check if user is a team member
+      if (!business) {
         const { data: member } = await supabase
           .from('business_members')
           .select('business_id')
           .eq('user_id', user.id)
           .single();
 
-        if (member) {
-          setBusinessId(member.business_id);
-        } else {
-          setError('No business found. Please create a business profile first.');
-          setLoading(false);
+        if (!member) {
+          router.push('/business-profile');
           return;
         }
+        setBusinessId(member.business_id);
       } else {
         setBusinessId(business.id);
       }
 
       const bizId = business?.id || businessId;
+      if (!bizId) return;
 
-      // Load annual goals
-      const { data: annualData, error: annualError } = await supabase
-        .from('goals')
+      // Load vision & targets
+      const { data: vision } = await supabase
+        .from('vision_targets')
         .select('*')
         .eq('business_id', bizId)
-        .eq('goal_type', 'annual')
-        .order('priority', { ascending: true });
+        .single();
 
-      if (annualError) throw annualError;
+      setVisionTargets(vision);
 
-      // Load 90-day rocks
-      const { data: rocksData, error: rocksError } = await supabase
-        .from('goals')
+      // Load current quarter forecast
+      const { year, quarter } = getCurrentQuarter();
+      const { data: forecast } = await supabase
+        .from('quarterly_forecasts')
         .select('*')
         .eq('business_id', bizId)
-        .eq('goal_type', '90_day_rock')
-        .order('priority', { ascending: true });
+        .eq('quarter_year', year)
+        .eq('quarter_number', quarter)
+        .single();
 
-      if (rocksError) throw rocksError;
+      setCurrentForecast(forecast);
 
-      setAnnualGoals(annualData || []);
-      setNinetyDayRocks(rocksData || []);
-    } catch (err) {
-      console.error('Error loading goals:', err);
-      setError('Failed to load goals');
+      // Load current priorities with their todos
+      const { data: prioritiesData } = await supabase
+        .from('quarterly_priorities')
+        .select(`
+          *,
+          strategic_todo:strategic_todos(
+            title,
+            engine,
+            impact_level,
+            owner_name
+          )
+        `)
+        .eq('business_id', bizId)
+        .eq('quarter_year', year)
+        .eq('quarter_number', quarter)
+        .order('priority_order');
+
+      setPriorities(prioritiesData || []);
+
+      // Count todos by engine
+      const { data: todos } = await supabase
+        .from('strategic_todos')
+        .select('engine')
+        .eq('business_id', bizId)
+        .eq('status', 'backlog');
+
+      const counts: Record<string, number> = {};
+      todos?.forEach((todo) => {
+        counts[todo.engine] = (counts[todo.engine] || 0) + 1;
+      });
+      setTodoCount(counts);
+
+    } catch (error) {
+      console.error('Error loading goal data:', error);
     } finally {
       setLoading(false);
     }
   }
 
+  function getEngineColor(engine: string) {
+    const colors: Record<string, string> = {
+      attract: 'bg-blue-100 text-blue-800',
+      convert: 'bg-purple-100 text-purple-800',
+      deliver_customer: 'bg-green-100 text-green-800',
+      deliver_operations: 'bg-yellow-100 text-yellow-800',
+      scale: 'bg-indigo-100 text-indigo-800',
+      finance: 'bg-red-100 text-red-800'
+    };
+    return colors[engine] || 'bg-gray-100 text-gray-800';
+  }
+
   function getStatusColor(status: string) {
-    switch (status) {
-      case 'completed': return 'text-green-600 bg-green-50';
-      case 'in_progress': return 'text-blue-600 bg-blue-50';
-      case 'at_risk': return 'text-red-600 bg-red-50';
-      case 'not_started': return 'text-gray-600 bg-gray-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
+    const colors: Record<string, string> = {
+      not_started: 'bg-gray-100 text-gray-800',
+      on_track: 'bg-green-100 text-green-800',
+      at_risk: 'bg-yellow-100 text-yellow-800',
+      behind: 'bg-red-100 text-red-800',
+      completed: 'bg-blue-100 text-blue-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
   }
 
-  function getCategoryColor(category: string | null) {
-    switch (category) {
-      case 'financial': return 'bg-green-100 text-green-800';
-      case 'customer': return 'bg-blue-100 text-blue-800';
-      case 'operations': return 'bg-purple-100 text-purple-800';
-      case 'team': return 'bg-yellow-100 text-yellow-800';
-      case 'strategic': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  }
-
-  function formatDate(date: string) {
-    return new Date(date).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
+  function formatCurrency(amount: number | null) {
+    if (!amount) return '$0';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0
+    }).format(amount);
   }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading goals...</p>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h2 className="text-red-800 font-semibold mb-2">Error</h2>
-            <p className="text-red-600">{error}</p>
-            <Link 
-              href="/business-profile" 
-              className="mt-4 inline-block bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-            >
-              Create Business Profile
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const { year, quarter } = getCurrentQuarter();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -167,228 +204,254 @@ export default function GoalsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Goal Setting & Tracking</h1>
-              <p className="text-gray-600 mt-1">Cascade from annual goals to daily execution</p>
+              <h1 className="text-2xl font-bold text-gray-900">Strategic Planning & Execution</h1>
+              <p className="text-gray-600 mt-1">Financial forecasts drive priorities</p>
             </div>
-            <div className="flex gap-3">
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 text-gray-600 hover:text-gray-900"
-              >
-                Back to Dashboard
-              </Link>
-              <Link
-                href="/goals/create"
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                + Create Goal
-              </Link>
-            </div>
+            <Link
+              href="/dashboard"
+              className="px-4 py-2 text-gray-600 hover:text-gray-900"
+            >
+              Back to Dashboard
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Goal Cascade Visualization */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Goal Cascade Framework</h2>
-          <div className="flex items-center justify-between">
-            <div className="flex-1 text-center">
-              <div className="bg-blue-100 rounded-lg p-4">
-                <div className="text-3xl font-bold text-blue-600">{annualGoals.length}</div>
-                <div className="text-sm text-blue-800 mt-1">Annual Goals</div>
-              </div>
-            </div>
-            <div className="text-gray-400 text-2xl px-4">→</div>
-            <div className="flex-1 text-center">
-              <div className="bg-purple-100 rounded-lg p-4">
-                <div className="text-3xl font-bold text-purple-600">{ninetyDayRocks.length}</div>
-                <div className="text-sm text-purple-800 mt-1">90-Day Rocks</div>
-              </div>
-            </div>
-            <div className="text-gray-400 text-2xl px-4">→</div>
-            <div className="flex-1 text-center">
-              <div className="bg-green-100 rounded-lg p-4">
-                <div className="text-3xl font-bold text-green-600">0</div>
-                <div className="text-sm text-green-800 mt-1">Monthly Milestones</div>
-              </div>
-            </div>
-            <div className="text-gray-400 text-2xl px-4">→</div>
-            <div className="flex-1 text-center">
-              <div className="bg-yellow-100 rounded-lg p-4">
-                <div className="text-3xl font-bold text-yellow-600">0</div>
-                <div className="text-sm text-yellow-800 mt-1">Weekly Priorities</div>
-              </div>
-            </div>
+        {/* Vision & Targets Summary */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Vision & Targets</h2>
+            <Link
+              href="/goals/vision"
+              className="text-blue-600 hover:text-blue-700 text-sm"
+            >
+              {visionTargets ? 'Edit' : 'Set'} Targets →
+            </Link>
           </div>
-        </div>
 
-        {/* Annual Goals Section */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Annual Goals</h2>
-            <span className="text-sm text-gray-500">Year-long strategic objectives</span>
-          </div>
-          
-          {annualGoals.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No annual goals yet</h3>
-              <p className="mt-1 text-sm text-gray-500">Get started by creating your first annual goal.</p>
-              <Link
-                href="/goals/create?type=annual"
-                className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-              >
-                Create Annual Goal
-              </Link>
+          {visionTargets ? (
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">3-Year Vision</h3>
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-sm">Revenue:</span>
+                    <span className="font-medium">{formatCurrency(visionTargets.three_year_revenue)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Gross Profit:</span>
+                    <span className="font-medium">{visionTargets.three_year_gross_profit_percent}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Net Profit:</span>
+                    <span className="font-medium">{visionTargets.three_year_net_profit_percent}%</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">1-Year Plan</h3>
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-sm">Revenue:</span>
+                    <span className="font-medium">{formatCurrency(visionTargets.one_year_revenue)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Gross Profit:</span>
+                    <span className="font-medium">{visionTargets.one_year_gross_profit_percent}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Net Profit:</span>
+                    <span className="font-medium">{visionTargets.one_year_net_profit_percent}%</span>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="grid gap-4">
-              {annualGoals.map((goal) => (
-                <div key={goal.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            <p className="text-gray-500 text-center py-8">
+              No vision & targets set yet. 
+              <Link href="/goals/vision" className="text-blue-600 hover:text-blue-700 ml-1">
+                Set them now →
+              </Link>
+            </p>
+          )}
+        </div>
+
+        {/* Current Quarter Forecast & Gaps */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Q{quarter} {year} Forecast</h2>
+            <Link
+              href="/goals/forecast"
+              className="text-blue-600 hover:text-blue-700 text-sm"
+            >
+              {currentForecast ? 'Update' : 'Create'} Forecast →
+            </Link>
+          </div>
+
+          {currentForecast ? (
+            <div>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatCurrency(currentForecast.total_revenue)}
+                  </div>
+                  <div className="text-sm text-gray-500">Revenue Target</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {currentForecast.total_gross_profit_percent}%
+                  </div>
+                  <div className="text-sm text-gray-500">Gross Margin</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {currentForecast.total_net_profit_percent}%
+                  </div>
+                  <div className="text-sm text-gray-500">Net Margin</div>
+                </div>
+              </div>
+
+              {currentForecast.revenue_gap && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-red-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <span className="font-medium text-red-900">Revenue Gap: </span>
+                      <span className="text-red-700">
+                        {formatCurrency(Math.abs(currentForecast.revenue_gap))} 
+                        ({Math.abs(currentForecast.revenue_gap_percent || 0).toFixed(1)}% behind pace)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">
+              No forecast for current quarter. 
+              <Link href="/goals/forecast" className="text-blue-600 hover:text-blue-700 ml-1">
+                Create forecast →
+              </Link>
+            </p>
+          )}
+        </div>
+
+        {/* 90-Day Priorities */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">90-Day Priorities</h2>
+            <Link
+              href="/goals/priorities"
+              className="text-blue-600 hover:text-blue-700 text-sm"
+            >
+              Manage Priorities →
+            </Link>
+          </div>
+
+          {priorities.length > 0 ? (
+            <div className="space-y-4">
+              {priorities.map((priority) => (
+                <div key={priority.id} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{goal.title}</h3>
-                        {goal.is_critical && (
-                          <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">CRITICAL</span>
-                        )}
-                        {goal.category && (
-                          <span className={`text-xs px-2 py-1 rounded ${getCategoryColor(goal.category)}`}>
-                            {goal.category}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                        <span>Due: {formatDate(goal.end_date)}</span>
-                        {goal.owner_name && <span>Owner: {goal.owner_name}</span>}
-                        {goal.priority && <span>Priority: {goal.priority}</span>}
-                      </div>
-
-                      {goal.target_metric && (
-                        <div className="mb-3">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">Progress: {goal.target_metric}</span>
-                            <span className="font-medium">{goal.current_value || 0} / {goal.target_value}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${goal.progress_percentage || 0}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs px-2 py-1 rounded ${getStatusColor(goal.status)}`}>
-                          {goal.status.replace('_', ' ').toUpperCase()}
+                        <span className="text-lg font-semibold text-gray-900">
+                          #{priority.priority_order}. {priority.strategic_todo?.title}
                         </span>
-                        <Link
-                          href={`/goals/${goal.id}`}
-                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                        >
-                          View Details →
-                        </Link>
+                        <span className={`text-xs px-2 py-1 rounded ${getEngineColor(priority.strategic_todo?.engine || '')}`}>
+                          {priority.strategic_todo?.engine.replace('_', ' ').toUpperCase()}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded ${getStatusColor(priority.status)}`}>
+                          {priority.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">{priority.why_critical}</p>
+                      <div className="flex items-center gap-4 text-sm">
+                        <span>Success Metric: {priority.success_metric}</span>
+                        {priority.strategic_todo?.owner_name && (
+                          <span>Owner: {priority.strategic_todo.owner_name}</span>
+                        )}
                       </div>
                     </div>
-                    
-                    <div className="text-right ml-4">
-                      <div className="text-2xl font-bold text-gray-900">{goal.progress_percentage || 0}%</div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-gray-900">{priority.progress_percentage}%</div>
                       <div className="text-xs text-gray-500">Complete</div>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all"
+                        style={{ width: `${priority.progress_percentage}%` }}
+                      />
                     </div>
                   </div>
                 </div>
               ))}
             </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">
+              No priorities set for this quarter. 
+              <Link href="/goals/priorities" className="text-blue-600 hover:text-blue-700 ml-1">
+                Select priorities →
+              </Link>
+            </p>
           )}
         </div>
 
-        {/* 90-Day Rocks Section */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">90-Day Rocks</h2>
-            <span className="text-sm text-gray-500">Quarterly priorities driving annual goals</span>
+        {/* Strategic To-Do Master List Summary */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Strategic To-Do List</h2>
+            <Link
+              href="/goals/todos"
+              className="text-blue-600 hover:text-blue-700 text-sm"
+            >
+              Manage List →
+            </Link>
           </div>
-          
-          {ninetyDayRocks.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{todoCount.attract || 0}</div>
+              <div className="text-sm text-blue-800">Attract Engine</div>
+            </div>
+            <div className="text-center p-4 bg-purple-50 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600">{todoCount.convert || 0}</div>
+              <div className="text-sm text-purple-800">Convert Engine</div>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">{todoCount.deliver_customer || 0}</div>
+              <div className="text-sm text-green-800">Deliver - Customer</div>
+            </div>
+            <div className="text-center p-4 bg-yellow-50 rounded-lg">
+              <div className="text-2xl font-bold text-yellow-600">{todoCount.deliver_operations || 0}</div>
+              <div className="text-sm text-yellow-800">Deliver - Operations</div>
+            </div>
+            <div className="text-center p-4 bg-indigo-50 rounded-lg">
+              <div className="text-2xl font-bold text-indigo-600">{todoCount.scale || 0}</div>
+              <div className="text-sm text-indigo-800">Scale Engine</div>
+            </div>
+            <div className="text-center p-4 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">{todoCount.finance || 0}</div>
+              <div className="text-sm text-red-800">Finance Engine</div>
+            </div>
+          </div>
+
+          <div className="mt-4 text-center">
+            <Link
+              href="/goals/todos/add"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No 90-day rocks yet</h3>
-              <p className="mt-1 text-sm text-gray-500">Break down your annual goals into quarterly rocks.</p>
-              <Link
-                href="/goals/create?type=90_day_rock"
-                className="mt-4 inline-block bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
-                Create 90-Day Rock
-              </Link>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {ninetyDayRocks.map((rock) => (
-                <div key={rock.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{rock.title}</h3>
-                        {rock.is_critical && (
-                          <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">CRITICAL</span>
-                        )}
-                        {rock.category && (
-                          <span className={`text-xs px-2 py-1 rounded ${getCategoryColor(rock.category)}`}>
-                            {rock.category}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                        <span>Due: {formatDate(rock.end_date)}</span>
-                        {rock.owner_name && <span>Owner: {rock.owner_name}</span>}
-                        {rock.priority && <span>Priority: {rock.priority}</span>}
-                      </div>
-
-                      {rock.target_metric && (
-                        <div className="mb-3">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">Progress: {rock.target_metric}</span>
-                            <span className="font-medium">{rock.current_value || 0} / {rock.target_value}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${rock.progress_percentage || 0}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs px-2 py-1 rounded ${getStatusColor(rock.status)}`}>
-                          {rock.status.replace('_', ' ').toUpperCase()}
-                        </span>
-                        <Link
-                          href={`/goals/${rock.id}`}
-                          className="text-purple-600 hover:text-purple-700 text-sm font-medium"
-                        >
-                          View Details →
-                        </Link>
-                      </div>
-                    </div>
-                    
-                    <div className="text-right ml-4">
-                      <div className="text-2xl font-bold text-gray-900">{rock.progress_percentage || 0}%</div>
-                      <div className="text-xs text-gray-500">Complete</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+              Add Strategic Initiative
+            </Link>
+          </div>
         </div>
       </div>
     </div>

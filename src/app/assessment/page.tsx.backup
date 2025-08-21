@@ -3,828 +3,1032 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Database } from '@/types/database.types';
+import { saveAssessment } from '@/lib/assessment-service';
+import { ChevronRight, ChevronLeft, Check, AlertCircle } from 'lucide-react';
 
-interface AssessmentResponse {
-  [key: string]: string | number | boolean | string[];
+interface Question {
+  id: string;
+  text: string;
+  type: 'radio' | 'checkbox' | 'text' | 'multiselect' | 'yesno-group';
+  options?: { value: string; label: string; points?: number }[];
+  questions?: { id: string; text: string }[]; // For grouped yes/no questions
+  section: string;
+  subsection?: string;
 }
 
+const questions: Question[] = [
+  // SECTION 1: BUSINESS FOUNDATION (6 questions)
+  {
+    id: 'q1',
+    text: "What's your current annual revenue?",
+    type: 'radio',
+    section: 'Business Foundation',
+    options: [
+      { value: 'under_250k', label: 'Under $250K (Foundation Stage)', points: 2 },
+      { value: '250k_1m', label: '$250K - $1M (Traction Stage)', points: 4 },
+      { value: '1m_3m', label: '$1M - $3M (Scaling Stage)', points: 6 },
+      { value: '3m_5m', label: '$3M - $5M (Optimization Stage)', points: 8 },
+      { value: '5m_10m', label: '$5M - $10M (Leadership Stage)', points: 9 },
+      { value: 'over_10m', label: '$10M+ (Mastery Stage)', points: 10 }
+    ]
+  },
+  {
+    id: 'q2',
+    text: "What's your current profit margin?",
+    type: 'radio',
+    section: 'Business Foundation',
+    options: [
+      { value: 'losing', label: 'Losing money', points: 0 },
+      { value: 'breakeven', label: 'Breaking even (0-5%)', points: 2 },
+      { value: 'small_5_10', label: 'Small profit (5-10%)', points: 4 },
+      { value: 'healthy_10_15', label: 'Healthy profit (10-15%)', points: 6 },
+      { value: 'strong_15_20', label: 'Strong profit (15-20%)', points: 8 },
+      { value: 'exceptional_20_plus', label: 'Exceptional profit (20%+)', points: 10 }
+    ]
+  },
+  {
+    id: 'q3',
+    text: 'Are you paying yourself a market-rate salary consistently?',
+    type: 'radio',
+    section: 'Business Foundation',
+    options: [
+      { value: 'no_rarely', label: 'No - rarely take money out', points: 0 },
+      { value: 'sometimes', label: 'Sometimes - when cash flow allows', points: 2 },
+      { value: 'yes_below', label: 'Yes - regular salary below market', points: 3 },
+      { value: 'yes_full', label: 'Yes - full market-rate salary', points: 4 },
+      { value: 'yes_plus_profit', label: 'Yes - salary plus profit distributions', points: 5 }
+    ]
+  },
+  {
+    id: 'q4',
+    text: 'How many people work in your business?',
+    type: 'radio',
+    section: 'Business Foundation',
+    options: [
+      { value: 'just_me', label: 'Just me', points: 1 },
+      { value: '2_5', label: '2-5 people', points: 2 },
+      { value: '6_15', label: '6-15 people', points: 3 },
+      { value: '16_50', label: '16-50 people', points: 4 },
+      { value: '50_plus', label: '50+ people', points: 5 }
+    ]
+  },
+  {
+    id: 'q5',
+    text: 'How dependent is the business on you personally?',
+    type: 'radio',
+    section: 'Business Foundation',
+    options: [
+      { value: 'completely', label: 'Completely - stops without me', points: 0 },
+      { value: 'very', label: 'Very - needs me for most decisions', points: 2 },
+      { value: 'somewhat', label: 'Somewhat - can run for short periods', points: 4 },
+      { value: 'minimal', label: 'Minimal - runs well without me', points: 5 }
+    ]
+  },
+  {
+    id: 'q6',
+    text: 'How predictable is your monthly revenue?',
+    type: 'radio',
+    section: 'Business Foundation',
+    options: [
+      { value: 'unpredictable', label: 'Completely unpredictable - varies wildly', points: 0 },
+      { value: 'somewhat_50', label: 'Somewhat predictable - within 50%', points: 3 },
+      { value: 'very_25', label: 'Very predictable - within 25%', points: 7 },
+      { value: 'extremely_recurring', label: 'Extremely predictable - recurring revenue', points: 10 }
+    ]
+  },
+
+  // SECTION 2: STRATEGIC WHEEL (14 questions)
+  {
+    id: 'q7',
+    text: 'How clear and compelling is your business vision?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Vision & Purpose',
+    options: [
+      { value: 'very_unclear', label: 'Very unclear - no defined direction', points: 0 },
+      { value: 'somewhat_clear', label: 'Somewhat clear - general idea', points: 3 },
+      { value: 'clear', label: 'Clear - team understands it', points: 7 },
+      { value: 'crystal_clear', label: 'Crystal clear - guides all decisions', points: 10 }
+    ]
+  },
+  {
+    id: 'q8',
+    text: 'Does your team understand and believe in your purpose?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Vision & Purpose',
+    options: [
+      { value: 'no_understanding', label: 'No understanding or buy-in', points: 0 },
+      { value: 'some_understanding', label: 'Some understanding, limited buy-in', points: 3 },
+      { value: 'good_understanding', label: 'Good understanding and buy-in', points: 7 },
+      { value: 'complete_alignment', label: 'Complete alignment and passion', points: 10 }
+    ]
+  },
+  {
+    id: 'q9',
+    text: 'How well-defined is your target market and positioning?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Strategy & Market',
+    options: [
+      { value: 'anyone', label: 'Serve anyone who will pay', points: 0 },
+      { value: 'general', label: 'General target market defined', points: 3 },
+      { value: 'specific', label: 'Specific ideal customer profile', points: 7 },
+      { value: 'laser_focused', label: 'Laser-focused with clear differentiation', points: 10 }
+    ]
+  },
+  {
+    id: 'q10',
+    text: 'Do you have a sustainable competitive advantage?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Strategy & Market',
+    options: [
+      { value: 'price_only', label: 'Compete mainly on price', points: 0 },
+      { value: 'some_differentiation', label: 'Some differentiation', points: 3 },
+      { value: 'clear_value', label: 'Clear unique value proposition', points: 7 },
+      { value: 'dominant', label: 'Dominant market position', points: 10 }
+    ]
+  },
+  {
+    id: 'q11',
+    text: 'Have you clearly defined and do you actively use your Unique Selling Propositions (USPs)?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Strategy & Market',
+    options: [
+      { value: 'dont_know', label: "Don't know what makes us different", points: 0 },
+      { value: 'some_ideas', label: 'Have some ideas but not clearly defined', points: 3 },
+      { value: 'defined_not_used', label: 'USPs defined but not consistently used in marketing', points: 5 },
+      { value: 'clear_used', label: 'Clear USPs used across all marketing materials', points: 8 },
+      { value: 'powerful', label: 'Powerful USPs that immediately resonate with ideal clients', points: 10 }
+    ]
+  },
+  {
+    id: 'q13',
+    text: 'How strong is your team and culture?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'People & Culture',
+    options: [
+      { value: 'struggling', label: 'Struggling with people issues', points: 0 },
+      { value: 'adequate', label: 'Adequate team, developing culture', points: 3 },
+      { value: 'good', label: 'Good team, positive culture', points: 7 },
+      { value: 'excellent', label: 'A-players with exceptional culture', points: 10 }
+    ]
+  },
+  {
+    id: 'q14',
+    text: 'How well-defined and lived are your core values?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'People & Culture',
+    options: [
+      { value: 'none', label: 'No defined core values', points: 0 },
+      { value: 'exist_unused', label: "Values exist but aren't used", points: 3 },
+      { value: 'guide_some', label: 'Values guide some decisions', points: 7 },
+      { value: 'drive_all', label: 'Values drive all decisions and hiring', points: 10 }
+    ]
+  },
+  {
+    id: 'q15',
+    text: 'How systematic is your business execution?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Systems & Execution',
+    options: [
+      { value: 'adhoc', label: 'Ad hoc, reactive approach', points: 0 },
+      { value: 'some_systems', label: 'Some systems, inconsistent execution', points: 3 },
+      { value: 'good_systems', label: 'Good systems, reliable execution', points: 7 },
+      { value: 'exceptional', label: 'Exceptional systems and execution', points: 10 }
+    ]
+  },
+  {
+    id: 'q16',
+    text: 'Do you have effective meeting rhythms?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Systems & Execution',
+    options: [
+      { value: 'irregular', label: 'Irregular, unproductive meetings', points: 0 },
+      { value: 'some_meetings', label: 'Some meetings, limited value', points: 3 },
+      { value: 'weekly', label: 'Weekly team meetings with agendas', points: 7 },
+      { value: 'comprehensive', label: 'Daily huddles, weekly tactical, monthly strategic', points: 10 }
+    ]
+  },
+  {
+    id: 'q17',
+    text: 'How well do you track business performance with a dashboard?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Money & Metrics',
+    options: [
+      { value: 'dont_track', label: "Don't track metrics systematically", points: 0 },
+      { value: 'monthly', label: 'Track basic metrics monthly', points: 3 },
+      { value: 'weekly', label: 'Weekly dashboard review', points: 7 },
+      { value: 'daily', label: 'Real-time dashboard reviewed daily', points: 10 }
+    ]
+  },
+  {
+    id: 'q18',
+    text: 'Have you identified your "1 Number" that drives everything?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Money & Metrics',
+    options: [
+      { value: 'no_idea', label: 'No idea what this means', points: 0 },
+      { value: 'many_metrics', label: 'Track many metrics, no focus', points: 3 },
+      { value: 'identified', label: 'Have identified key metric', points: 7 },
+      { value: 'drives_all', label: '"1 Number" drives all decisions', points: 10 }
+    ]
+  },
+  {
+    id: 'q19',
+    text: 'How aligned is your team around priorities?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Communications & Alignment',
+    options: [
+      { value: 'no_alignment', label: 'Little to no alignment', points: 0 },
+      { value: 'some_alignment', label: 'Some alignment, poor communication', points: 3 },
+      { value: 'good_alignment', label: 'Good alignment and communication', points: 7 },
+      { value: 'perfect', label: 'Perfect alignment and rhythm', points: 10 }
+    ]
+  },
+  {
+    id: 'q20',
+    text: 'How organized are your team communications?',
+    type: 'radio',
+    section: 'Strategic Wheel',
+    subsection: 'Communications & Alignment',
+    options: [
+      { value: 'scattered', label: 'Scattered across email, texts, calls, and apps - very inefficient', points: 0 },
+      { value: 'multiple', label: 'Multiple channels but manageable', points: 3 },
+      { value: 'streamlined', label: 'Streamlined to 2-3 main channels', points: 7 },
+      { value: 'unified', label: 'One primary platform for all team communication', points: 10 }
+    ]
+  },
+
+  // SECTION 3: PROFITABILITY HEALTH (6 questions)
+  {
+    id: 'q22',
+    text: 'When did you last increase prices?',
+    type: 'radio',
+    section: 'Profitability Health',
+    options: [
+      { value: 'never_2years', label: 'Never or over 2 years ago', points: 0 },
+      { value: '1_2_years', label: '1-2 years ago', points: 3 },
+      { value: '6_12_months', label: '6-12 months ago', points: 7 },
+      { value: 'within_6', label: 'Within last 6 months', points: 10 }
+    ]
+  },
+  {
+    id: 'q23',
+    text: 'How confident are you in your pricing strategy?',
+    type: 'radio',
+    section: 'Profitability Health',
+    options: [
+      { value: 'very_unsure', label: 'Very unsure - often discount or apologize', points: 0 },
+      { value: 'somewhat', label: 'Somewhat confident - occasional doubts', points: 3 },
+      { value: 'confident', label: 'Confident - rarely questioned', points: 7 },
+      { value: 'very_confident', label: 'Very confident - optimal pricing achieved', points: 10 }
+    ]
+  },
+  {
+    id: 'q24',
+    text: 'How often do you review and audit your business expenses?',
+    type: 'radio',
+    section: 'Profitability Health',
+    options: [
+      { value: 'never_tight', label: 'Never or only when cash is tight', points: 0 },
+      { value: 'annually', label: 'Annually', points: 3 },
+      { value: 'quarterly', label: 'Quarterly', points: 7 },
+      { value: 'monthly', label: 'Monthly with action taken on findings', points: 10 }
+    ]
+  },
+  {
+    id: 'q25',
+    text: 'Do you regularly review and cancel unused subscriptions/services?',
+    type: 'radio',
+    section: 'Profitability Health',
+    options: [
+      { value: 'no_probably', label: "No - probably paying for things we don't use", points: 0 },
+      { value: 'occasionally', label: 'Occasionally when I notice something', points: 3 },
+      { value: 'annual', label: 'Annual review of all subscriptions', points: 7 },
+      { value: 'quarterly', label: 'Quarterly audit with immediate cancellations', points: 10 }
+    ]
+  },
+  {
+    id: 'q26',
+    text: 'When did you last negotiate with suppliers for better pricing?',
+    type: 'radio',
+    section: 'Profitability Health',
+    options: [
+      { value: 'never_2years', label: 'Never or over 2 years ago', points: 0 },
+      { value: 'within_2years', label: 'Within the last 2 years', points: 3 },
+      { value: 'within_year', label: 'Within the last year', points: 7 },
+      { value: 'within_6months', label: 'Within the last 6 months', points: 10 }
+    ]
+  },
+
+  // SECTION 4: BUSINESS ENGINES - ATTRACT ENGINE
+  {
+    id: 'q27',
+    text: 'How many qualified leads do you generate monthly?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Attract Engine',
+    options: [
+      { value: 'under_20', label: 'Under 20 leads', points: 2 },
+      { value: '20_50', label: '20-50 leads', points: 5 },
+      { value: '50_100', label: '50-100 leads', points: 8 },
+      { value: 'over_100', label: '100+ leads', points: 10 }
+    ]
+  },
+  {
+    id: 'q28',
+    text: 'How many reliable marketing channels generate leads?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Attract Engine',
+    options: [
+      { value: 'none', label: 'No consistent channels', points: 0 },
+      { value: '1_2', label: '1-2 inconsistent sources', points: 3 },
+      { value: '3_4', label: '3-4 regular sources', points: 7 },
+      { value: '5_plus', label: '5+ systematic channels', points: 10 }
+    ]
+  },
+  {
+    id: 'q30',
+    text: 'How systematic is your lead generation? (Answer Yes or No to each)',
+    type: 'yesno-group',
+    section: 'Business Engines',
+    subsection: 'Attract Engine',
+    questions: [
+      { id: 'q30a', text: 'We have a referral system generating 30%+ of business' },
+      { id: 'q30b', text: 'We email our database/leads regularly to nurture relationships' },
+      { id: 'q30c', text: 'We track ROI for each marketing channel' },
+      { id: 'q30d', text: 'We know our cost per lead and customer acquisition cost' }
+    ]
+  },
+
+  // CONVERT ENGINE
+  {
+    id: 'q31',
+    text: "What's your lead-to-customer conversion rate?",
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Convert Engine',
+    options: [
+      { value: 'under_15', label: "Under 15% or don't track", points: 2 },
+      { value: '15_25', label: '15-25%', points: 5 },
+      { value: '25_40', label: '25-40%', points: 8 },
+      { value: 'over_40', label: 'Over 40%', points: 10 }
+    ]
+  },
+  {
+    id: 'q33',
+    text: 'How effective is your sales capability? (Answer Yes or No to each)',
+    type: 'yesno-group',
+    section: 'Business Engines',
+    subsection: 'Convert Engine',
+    questions: [
+      { id: 'q33a', text: 'We follow up multiple times with interested prospects' },
+      { id: 'q33b', text: "We contact prospects who didn't sign after receiving proposals" },
+      { id: 'q33c', text: 'We have ready answers for common objections' },
+      { id: 'q33d', text: 'We always ask for the business rather than waiting' }
+    ]
+  },
+  {
+    id: 'q34',
+    text: 'Do you maximize transaction value? (Answer Yes or No to each)',
+    type: 'yesno-group',
+    section: 'Business Engines',
+    subsection: 'Convert Engine',
+    questions: [
+      { id: 'q34a', text: 'We offer different price points (basic, standard, premium)' },
+      { id: 'q34b', text: 'We regularly offer additional products/services to clients' },
+      { id: 'q34c', text: 'We can confidently explain our pricing without apologizing' },
+      { id: 'q34d', text: 'Our prices are based on value, not just costs' }
+    ]
+  },
+
+  // DELIVER ENGINE - CUSTOMER EXPERIENCE
+  {
+    id: 'q35',
+    text: 'What percentage of customers are delighted with your delivery?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Deliver Engine - Customer',
+    options: [
+      { value: 'under_60', label: 'Under 60%', points: 0 },
+      { value: '60_75', label: '60-75%', points: 3 },
+      { value: '75_90', label: '75-90%', points: 7 },
+      { value: 'over_90', label: 'Over 90%', points: 10 }
+    ]
+  },
+  {
+    id: 'q39',
+    text: 'How exceptional is your customer journey? (Answer Yes or No to each)',
+    type: 'yesno-group',
+    section: 'Business Engines',
+    subsection: 'Deliver Engine - Customer',
+    questions: [
+      { id: 'q39a', text: 'Our onboarding experience impresses new customers' },
+      { id: 'q39b', text: "We've mapped every customer touchpoint" },
+      { id: 'q39c', text: 'Customers can easily reach us when needed' },
+      { id: 'q39d', text: 'We systematically review and improve the experience' }
+    ]
+  },
+
+  // DELIVER ENGINE - PEOPLE & TEAM
+  {
+    id: 'q40',
+    text: 'How strategic is your approach to talent?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Deliver Engine - People',
+    options: [
+      { value: 'reactive', label: 'Reactive hiring when desperate', points: 0 },
+      { value: 'basic', label: 'Basic hiring process', points: 3 },
+      { value: 'good', label: 'Good hiring with defined criteria', points: 7 },
+      { value: 'systematic', label: 'Systematic recruitment of A-players', points: 10 }
+    ]
+  },
+  {
+    id: 'q42',
+    text: 'How effectively do you develop and leverage your team? (Answer Yes or No to each)',
+    type: 'yesno-group',
+    section: 'Business Engines',
+    subsection: 'Deliver Engine - People',
+    questions: [
+      { id: 'q42a', text: 'Every role has documented responsibilities and KPIs' },
+      { id: 'q42b', text: 'We invest in team training and development' },
+      { id: 'q42c', text: 'We strategically outsource non-core activities' },
+      { id: 'q42d', text: 'Team is accountable for results' }
+    ]
+  },
+
+  // DELIVER ENGINE - SYSTEMS & PROCESS
+  {
+    id: 'q43',
+    text: 'How comprehensive is your process documentation?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Deliver Engine - Systems',
+    options: [
+      { value: 'in_heads', label: "Most processes exist only in people's heads", points: 0 },
+      { value: 'some_documented', label: 'Some processes documented', points: 3 },
+      { value: 'most_documented', label: 'Most key processes documented', points: 7 },
+      { value: 'all_optimized', label: 'All processes documented and optimized', points: 10 }
+    ]
+  },
+  {
+    id: 'q45',
+    text: 'How advanced is your operational infrastructure? (Answer Yes or No to each)',
+    type: 'yesno-group',
+    section: 'Business Engines',
+    subsection: 'Deliver Engine - Systems',
+    questions: [
+      { id: 'q45a', text: 'We have robust data backup and security systems' },
+      { id: 'q45b', text: 'We have documented customer retention/delight processes' },
+      { id: 'q45c', text: 'Our technology infrastructure is current and integrated' },
+      { id: 'q45d', text: 'We measure process efficiency and cycle times' }
+    ]
+  },
+
+  // FINANCE ENGINE
+  {
+    id: 'q46',
+    text: 'Do you have a comprehensive P&L budget/forecast?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Finance Engine',
+    options: [
+      { value: 'no_budget', label: 'No budget or forecast', points: 0 },
+      { value: 'basic', label: 'Basic revenue/expense tracking', points: 3 },
+      { value: 'annual', label: 'Annual budget created', points: 7 },
+      { value: 'detailed', label: 'Detailed budget with monthly variance analysis', points: 10 }
+    ]
+  },
+  {
+    id: 'q49',
+    text: 'How well do you manage profitability and working capital? (Answer Yes or No to each)',
+    type: 'yesno-group',
+    section: 'Business Engines',
+    subsection: 'Finance Engine',
+    questions: [
+      { id: 'q49a', text: 'We maintain sufficient cash reserves (3+ months expenses)' },
+      { id: 'q49b', text: 'We actively manage our cash conversion cycle' },
+      { id: 'q49c', text: 'We know which products/services are most profitable' },
+      { id: 'q49d', text: 'We have increased prices in the last 12 months' }
+    ]
+  },
+
+  // SECTION 5: SUCCESS DISCIPLINES - Each discipline gets 5 yes/no questions on one page
+  {
+    id: 'q50',
+    text: 'Decision-Making Frameworks',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Decision-Making',
+    questions: [
+      { id: 'q50a', text: 'I have clear criteria for different types of decisions' },
+      { id: 'q50b', text: 'I make small decisions quickly without overthinking' },
+      { id: 'q50c', text: 'I know which decisions need deep analysis vs quick action' },
+      { id: 'q50d', text: 'I rarely procrastinate on important decisions' },
+      { id: 'q50e', text: 'I have defined decision-making authority levels' }
+    ]
+  },
+  {
+    id: 'q51',
+    text: 'Technology & AI Integration',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Technology & AI',
+    questions: [
+      { id: 'q51a', text: 'We use technology effectively for marketing automation' },
+      { id: 'q51b', text: 'We track and manage all customer interactions systematically' },
+      { id: 'q51c', text: 'We use AI for content creation or customer service' },
+      { id: 'q51d', text: 'We use AI for data analysis or insights' },
+      { id: 'q51e', text: 'We regularly evaluate new technology opportunities' }
+    ]
+  },
+  {
+    id: 'q52',
+    text: 'Growth Mindset & Learning',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Growth Mindset',
+    questions: [
+      { id: 'q52a', text: 'I dedicate time weekly to learning new business skills' },
+      { id: 'q52b', text: 'I read business books or listen to podcasts regularly' },
+      { id: 'q52c', text: 'Our team has learning and development plans' },
+      { id: 'q52d', text: 'We document and share lessons from wins and failures' },
+      { id: 'q52e', text: 'We have a culture of continuous improvement' }
+    ]
+  },
+  {
+    id: 'q53',
+    text: 'Leadership Development',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Leadership',
+    questions: [
+      { id: 'q53a', text: 'Others naturally follow my vision and direction' },
+      { id: 'q53b', text: "I'm developing other leaders in the business" },
+      { id: 'q53c', text: 'I delegate effectively and empower my team' },
+      { id: 'q53d', text: 'I regularly assess and improve my leadership skills' },
+      { id: 'q53e', text: 'I spend time working ON the business, not just IN it' }
+    ]
+  },
+  {
+    id: 'q54',
+    text: 'Personal Mastery',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Personal Mastery',
+    questions: [
+      { id: 'q54a', text: 'I have a morning ritual including planning and goals review' },
+      { id: 'q54b', text: 'I can maintain deep focus for 2+ hours on important work' },
+      { id: 'q54c', text: 'I take at least 30 minutes daily for exercise/physical activity' },
+      { id: 'q54d', text: 'I plan each day in advance with specific outcomes' },
+      { id: 'q54e', text: 'I consistently maintain high energy throughout the workday' }
+    ]
+  },
+  {
+    id: 'q55',
+    text: 'Operational Excellence',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Operational Excellence',
+    questions: [
+      { id: 'q55a', text: 'We have standard operating procedures that everyone follows' },
+      { id: 'q55b', text: 'Our business could operate effectively without me for 6 weeks' },
+      { id: 'q55c', text: 'We regularly review and optimize our systems' },
+      { id: 'q55d', text: 'We measure and improve operational efficiency metrics' },
+      { id: 'q55e', text: 'We have quality control systems in place' }
+    ]
+  },
+  {
+    id: 'q56',
+    text: 'Resource Optimization',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Resource Optimization',
+    questions: [
+      { id: 'q56a', text: 'We maximize utilization of physical assets and space' },
+      { id: 'q56b', text: 'Our people are deployed in their highest-value roles' },
+      { id: 'q56c', text: "We've eliminated or outsourced non-core activities" },
+      { id: 'q56d', text: 'We regularly review and optimize all resource allocation' },
+      { id: 'q56e', text: 'We track ROI on all major investments and decisions' }
+    ]
+  },
+  {
+    id: 'q57',
+    text: 'Financial Acumen',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Financial Acumen',
+    questions: [
+      { id: 'q57a', text: 'I review financial metrics weekly' },
+      { id: 'q57b', text: 'I understand my profit per customer/job/unit sold' },
+      { id: 'q57c', text: 'We track budget vs actual with variance analysis' },
+      { id: 'q57d', text: 'I make decisions based on financial impact' },
+      { id: 'q57e', text: 'We actively manage cash flow to avoid surprises' }
+    ]
+  },
+  {
+    id: 'q58',
+    text: 'Accountability & Performance Management',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Accountability',
+    questions: [
+      { id: 'q58a', text: 'Every team member has clear KPIs and scorecards' },
+      { id: 'q58b', text: 'We conduct regular performance reviews' },
+      { id: 'q58c', text: 'People consistently do what they say they will do' },
+      { id: 'q58d', text: 'I hold myself accountable to my commitments' },
+      { id: 'q58e', text: 'We have a culture of ownership and responsibility' }
+    ]
+  },
+  {
+    id: 'q59',
+    text: 'Customer Experience',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Customer Experience',
+    questions: [
+      { id: 'q59a', text: 'Customers are delighted and become advocates (referrals/reviews)' },
+      { id: 'q59b', text: 'We systematically gather and act on customer feedback' },
+      { id: 'q59c', text: 'We maintain strong relationships beyond the initial transaction' },
+      { id: 'q59d', text: 'We exceed expectations at every touchpoint' },
+      { id: 'q59e', text: 'We have a customer success process, not just customer service' }
+    ]
+  },
+  {
+    id: 'q60',
+    text: 'Resilience & Renewal',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Resilience & Renewal',
+    questions: [
+      { id: 'q60a', text: 'I have scheduled breaks and renewal time' },
+      { id: 'q60b', text: 'I work less than 50 hours per week consistently' },
+      { id: 'q60c', text: "I've scheduled time off in the next 12 months" },
+      { id: 'q60d', text: 'I bounce back quickly from setbacks' },
+      { id: 'q60e', text: 'I maintain work-life integration that energizes me' }
+    ]
+  },
+  {
+    id: 'q61',
+    text: 'Time Management & Effectiveness',
+    type: 'yesno-group',
+    section: 'Success Disciplines',
+    subsection: 'Time Management',
+    questions: [
+      { id: 'q61a', text: 'I use a prioritization system (urgent/important matrix or similar)' },
+      { id: 'q61b', text: 'I maintain and work from organized to-do lists daily' },
+      { id: 'q61c', text: 'I calendar-block my most important activities' },
+      { id: 'q61d', text: 'I have a "Stop Doing List" to eliminate low-value activities' },
+      { id: 'q61e', text: 'I protect my time by saying no to non-essential requests' }
+    ]
+  }
+];
+
 export default function AssessmentPage() {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClientComponentClient();
-  const [currentSection, setCurrentSection] = useState(0);
-  const [responses, setResponses] = useState<AssessmentResponse>({});
-  const [loading, setLoading] = useState(false);
-  const [businessId, setBusinessId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const supabase = createClientComponentClient<Database>();
 
+  const currentQuestion = questions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  
+  // Get unique sections and current section info
+  const sections = ['Business Foundation', 'Strategic Wheel', 'Profitability Health', 'Business Engines', 'Success Disciplines'];
+  const currentSection = currentQuestion.section;
+  const currentSectionIndex = sections.indexOf(currentSection);
+  const questionsInSection = questions.filter(q => q.section === currentSection).length;
+  const currentQuestionInSection = questions.filter((q, i) => q.section === currentSection && i <= currentQuestionIndex).length;
+
+  // Add keyboard navigation
   useEffect(() => {
-    checkUser();
-  }, []);
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        if (currentQuestion.type === 'yesno-group') {
+          // Check if all sub-questions are answered
+          const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
+          if (allAnswered) {
+            if (currentQuestionIndex < questions.length - 1) {
+              goToNext();
+            } else {
+              handleSubmit();
+            }
+          }
+        } else if (answers[currentQuestion.id]) {
+          if (currentQuestionIndex < questions.length - 1) {
+            goToNext();
+          } else {
+            handleSubmit();
+          }
+        }
+      }
+    };
 
-  const checkUser = async () => {
+    window.addEventListener('keypress', handleKeyPress);
+    return () => window.removeEventListener('keypress', handleKeyPress);
+  }, [currentQuestionIndex, answers, currentQuestion]);
+
+  function handleAnswer(value: string, points?: number) {
+    setAnswers({
+      ...answers,
+      [currentQuestion.id]: { 
+        value, 
+        points: points || 0,
+        question: currentQuestion.text 
+      }
+    });
+  }
+
+  function handleYesNoGroup(questionId: string, value: 'yes' | 'no') {
+    const points = value === 'yes' ? 1.25 : 0; // Each yes/no in a group worth 1.25 points (5 questions = max 6.25)
+    setAnswers({
+      ...answers,
+      [questionId]: { 
+        value, 
+        points,
+        question: currentQuestion.questions?.find(q => q.id === questionId)?.text || ''
+      }
+    });
+  }
+
+  function goToPrevious() {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
+  }
+
+  function goToNext() {
+    if (currentQuestion.type === 'yesno-group') {
+      // Check if all sub-questions are answered
+      const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
+      if (allAnswered && currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+      }
+    } else if (answers[currentQuestion.id] && currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  }
+
+  function isCurrentQuestionAnswered(): boolean {
+    if (currentQuestion.type === 'yesno-group') {
+      return currentQuestion.questions?.every(q => answers[q.id]) || false;
+    }
+    return !!answers[currentQuestion.id];
+  }
+
+  async function handleSubmit() {
+    setIsSubmitting(true);
+    setError(null);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/auth/login');
         return;
       }
-      setUserId(user.id);
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('business_id')
-        .eq('id', user.id)
-        .single();
+      // Calculate scores
+      const totalScore = Object.values(answers).reduce((sum: number, answer: any) => 
+        sum + (answer.points || 0), 0
+      );
 
-      if (!profile?.business_id) {
-        alert('No business found. Please complete setup first.');
-        router.push('/dashboard');
-        return;
-      }
-      
-      setBusinessId(profile.business_id);
-    } catch (error) {
-      console.error('Error checking user:', error);
-    }
-  };
+      // Get revenue stage from first question
+      const revenueStage = answers['q1']?.value || 'unknown';
 
-  const sections = [
-    {
-      title: "Section 1: Business Foundation",
-      description: "Understanding your current position and motivation",
-      questions: [
-        {
-          id: 'q1_revenue',
-          question: "1. What's your current annual revenue?",
-          type: 'radio',
-          options: ['Under $250K', '$250K - $1M', '$1M - $3M', '$3M - $5M', '$5M - $10M', '$10M+']
-        },
-        {
-          id: 'q2_profit',
-          question: "2. What's your current profit margin?",
-          type: 'radio',
-          options: ['Losing money', 'Breaking even (0-5%)', 'Small profit (5-10%)', 'Healthy profit (10-15%)', 'Strong profit (15-20%)', 'Exceptional profit (20%+)']
-        },
-        {
-          id: 'q3_salary',
-          question: "3. Are you paying yourself a market-rate salary consistently?",
-          type: 'radio',
-          options: ['No - rarely take money out', 'Sometimes - when cash flow allows', 'Yes - regular salary below market', 'Yes - full market-rate salary', 'Yes - salary plus profit distributions']
-        },
-        {
-          id: 'q4_team',
-          question: "4. How many people work in your business?",
-          type: 'radio',
-          options: ['Just me', '2-5 people', '6-15 people', '16-50 people', '50+ people']
-        },
-        {
-          id: 'q5_dependency',
-          question: "5. How dependent is the business on you personally?",
-          type: 'radio',
-          options: ['Completely - stops without me', 'Very - needs me for most decisions', 'Somewhat - can run for short periods', 'Minimal - runs well without me']
-        },
-        {
-          id: 'q6_predictability',
-          question: "6. How predictable is your monthly revenue?",
-          type: 'radio',
-          options: ['Completely unpredictable', 'Somewhat predictable - within 50%', 'Very predictable - within 25%', 'Extremely predictable - recurring revenue']
-        }
-      ]
-    },
-    {
-      title: "Section 2: Strategic Wheel Assessment",
-      description: "The 6 components that drive business success",
-      questions: [
-        {
-          id: 'q7_vision',
-          question: "7. How clear and compelling is your business vision?",
-          type: 'radio',
-          options: ['Very unclear - no defined direction', 'Somewhat clear - general idea', 'Clear - team understands it', 'Crystal clear - guides all decisions']
-        },
-        {
-          id: 'q8_purpose',
-          question: "8. Does your team understand and believe in your purpose?",
-          type: 'radio',
-          options: ['No understanding or buy-in', 'Some understanding, limited buy-in', 'Good understanding and buy-in', 'Complete alignment and passion']
-        },
-        {
-          id: 'q9_target',
-          question: "9. How well-defined is your target market and positioning?",
-          type: 'radio',
-          options: ['Serve anyone who will pay', 'General target market defined', 'Specific ideal customer profile', 'Laser-focused with clear differentiation']
-        },
-        {
-          id: 'q10_advantage',
-          question: "10. Do you have a sustainable competitive advantage?",
-          type: 'radio',
-          options: ['Compete mainly on price', 'Some differentiation', 'Clear unique value proposition', 'Dominant market position']
-        },
-        {
-          id: 'q11_usps',
-          question: "11. Have you clearly defined and do you actively use your USPs?",
-          type: 'radio',
-          options: ["Don't know what makes us different", 'Have ideas but not clearly defined', 'USPs defined but not consistently used', 'Clear USPs used across all marketing', 'Powerful USPs that resonate with clients']
-        },
-        {
-          id: 'q13_team_culture',
-          question: "13. How strong is your team and culture?",
-          type: 'radio',
-          options: ['Struggling with people issues', 'Adequate team, developing culture', 'Good team, positive culture', 'A-players with exceptional culture']
-        },
-        {
-          id: 'q14_values',
-          question: "14. How well-defined and lived are your core values?",
-          type: 'radio',
-          options: ['No defined core values', "Values exist but aren't used", 'Values guide some decisions', 'Values drive all decisions and hiring']
-        },
-        {
-          id: 'q15_execution',
-          question: "15. How systematic is your business execution?",
-          type: 'radio',
-          options: ['Ad hoc, reactive approach', 'Some systems, inconsistent execution', 'Good systems, reliable execution', 'Exceptional systems and execution']
-        },
-        {
-          id: 'q16_meetings',
-          question: "16. Do you have effective meeting rhythms?",
-          type: 'radio',
-          options: ['Irregular, unproductive meetings', 'Some meetings, limited value', 'Weekly team meetings with agendas', 'Daily huddles, weekly tactical, monthly strategic']
-        },
-        {
-          id: 'q17_metrics',
-          question: "17. How well do you track business performance with a dashboard?",
-          type: 'radio',
-          options: ["Don't track metrics systematically", 'Track basic metrics monthly', 'Weekly dashboard review', 'Real-time dashboard reviewed daily']
-        },
-        {
-          id: 'q18_one_number',
-          question: '18. Have you identified your "1 Number" that drives everything?',
-          type: 'radio',
-          options: ['No idea what this means', 'Track many metrics, no focus', 'Have identified key metric', '"1 Number" drives all decisions']
-        },
-        {
-          id: 'q19_alignment',
-          question: "19. How aligned is your team around priorities?",
-          type: 'radio',
-          options: ['Little to no alignment', 'Some alignment, poor communication', 'Good alignment and communication', 'Perfect alignment and rhythm']
-        },
-        {
-          id: 'q20_communications',
-          question: "20. How organized are your team communications?",
-          type: 'radio',
-          options: ['Scattered across multiple channels', 'Multiple channels but manageable', 'Streamlined to 2-3 main channels', 'One primary platform for all communication']
-        }
-      ]
-    },
-    {
-      title: "Section 3: Profitability Health Check",
-      description: "Understanding your path to target profit margins",
-      questions: [
-        {
-          id: 'q21_profit_blockers',
-          question: "21. What prevents you from achieving your target profit margin? (Check all that apply)",
-          type: 'checkbox',
-          options: [
-            'Prices are too low for value delivered',
-            'Costs are not well controlled',
-            "Don't know true profit by product/service",
-            'Too many discounts given',
-            'Inefficient operations increase costs',
-            'High customer acquisition costs',
-            'Poor cash flow management',
-            'Overhead too high for revenue'
-          ]
-        },
-        {
-          id: 'q22_price_increase',
-          question: "22. When did you last increase prices?",
-          type: 'radio',
-          options: ['Never or over 2 years ago', '1-2 years ago', '6-12 months ago', 'Within last 6 months']
-        },
-        {
-          id: 'q23_pricing_confidence',
-          question: "23. How confident are you in your pricing strategy?",
-          type: 'radio',
-          options: ['Very unsure - often discount', 'Somewhat confident - occasional doubts', 'Confident - rarely questioned', 'Very confident - optimal pricing']
-        },
-        {
-          id: 'q24_expense_review',
-          question: "24. How often do you review and audit your business expenses?",
-          type: 'radio',
-          options: ['Never or only when cash tight', 'Annually', 'Quarterly', 'Monthly with action taken']
-        },
-        {
-          id: 'q25_subscriptions',
-          question: "25. Do you regularly review and cancel unused subscriptions/services?",
-          type: 'radio',
-          options: ['No - probably paying for unused', 'Occasionally when I notice', 'Annual review of all', 'Quarterly audit with cancellations']
-        },
-        {
-          id: 'q26_negotiations',
-          question: "26. When did you last negotiate with suppliers for better pricing?",
-          type: 'radio',
-          options: ['Never or over 2 years ago', 'Within the last 2 years', 'Within the last year', 'Within the last 6 months']
-        }
-      ]
-    },
-    {
-      title: "Section 4: Business Engines Assessment",
-      description: "The core engines that power your business growth",
-      questions: [
-        {
-          id: 'q27_leads',
-          question: "27. How many qualified leads do you generate monthly?",
-          type: 'radio',
-          options: ['Under 20 leads', '20-50 leads', '50-100 leads', '100+ leads']
-        },
-        {
-          id: 'q28_channels',
-          question: "28. How many reliable marketing channels generate leads?",
-          type: 'radio',
-          options: ['No consistent channels', '1-2 inconsistent sources', '3-4 regular sources', '5+ systematic channels']
-        },
-        {
-          id: 'q29_marketing_process',
-          question: "29. Do you have a documented marketing process?",
-          type: 'radio',
-          options: ['No process at all', "Have process but don't follow", 'Follow it sometimes', 'Follow it consistently']
-        },
-        {
-          id: 'q30_lead_systems',
-          question: "30. How systematic is your lead generation? (Check all that apply)",
-          type: 'checkbox',
-          options: [
-            'We have a referral system generating 30%+ of business',
-            'We email our database/leads regularly',
-            'We track ROI for each marketing channel',
-            'We know our cost per lead and CAC'
-          ]
-        },
-        {
-          id: 'q31_conversion',
-          question: "31. What's your lead-to-customer conversion rate?",
-          type: 'radio',
-          options: ["Under 15% or don't track", '15-25%', '25-40%', 'Over 40%']
-        },
-        {
-          id: 'q32_sales_process',
-          question: "32. Do you have a documented sales process that you follow?",
-          type: 'radio',
-          options: ['No process at all', "Have process but don't follow", 'Follow it sometimes', 'Follow it consistently']
-        },
-        {
-          id: 'q33_sales_capability',
-          question: "33. How effective is your sales capability? (Check all that apply)",
-          type: 'checkbox',
-          options: [
-            'We follow up multiple times with prospects',
-            'We contact prospects who did not sign',
-            'We have ready answers for objections',
-            'We always ask for the business'
-          ]
-        },
-        {
-          id: 'q34_transaction_value',
-          question: "34. Do you maximize transaction value? (Check all that apply)",
-          type: 'checkbox',
-          options: [
-            'We offer different price points',
-            'We regularly offer additional products/services',
-            'We can explain pricing without apologizing',
-            'Our prices are based on value, not costs'
-          ]
-        },
-        {
-          id: 'q35_customer_delight',
-          question: "35. What percentage of customers are delighted with your delivery?",
-          type: 'radio',
-          options: ['Under 60%', '60-75%', '75-90%', 'Over 90%']
-        },
-        {
-          id: 'q37_delivery_process',
-          question: "37. Do you have a documented delivery process that you follow?",
-          type: 'radio',
-          options: ['No process at all', "Have process but don't follow", 'Follow it sometimes', 'Follow it consistently']
-        },
-        {
-          id: 'q38_satisfaction',
-          question: "38. How do you measure and track customer satisfaction?",
-          type: 'radio',
-          options: ["Don't measure systematically", 'Occasional informal feedback', 'Regular satisfaction surveys', 'Comprehensive feedback with action plans']
-        },
-        {
-          id: 'q39_customer_journey',
-          question: "39. How exceptional is your customer journey? (Check all that apply)",
-          type: 'checkbox',
-          options: [
-            'Our onboarding impresses new customers',
-            'We have mapped every customer touchpoint',
-            'Customers can easily reach us when needed',
-            'We systematically review and improve experience'
-          ]
-        },
-        {
-          id: 'q40_talent',
-          question: "40. How strategic is your approach to talent?",
-          type: 'radio',
-          options: ['Reactive hiring when desperate', 'Basic hiring process', 'Good hiring with criteria', 'Systematic recruitment of A-players']
-        },
-        {
-          id: 'q41_performance',
-          question: "41. Do you have a performance management system?",
-          type: 'radio',
-          options: ['No formal management', 'Occasional informal feedback', 'Regular reviews without criteria', 'Systematic reviews against KPIs']
-        },
-        {
-          id: 'q42_team_development',
-          question: "42. How effectively do you develop your team? (Check all that apply)",
-          type: 'checkbox',
-          options: [
-            'Every role has documented responsibilities',
-            'We invest in team training',
-            'We strategically outsource non-core',
-            'Team is accountable for results'
-          ]
-        },
-        {
-          id: 'q43_documentation',
-          question: "43. How comprehensive is your process documentation?",
-          type: 'radio',
-          options: ["Most processes in people's heads", 'Some processes documented', 'Most key processes documented', 'All processes documented']
-        },
-        {
-          id: 'q44_audits',
-          question: "44. How often do you audit if systems are being followed?",
-          type: 'radio',
-          options: ['Never audit compliance', 'Only when problems arise', 'Annual system audits', 'Quarterly audits with improvements']
-        },
-        {
-          id: 'q45_infrastructure',
-          question: "45. How advanced is your operational infrastructure? (Check all that apply)",
-          type: 'checkbox',
-          options: [
-            'We have robust data backup and security',
-            'We have documented retention processes',
-            'Our technology is current and integrated',
-            'We measure process efficiency and cycle times'
-          ]
-        },
-        {
-          id: 'q46_budget',
-          question: "46. Do you have a comprehensive P&L budget/forecast?",
-          type: 'radio',
-          options: ['No budget or forecast', 'Basic revenue/expense tracking', 'Annual budget created', 'Detailed budget with variance analysis']
-        },
-        {
-          id: 'q47_cashflow',
-          question: "47. Do you maintain cash flow forecasts?",
-          type: 'radio',
-          options: ['No cash flow forecasting', 'Check bank when needed', 'Monthly cash flow review', '13-week rolling forecast']
-        },
-        {
-          id: 'q48_pricing_knowledge',
-          question: "48. Which statement best describes your understanding of pricing?",
-          type: 'radio',
-          options: ["Not sure of markup vs margin", "Understand but don't use strategically", 'Calculate both and understand impact', 'Optimize using both analyses']
-        },
-        {
-          id: 'q49_working_capital',
-          question: "49. How well do you manage profitability? (Check all that apply)",
-          type: 'checkbox',
-          options: [
-            'We maintain 3+ months cash reserves',
-            'We actively manage cash conversion cycle',
-            'We know which products are most profitable',
-            'We increased prices in last 12 months'
-          ]
-        }
-      ]
-    },
-    {
-      title: "Section 5: Success Disciplines Assessment",
-      description: "Evaluate your strength in 12 key disciplines - Check all that apply for each discipline",
-      questions: [
-        {
-          id: 'disc_decision',
-          question: "Decision-Making Frameworks",
-          type: 'checkbox',
-          options: [
-            'I have clear criteria for different types of decisions',
-            'I make small decisions quickly without overthinking',
-            'I know which decisions need deep analysis vs quick action',
-            'I rarely procrastinate on important decisions',
-            'I have defined decision-making authority levels'
-          ]
-        },
-        {
-          id: 'disc_technology',
-          question: "Technology & AI Integration",
-          type: 'checkbox',
-          options: [
-            'We use technology effectively for marketing automation',
-            'We track and manage all customer interactions systematically',
-            'We use AI for content creation or customer service',
-            'We use AI for data analysis or insights',
-            'We regularly evaluate new technology opportunities'
-          ]
-        },
-        {
-          id: 'disc_growth',
-          question: "Growth Mindset & Learning",
-          type: 'checkbox',
-          options: [
-            'I dedicate time weekly to learning new business skills',
-            'I read business books or listen to podcasts regularly',
-            'Our team has learning and development plans',
-            'We document and share lessons from wins and failures',
-            'We have a culture of continuous improvement'
-          ]
-        },
-        {
-          id: 'disc_leadership',
-          question: "Leadership Development",
-          type: 'checkbox',
-          options: [
-            'Others naturally follow my vision and direction',
-            'I am developing other leaders in the business',
-            'I delegate effectively and empower my team',
-            'I regularly assess and improve my leadership skills',
-            'I spend time working ON the business, not just IN it'
-          ]
-        },
-        {
-          id: 'disc_personal',
-          question: "Personal Mastery",
-          type: 'checkbox',
-          options: [
-            'I have a morning ritual including planning and goals review',
-            'I can maintain deep focus for 2+ hours on important work',
-            'I take at least 30 minutes daily for exercise/physical activity',
-            'I plan each day in advance with specific outcomes',
-            'I consistently maintain high energy throughout the workday'
-          ]
-        },
-        {
-          id: 'disc_operational',
-          question: "Operational Excellence",
-          type: 'checkbox',
-          options: [
-            'We have standard operating procedures that everyone follows',
-            'Our business could operate effectively without me for 6 weeks',
-            'We regularly review and optimize our systems',
-            'We measure and improve operational efficiency metrics',
-            'We have quality control systems in place'
-          ]
-        },
-        {
-          id: 'disc_resource',
-          question: "Resource Optimization",
-          type: 'checkbox',
-          options: [
-            'We maximize utilization of physical assets and space',
-            'Our people are deployed in their highest-value roles',
-            'We have eliminated or outsourced non-core activities',
-            'We regularly review and optimize all resource allocation',
-            'We track ROI on all major investments and decisions'
-          ]
-        },
-        {
-          id: 'disc_financial',
-          question: "Financial Acumen",
-          type: 'checkbox',
-          options: [
-            'I review financial metrics weekly',
-            'I understand my profit per customer/job/unit sold',
-            'We track budget vs actual with variance analysis',
-            'I make decisions based on financial impact',
-            'We actively manage cash flow to avoid surprises'
-          ]
-        },
-        {
-          id: 'disc_accountability',
-          question: "Accountability & Performance Management",
-          type: 'checkbox',
-          options: [
-            'Every team member has clear KPIs and scorecards',
-            'We conduct regular performance reviews',
-            'People consistently do what they say they will do',
-            'I hold myself accountable to my commitments',
-            'We have a culture of ownership and responsibility'
-          ]
-        },
-        {
-          id: 'disc_customer',
-          question: "Customer Experience",
-          type: 'checkbox',
-          options: [
-            'Customers are delighted and become advocates',
-            'We systematically gather and act on customer feedback',
-            'We maintain strong relationships beyond the initial transaction',
-            'We exceed expectations at every touchpoint',
-            'We have a customer success process, not just customer service'
-          ]
-        },
-        {
-          id: 'disc_resilience',
-          question: "Resilience & Renewal",
-          type: 'checkbox',
-          options: [
-            'I have scheduled breaks and renewal time',
-            'I work less than 50 hours per week consistently',
-            'I have scheduled time off in the next 12 months',
-            'I bounce back quickly from setbacks',
-            'I maintain work-life integration that energizes me'
-          ]
-        },
-        {
-          id: 'disc_time',
-          question: "Time Management & Effectiveness",
-          type: 'checkbox',
-          options: [
-            'I use a prioritization system (urgent/important matrix or similar)',
-            'I maintain and work from organized to-do lists daily',
-            'I calendar-block my most important activities',
-            'I have a Stop Doing List to eliminate low-value activities',
-            'I protect my time by saying no to non-essential requests'
-          ]
-        }
-      ]
-    },
-    {
-      title: "Section 6: Strategic Priorities & Goals",
-      description: "Define your focus areas and targets",
-      questions: [
-        {
-          id: 'q50_constraint',
-          question: "50. What's the single biggest constraint holding your business back?",
-          type: 'text',
-          placeholder: "Describe your biggest challenge..."
-        },
-        {
-          id: 'q51_opportunity',
-          question: "51. What's your biggest opportunity for growth right now?",
-          type: 'text',
-          placeholder: "Describe your biggest opportunity..."
-        },
-        {
-          id: 'q52_90day',
-          question: "52. If you could fix ONE thing in the next 90 days for maximum impact, what would it be?",
-          type: 'text',
-          placeholder: "Your top priority..."
-        },
-        {
-          id: 'q53_help',
-          question: "53. Where do you need the most help to achieve your goals?",
-          type: 'text',
-          placeholder: "Areas where you need support..."
-        }
-      ]
-    }
-  ];
-
-  // Calculate total questions - simplified count
-  const totalQuestions = 54; // We know it's 54 questions total
-
-  // Calculate answered questions
-  const getAnsweredCount = () => {
-    let count = 0;
-    sections.forEach(section => {
-      section.questions.forEach(q => {
-        if (responses[q.id] !== undefined && responses[q.id] !== '') {
-          count++;
-        }
+      // Save assessment
+      const assessmentId = await saveAssessment({
+        userId: user.id,
+        answers,
+        totalScore,
+        maxScore: 290,
+        completionPercentage: 100,
+        revenueStage
       });
-    });
-    return count;
-  };
 
-  const currentSectionData = sections[currentSection];
-  const questionsInSection = currentSectionData.questions.length;
-  const overallProgress = Math.round((getAnsweredCount() / totalQuestions) * 100);
-
-  const calculateScore = () => {
-    let score = 0;
-    let maxScore = 0;
-    
-    sections.forEach(section => {
-      section.questions.forEach(question => {
-        const response = responses[question.id];
-        
-        if (question.type === 'radio' && response) {
-          maxScore += 4;
-          const optionIndex = question.options?.indexOf(response as string) || 0;
-          const optionScore = (optionIndex / ((question.options?.length || 1) - 1)) * 4;
-          score += optionScore;
-        } else if (question.type === 'checkbox' && response) {
-          const checkedItems = response as string[];
-          maxScore += 4;
-          score += (checkedItems.length / (question.options?.length || 1)) * 4;
-        }
-      });
-    });
-    
-    return Math.round((score / maxScore) * 100);
-  };
-
-  const handleSubmit = async () => {
-    if (!businessId || !userId) {
-      alert('Missing business or user information. Please try again.');
-      return;
+      // Redirect to results page
+      router.push(`/assessment/${assessmentId}`);
+    } catch (err) {
+      console.error('Error submitting assessment:', err);
+      setError('Failed to save assessment. Please try again.');
+      setIsSubmitting(false);
     }
-
-    setLoading(true);
-    
-    try {
-      const score = calculateScore();
-      
-      const { data, error } = await supabase
-        .from('assessments')
-        .insert({
-          business_id: businessId,
-          completed_by: userId,
-          responses: responses,
-          score: score,
-          completion_percentage: 100
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      router.push(`/assessment/results?id=${data.id}`);
-    } catch (error: any) {
-      console.error('Error saving assessment:', error);
-      alert(`Failed to save assessment: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentSection < sections.length - 1) {
-      setCurrentSection(currentSection + 1);
-      window.scrollTo(0, 0);
-    } else {
-      handleSubmit();
-    }
-  };
-
-  const handleBack = () => {
-    if (currentSection > 0) {
-      setCurrentSection(currentSection - 1);
-      window.scrollTo(0, 0);
-    }
-  };
-
-  const handleResponse = (questionId: string, value: any) => {
-    setResponses(prev => ({
-      ...prev,
-      [questionId]: value
-    }));
-  };
-
-  const handleCheckboxResponse = (questionId: string, value: string, checked: boolean) => {
-    const current = (responses[questionId] as string[]) || [];
-    if (checked) {
-      handleResponse(questionId, [...current, value]);
-    } else {
-      handleResponse(questionId, current.filter(v => v !== value));
-    }
-  };
-
-  const isCurrentSectionComplete = () => {
-    return currentSectionData.questions.every(q => {
-      if (q.type === 'text' || q.type === 'checkbox') {
-        return true; // Optional
-      }
-      return responses[q.id] !== undefined && responses[q.id] !== '';
-    });
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Progress Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">Business Development Diagnostic</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Header with exit button */}
+      <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Business Development Assessment</h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Comprehensive evaluation of your business health and opportunities
+              </p>
+            </div>
             <button
               onClick={() => router.push('/dashboard')}
-              className="text-gray-600 hover:text-gray-900"
+              className="text-gray-500 hover:text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-100"
             >
-              Save & Exit
+              Exit
             </button>
           </div>
-          
-          {/* Section Progress */}
-          <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium">
-                Section {currentSection + 1} of {sections.length}: {questionsInSection} questions
+
+          {/* Progress Information */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-600">
+                Section {currentSectionIndex + 1} of {sections.length}: <span className="font-medium">{currentSection}</span>
               </span>
-              <span className="text-sm text-gray-600">
-                Overall: {getAnsweredCount()} of {totalQuestions} questions ({overallProgress}%)
+              <span className="text-gray-900 font-medium">
+                {currentQuestionIndex + 1} of {questions.length}
               </span>
             </div>
-            
-            {/* Overall Progress Bar */}
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-              <div 
-                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${overallProgress}%` }}
-              />
-            </div>
-            
-            {/* Section Progress Bar */}
-            <div className="text-xs text-gray-500 mb-1">Current Section Progress</div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${((currentSection + 1) / sections.length) * 100}%` }}
+                className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
               />
+            </div>
+            <div className="flex items-center justify-center text-xs text-gray-500 mt-1">
+              <span>{Math.round(progress)}% Complete</span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Section Content */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-2">{currentSectionData.title}</h2>
-          <p className="text-gray-600 mb-6">{currentSectionData.description}</p>
-          
-          <div className="space-y-6">
-            {currentSectionData.questions.map((question) => (
-              <div key={question.id} className="space-y-3">
-                <label className="block text-gray-700 font-medium">
-                  {question.question}
-                </label>
-                
-                {question.type === 'radio' && (
-                  <div className="space-y-2">
-                    {question.options?.map((option) => (
-                      <label key={option} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                        <input
-                          type="radio"
-                          name={question.id}
-                          value={option}
-                          checked={responses[question.id] === option}
-                          onChange={(e) => handleResponse(question.id, e.target.value)}
-                          className="mr-3"
-                        />
-                        <span>{option}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                
-                {question.type === 'checkbox' && (
-                  <div className="space-y-2">
-                    {question.options?.map((option) => (
-                      <label key={option} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          value={option}
-                          checked={(responses[question.id] as string[] || []).includes(option)}
-                          onChange={(e) => handleCheckboxResponse(question.id, option, e.target.checked)}
-                          className="mr-3"
-                        />
-                        <span>{option}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                
-                {question.type === 'text' && (
-                  <textarea
-                    value={responses[question.id] as string || ''}
-                    onChange={(e) => handleResponse(question.id, e.target.value)}
-                    className="w-full p-3 border rounded-lg"
-                    rows={3}
-                    placeholder={question.placeholder}
-                  />
-                )}
-              </div>
-            ))}
+      {/* Question Content */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Question Header */}
+          <div className="bg-gradient-to-r from-blue-500 to-purple-500 px-8 py-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white/90 text-sm font-medium">
+                {currentQuestion.subsection || currentSection}
+              </span>
+              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">
+                {currentQuestionIndex + 1}/{questions.length}
+              </span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-white">
+              {currentQuestion.text}
+            </h2>
           </div>
-        </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between mt-6">
-          <button
-            onClick={handleBack}
-            disabled={currentSection === 0}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-          >
-            ← Previous
-          </button>
-          
-          <button
-            onClick={handleNext}
-            disabled={!isCurrentSectionComplete() || loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? 'Saving...' : currentSection === sections.length - 1 ? 'Complete Assessment' : 'Next Section →'}
-          </button>
+          {/* Answer Options */}
+          <div className="p-8">
+            {currentQuestion.type === 'radio' && currentQuestion.options && (
+              <div className="space-y-3">
+                {currentQuestion.options.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleAnswer(option.value, option.points)}
+                    className={`w-full text-left p-5 rounded-xl border-2 transition-all duration-200 group ${
+                      answers[currentQuestion.id]?.value === option.value
+                        ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg transform scale-[1.02]'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center transition-all ${
+                        answers[currentQuestion.id]?.value === option.value
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-gray-400 group-hover:border-gray-500'
+                      }`}>
+                        {answers[currentQuestion.id]?.value === option.value && (
+                          <div className="w-3 h-3 bg-white rounded-full" />
+                        )}
+                      </div>
+                      <span className={`text-lg ${
+                        answers[currentQuestion.id]?.value === option.value
+                          ? 'text-gray-900 font-medium'
+                          : 'text-gray-700'
+                      }`}>
+                        {option.label}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {currentQuestion.type === 'yesno-group' && currentQuestion.questions && (
+              <div className="space-y-4">
+                {currentQuestion.questions.map((q) => (
+                  <div key={q.id} className="flex items-center justify-between py-4 px-5 rounded-xl bg-gray-50/70 hover:bg-gray-100/70 transition-all border border-gray-200/50">
+                    <p className="text-gray-700 text-lg flex-1 pr-6">{q.text}</p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleYesNoGroup(q.id, 'yes')}
+                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                          answers[q.id]?.value === 'yes'
+                            ? 'bg-green-500 text-white shadow-md transform scale-105'
+                            : 'bg-white border-2 border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-600'
+                        }`}
+                      >
+                        YES
+                      </button>
+                      <button
+                        onClick={() => handleYesNoGroup(q.id, 'no')}
+                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                          answers[q.id]?.value === 'no'
+                            ? 'bg-red-500 text-white shadow-md transform scale-105'
+                            : 'bg-white border-2 border-gray-300 text-gray-600 hover:border-red-400 hover:text-red-600'
+                        }`}
+                      >
+                        NO
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+                <AlertCircle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+                <p className="text-red-700">{error}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <div className="px-8 py-6 bg-gray-50 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={goToPrevious}
+                disabled={currentQuestionIndex === 0}
+                className={`flex items-center px-6 py-3 rounded-lg font-medium transition-all ${
+                  currentQuestionIndex === 0
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:shadow'
+                }`}
+              >
+                <ChevronLeft className="w-5 h-5 mr-2" />
+                Previous
+              </button>
+
+              <span className="text-sm text-gray-500">
+                Press <kbd className="px-2 py-1 bg-white rounded border border-gray-300 text-xs">Enter</kbd> to continue
+              </span>
+
+              {currentQuestionIndex === questions.length - 1 ? (
+                <button
+                  onClick={handleSubmit}
+                  disabled={!isCurrentQuestionAnswered() || isSubmitting}
+                  className={`flex items-center px-8 py-3 rounded-lg font-medium transition-all ${
+                    !isCurrentQuestionAnswered() || isSubmitting
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transform hover:-translate-y-0.5'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      Complete Assessment
+                      <Check className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={goToNext}
+                  disabled={!isCurrentQuestionAnswered()}
+                  className={`flex items-center px-6 py-3 rounded-lg font-medium transition-all ${
+                    !isCurrentQuestionAnswered()
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg transform hover:-translate-y-0.5'
+                  }`}
+                >
+                  Next
+                  <ChevronRight className="w-5 h-5 ml-2" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Target, TrendingUp, CheckCircle, AlertCircle, Sparkles, Brain, Users, Zap, DollarSign, Shield, Clock, BarChart3, Star, FileText } from 'lucide-react'
 
 // Define the 12 Success Disciplines with their details

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -9,7 +9,7 @@ export default function CreateGoalPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const goalType = searchParams.get('type') || 'annual';
-  const supabase = createClient();
+  // supabase client imported from lib
 
   const [loading, setLoading] = useState(false);
   const [businessId, setBusinessId] = useState<string | null>(null);
