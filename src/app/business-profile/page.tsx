@@ -4,59 +4,101 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import type { Database } from '@/types/supabase'
-import { ArrowLeft, ArrowRight, Save, Building2, DollarSign, Users, Package, Users2, Target } from 'lucide-react'
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  Save, 
+  Building2, 
+  DollarSign, 
+  Users, 
+  Package, 
+  Users2, 
+  Target,
+  CheckCircle,
+  AlertCircle,
+  Globe,
+  Instagram,
+  Facebook,
+  Linkedin
+} from 'lucide-react'
 
-type BusinessProfile = Database['public']['Tables']['business_profiles']['Row']
+type Business = Database['public']['Tables']['businesses']['Row']
 
 const STEPS = [
   { id: 1, name: 'Company Information', icon: Building2 },
-  { id: 2, name: 'Financial Overview', icon: DollarSign },
+  { id: 2, name: 'Financial Snapshot', icon: DollarSign },
   { id: 3, name: 'Team & Organisation', icon: Users },
   { id: 4, name: 'Products & Services', icon: Package },
-  { id: 5, name: 'Customer Overview', icon: Users2 },
-  { id: 6, name: 'Strategic Context', icon: Target },
+  { id: 5, name: 'Customer Segments', icon: Users2 },
+  { id: 6, name: 'Current Situation', icon: Target },
 ]
 
+// Simplified industry list with most common options
 const INDUSTRIES = [
-  'Agriculture, Forestry & Fishing',
-  'Mining',
+  'Building & Construction',
+  'Professional Services',
+  'Medical & Healthcare',
+  'Retail & E-commerce',
   'Manufacturing',
-  'Electricity, Gas, Water & Waste',
-  'Construction',
-  'Wholesale Trade',
-  'Retail Trade',
-  'Accommodation & Food Services',
-  'Transport, Postal & Warehousing',
-  'Information Media & Telecommunications',
-  'Financial & Insurance Services',
-  'Rental, Hiring & Real Estate Services',
-  'Professional, Scientific & Technical Services',
-  'Administrative & Support Services',
-  'Public Administration & Safety',
+  'Technology & Software',
+  'Financial Services',
+  'Real Estate',
+  'Hospitality & Tourism',
   'Education & Training',
-  'Health Care & Social Assistance',
-  'Arts & Recreation Services',
-  'Other Services',
+  'Transport & Logistics',
+  'Agriculture & Farming',
+  'Mining & Resources',
+  'Marketing & Advertising',
+  'Legal Services',
+  'Trades & Services',
+  'Wholesale & Distribution',
+  'Non-Profit',
+  'Government',
+  'Other',
 ]
 
-export default function BusinessProfilePage() {
+const BUSINESS_MODELS = [
+  'B2B (Business to Business)',
+  'B2C (Business to Consumer)',
+  'B2B2C (Both)',
+  'Marketplace',
+  'SaaS (Software as a Service)',
+  'Subscription',
+  'E-commerce',
+  'Professional Services',
+  'Manufacturing',
+  'Retail',
+  'Wholesale',
+  'Franchise',
+]
+
+// Simplified product/service types
+const OFFERING_TYPES = [
+  'Physical Product',
+  'Service',
+  'Digital Product',
+  'Subscription',
+  'Project-Based',
+]
+
+export default function EnhancedBusinessProfile() {
   const router = useRouter()
   const supabase = createClient()
   
   const [currentStep, setCurrentStep] = useState(1)
-  const [isSaving, setIsSaving] = useState(false)
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  const [profile, setProfile] = useState<Partial<BusinessProfile>>({})
-  const [profileId, setProfileId] = useState<string | null>(null)
+  const [business, setBusiness] = useState<Partial<Business>>({})
+  const [businessId, setBusinessId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [saveTimer, setSaveTimer] = useState<NodeJS.Timeout | null>(null)
 
-  // Load existing profile on mount
+  // Load business data on mount
   useEffect(() => {
-    loadProfile()
+    loadBusiness()
   }, [])
 
-  const loadProfile = async () => {
+  const loadBusiness = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -65,106 +107,129 @@ export default function BusinessProfilePage() {
       }
 
       const { data, error } = await supabase
-        .from('business_profiles')
+        .from('businesses')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('owner_id', user.id)
         .maybeSingle()
 
       if (data) {
-        setProfile(data)
-        setProfileId(data.id)
-        if (data.updated_at) {
-          setLastSaved(new Date(data.updated_at))
+        setBusiness(data)
+        setBusinessId(data.id)
+        if (data.profile_updated_at) {
+          setLastSaved(new Date(data.profile_updated_at))
+        }
+        
+        // Initialize empty key_roles if not present
+        if (!data.key_roles || (data.key_roles as any[]).length === 0) {
+          setBusiness(prev => ({
+            ...prev,
+            key_roles: [
+              { title: '', name: '', status: '' },
+              { title: '', name: '', status: '' },
+              { title: '', name: '', status: '' }
+            ]
+          }))
         }
       } else {
-        // Create new profile if none exists
-        const { data: newProfile, error: createError } = await supabase
-          .from('business_profiles')
-          .insert({ user_id: user.id })
+        // Create new business if none exists
+        const { data: newBusiness, error: createError } = await supabase
+          .from('businesses')
+          .insert({ 
+            owner_id: user.id,
+            name: 'My Business',
+            industry: '',
+            profile_completed: false,
+            key_roles: [
+              { title: '', name: '', status: '' },
+              { title: '', name: '', status: '' },
+              { title: '', name: '', status: '' }
+            ]
+          })
           .select()
           .single()
 
         if (createError) {
-          console.error('Error creating profile:', createError)
-        } else if (newProfile) {
-          setProfile(newProfile)
-          setProfileId(newProfile.id)
+          console.error('Error creating business:', createError)
+        } else if (newBusiness) {
+          setBusiness(newBusiness)
+          setBusinessId(newBusiness.id)
         }
       }
     } catch (error) {
-      console.error('Error loading profile:', error)
+      console.error('Error loading business:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Auto-save functionality
-  const saveProfile = useCallback(async () => {
-    if (!profileId) return
+  // Auto-save function
+  const autoSave = useCallback(async () => {
+    if (!businessId) return
 
-    setIsSaving(true)
+    setSaveStatus('saving')
     try {
       const { error } = await supabase
-        .from('business_profiles')
+        .from('businesses')
         .update({
-          ...profile,
-          updated_at: new Date().toISOString()
+          ...business,
+          profile_completed: calculateCompletion() >= 80,
+          profile_updated_at: new Date().toISOString()
         })
-        .eq('id', profileId)
+        .eq('id', businessId)
 
       if (error) {
-        console.error('Error saving profile:', error)
+        console.error('Error saving business:', error)
+        setSaveStatus('error')
       } else {
         setLastSaved(new Date())
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus('idle'), 2000)
       }
     } catch (error) {
       console.error('Error:', error)
-    } finally {
-      setIsSaving(false)
+      setSaveStatus('error')
     }
-  }, [profile, profileId, supabase])
+  }, [business, businessId])
 
-  // Handle field changes with auto-save
-  const handleFieldChange = (field: keyof BusinessProfile, value: any) => {
-    setProfile(prev => ({ ...prev, [field]: value }))
+  // Handle field changes with debounced auto-save
+  const handleFieldChange = (field: keyof Business, value: any) => {
+    setBusiness(prev => ({ ...prev, [field]: value }))
     
     // Clear existing timer
     if (saveTimer) clearTimeout(saveTimer)
     
-    // Set new timer for auto-save
+    // Set new timer for auto-save (2 seconds after user stops typing)
     const newTimer = setTimeout(() => {
-      saveProfile()
+      autoSave()
     }, 2000)
     
     setSaveTimer(newTimer)
   }
 
-  // Handle JSON field changes (for complex nested data)
-  const handleJsonFieldChange = (field: keyof BusinessProfile, path: string, value: any) => {
-    setProfile(prev => {
-      const currentData = (prev[field] as any) || {}
-      const keys = path.split('.')
-      const newData = { ...currentData }
-      
-      let target = newData
-      for (let i = 0; i < keys.length - 1; i++) {
-        if (!target[keys[i]]) target[keys[i]] = {}
-        target = target[keys[i]]
-      }
-      target[keys[keys.length - 1]] = value
-      
-      return { ...prev, [field]: newData }
-    })
-    
-    // Clear existing timer
-    if (saveTimer) clearTimeout(saveTimer)
-    
-    // Set new timer for auto-save
-    const newTimer = setTimeout(() => {
-      saveProfile()
-    }, 2000)
-    
-    setSaveTimer(newTimer)
+  // Handle array field changes
+  const handleArrayFieldChange = (field: keyof Business, index: number, value: string) => {
+    const currentArray = (business[field] as string[]) || []
+    const newArray = [...currentArray]
+    newArray[index] = value
+    handleFieldChange(field, newArray)
+  }
+
+  // Add item to array field
+  const addArrayItem = (field: keyof Business) => {
+    const currentArray = (business[field] as string[]) || []
+    handleFieldChange(field, [...currentArray, ''])
+  }
+
+  // Remove item from array field
+  const removeArrayItem = (field: keyof Business, index: number) => {
+    const currentArray = (business[field] as string[]) || []
+    const newArray = currentArray.filter((_, i) => i !== index)
+    handleFieldChange(field, newArray)
+  }
+
+  // Handle JSON field changes
+  const handleJsonFieldChange = (field: keyof Business, data: any) => {
+    handleFieldChange(field, data)
   }
 
   // Calculate completion percentage
@@ -172,26 +237,30 @@ export default function BusinessProfilePage() {
     let totalFields = 0
     let filledFields = 0
 
-    // Company Information fields
-    const companyFields = ['business_name', 'industry']
-    totalFields += companyFields.length
-    filledFields += companyFields.filter(field => profile[field as keyof BusinessProfile]).length
+    // Required fields check
+    const requiredFields: (keyof Business)[] = [
+      'name', 'industry', 'annual_revenue', 
+      'employee_count', 'years_in_business'
+    ]
+    
+    totalFields += requiredFields.length
+    filledFields += requiredFields.filter(field => business[field]).length
 
-    // Financial fields
-    const financialFields = ['annual_revenue']
-    totalFields += financialFields.length
-    filledFields += financialFields.filter(field => profile[field as keyof BusinessProfile]).length
-
-    // Team fields
-    if (profile.employee_count && profile.employee_count > 0) filledFields++
-    totalFields++
-
-    // Add more as needed...
+    // Optional but important fields
+    if (business.locations && business.locations.length > 0) filledFields++
+    if (business.gross_margin) filledFields++
+    if (business.net_margin) filledFields++
+    if (business.products_services) filledFields++
+    if (business.customer_segments) filledFields++
+    if (business.top_challenges && business.top_challenges.length > 0) filledFields++
+    if (business.growth_opportunities && business.growth_opportunities.length > 0) filledFields++
+    
+    totalFields += 7
 
     return totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0
   }
 
-  // Calculate revenue stage based on revenue
+  // Calculate revenue stage
   const getRevenueStage = (revenue?: number | null): string => {
     if (!revenue) return 'Foundation'
     if (revenue < 250000) return 'Foundation ($0-250K)'
@@ -202,6 +271,12 @@ export default function BusinessProfilePage() {
     return 'Mastery ($10M+)'
   }
 
+  // Manual save function
+  const manualSave = async () => {
+    if (saveTimer) clearTimeout(saveTimer)
+    await autoSave()
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8 flex items-center justify-center">
@@ -209,6 +284,9 @@ export default function BusinessProfilePage() {
       </div>
     )
   }
+
+  // Get social media data or initialize empty
+  const socialMedia = (business as any)?.social_media || {}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
@@ -227,18 +305,21 @@ export default function BusinessProfilePage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Business Profile</h1>
               <p className="text-gray-600 mt-2">
-                Essential information that powers your AI coaching experience
+                Comprehensive context that powers AI-driven insights and recommendations
               </p>
             </div>
             
             <div className="text-right">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className={`text-2xl font-bold ${
+                calculateCompletion() >= 80 ? 'text-green-600' : 
+                calculateCompletion() >= 50 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
                 {calculateCompletion()}%
               </div>
               <div className="text-sm text-gray-600">Complete</div>
               {lastSaved && (
                 <div className="text-xs text-gray-500 mt-2">
-                  Last saved: {lastSaved.toLocaleTimeString()}
+                  Auto-saved: {lastSaved.toLocaleTimeString()}
                 </div>
               )}
             </div>
@@ -273,12 +354,27 @@ export default function BusinessProfilePage() {
 
         {/* Form Content */}
         <div className="bg-white rounded-xl shadow-lg p-8 relative">
-          {isSaving && (
-            <div className="absolute top-4 right-4 flex items-center gap-2 text-blue-600">
-              <Save className="w-4 h-4 animate-pulse" />
-              <span className="text-sm">Saving...</span>
-            </div>
-          )}
+          {/* Save Status Indicator */}
+          <div className="absolute top-4 right-4">
+            {saveStatus === 'saving' && (
+              <div className="flex items-center gap-2 text-blue-600">
+                <Save className="w-4 h-4 animate-pulse" />
+                <span className="text-sm">Auto-saving...</span>
+              </div>
+            )}
+            {saveStatus === 'saved' && (
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm">Saved</span>
+              </div>
+            )}
+            {saveStatus === 'error' && (
+              <div className="flex items-center gap-2 text-red-600">
+                <AlertCircle className="w-4 h-4" />
+                <span className="text-sm">Error saving</span>
+              </div>
+            )}
+          </div>
 
           {/* Step 1: Company Information */}
           {currentStep === 1 && (
@@ -292,36 +388,10 @@ export default function BusinessProfilePage() {
                   </label>
                   <input
                     type="text"
-                    value={profile.business_name || ''}
-                    onChange={(e) => handleFieldChange('business_name', e.target.value)}
+                    value={business.name || ''}
+                    onChange={(e) => handleFieldChange('name', e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Your registered business name"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Trading Name
-                  </label>
-                  <input
-                    type="text"
-                    value={(profile.company_info as any)?.trading_name || ''}
-                    onChange={(e) => handleJsonFieldChange('company_info', 'trading_name', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Name you trade under (if different)"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ABN
-                  </label>
-                  <input
-                    type="text"
-                    value={(profile.company_info as any)?.abn || ''}
-                    onChange={(e) => handleJsonFieldChange('company_info', 'abn', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Australian Business Number"
+                    placeholder="Your business name"
                   />
                 </div>
 
@@ -330,7 +400,7 @@ export default function BusinessProfilePage() {
                     Industry *
                   </label>
                   <select
-                    value={profile.industry || ''}
+                    value={business.industry || ''}
                     onChange={(e) => handleFieldChange('industry', e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
@@ -343,14 +413,15 @@ export default function BusinessProfilePage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Years in Business
+                    Years in Business *
                   </label>
                   <input
                     type="number"
-                    value={(profile.company_info as any)?.years_in_business || ''}
-                    onChange={(e) => handleJsonFieldChange('company_info', 'years_in_business', parseInt(e.target.value) || 0)}
+                    value={business.years_in_business || ''}
+                    onChange={(e) => handleFieldChange('years_in_business', parseInt(e.target.value) || 0)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="0"
+                    max="100"
                   />
                 </div>
 
@@ -359,58 +430,52 @@ export default function BusinessProfilePage() {
                     Business Model
                   </label>
                   <select
-                    value={(profile.company_info as any)?.business_model || ''}
-                    onChange={(e) => handleJsonFieldChange('company_info', 'business_model', e.target.value)}
+                    value={business.business_model || ''}
+                    onChange={(e) => handleFieldChange('business_model', e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="">Select...</option>
-                    <option value="B2B">B2B (Business to Business)</option>
-                    <option value="B2C">B2C (Business to Consumer)</option>
-                    <option value="B2B2C">B2B2C (Both)</option>
-                    <option value="Marketplace">Marketplace</option>
+                    <option value="">Select Model...</option>
+                    {BUSINESS_MODELS.map(model => (
+                      <option key={model} value={model}>{model}</option>
+                    ))}
                   </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Locations / Service Areas
-                  </label>
-                  <textarea
-                    value={(profile.company_info as any)?.locations || ''}
-                    onChange={(e) => handleJsonFieldChange('company_info', 'locations', e.target.value)}
-                    rows={2}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Where do you operate? e.g., Sydney, Melbourne, Australia-wide, Global"
-                  />
                 </div>
               </div>
 
-              {/* Website and Social Media */}
+              {/* Online Presence */}
               <div className="border-t pt-6">
-                <h3 className="text-lg font-medium mb-4 text-gray-800">Online Presence</h3>
+                <h3 className="text-lg font-medium text-gray-800 mb-4">Online Presence</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Company Website
+                      <Globe className="inline w-4 h-4 mr-1" />
+                      Website
                     </label>
                     <input
                       type="url"
-                      value={(profile.company_info as any)?.website || ''}
-                      onChange={(e) => handleJsonFieldChange('company_info', 'website', e.target.value)}
+                      value={socialMedia.website || ''}
+                      onChange={(e) => {
+                        const updated = { ...socialMedia, website: e.target.value }
+                        handleJsonFieldChange('social_media', updated)
+                      }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="https://www.example.com.au"
+                      placeholder="https://www.example.com"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Linkedin className="inline w-4 h-4 mr-1" />
                       LinkedIn
                     </label>
                     <input
                       type="url"
-                      value={(profile.company_info as any)?.social_media?.linkedin || ''}
-                      onChange={(e) => handleJsonFieldChange('company_info', 'social_media.linkedin', e.target.value)}
+                      value={socialMedia.linkedin || ''}
+                      onChange={(e) => {
+                        const updated = { ...socialMedia, linkedin: e.target.value }
+                        handleJsonFieldChange('social_media', updated)
+                      }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="https://linkedin.com/company/..."
                     />
@@ -418,12 +483,16 @@ export default function BusinessProfilePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Facebook className="inline w-4 h-4 mr-1" />
                       Facebook
                     </label>
                     <input
                       type="url"
-                      value={(profile.company_info as any)?.social_media?.facebook || ''}
-                      onChange={(e) => handleJsonFieldChange('company_info', 'social_media.facebook', e.target.value)}
+                      value={socialMedia.facebook || ''}
+                      onChange={(e) => {
+                        const updated = { ...socialMedia, facebook: e.target.value }
+                        handleJsonFieldChange('social_media', updated)
+                      }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="https://facebook.com/..."
                     />
@@ -431,12 +500,16 @@ export default function BusinessProfilePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <Instagram className="inline w-4 h-4 mr-1" />
                       Instagram
                     </label>
                     <input
                       type="url"
-                      value={(profile.company_info as any)?.social_media?.instagram || ''}
-                      onChange={(e) => handleJsonFieldChange('company_info', 'social_media.instagram', e.target.value)}
+                      value={socialMedia.instagram || ''}
+                      onChange={(e) => {
+                        const updated = { ...socialMedia, instagram: e.target.value }
+                        handleJsonFieldChange('social_media', updated)
+                      }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="https://instagram.com/..."
                     />
@@ -448,143 +521,171 @@ export default function BusinessProfilePage() {
                     </label>
                     <input
                       type="url"
-                      value={(profile.company_info as any)?.social_media?.tiktok || ''}
-                      onChange={(e) => handleJsonFieldChange('company_info', 'social_media.tiktok', e.target.value)}
+                      value={socialMedia.tiktok || ''}
+                      onChange={(e) => {
+                        const updated = { ...socialMedia, tiktok: e.target.value }
+                        handleJsonFieldChange('social_media', updated)
+                      }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="https://tiktok.com/@..."
                     />
                   </div>
                 </div>
               </div>
+
+              {/* Locations */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Locations / Service Areas
+                </label>
+                <div className="space-y-2">
+                  {(business.locations || ['']).map((location, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={location}
+                        onChange={(e) => handleArrayFieldChange('locations', index, e.target.value)}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="e.g., Sydney, Melbourne, Australia-wide"
+                      />
+                      {(business.locations?.length || 0) > 1 && (
+                        <button
+                          onClick={() => removeArrayItem('locations', index)}
+                          className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => addArrayItem('locations')}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                  >
+                    + Add Location
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Step 2: Financial Overview */}
+          {/* Step 2: Financial Snapshot */}
           {currentStep === 2 && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Financial Overview</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Financial Snapshot</h2>
               
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <p className="text-sm text-blue-800">
-                  This data will be automatically pulled from Xero once integrated. For now, please enter manually.
+                  This data will be automatically synchronized with Xero once integrated. Manual entry for now.
                 </p>
               </div>
+
+              {/* Revenue Stage Indicator */}
+              {business.annual_revenue && (
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white mb-6">
+                  <div className="text-sm opacity-90">Revenue Stage</div>
+                  <div className="text-2xl font-bold mt-1">{getRevenueStage(business.annual_revenue)}</div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Revenue (Annual) *
+                    Annual Revenue *
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-gray-500">$</span>
                     <input
                       type="number"
-                      value={profile.annual_revenue || ''}
+                      value={business.annual_revenue || ''}
                       onChange={(e) => handleFieldChange('annual_revenue', parseFloat(e.target.value) || 0)}
                       className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="0"
                     />
                   </div>
-                  {profile.annual_revenue && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Stage: <span className="font-medium text-blue-600">{getRevenueStage(profile.annual_revenue)}</span>
-                    </p>
-                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Gross Profit
+                    Revenue Growth Rate (%)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
                     <input
                       type="number"
-                      value={(profile.financial_metrics as any)?.gross_profit || ''}
-                      onChange={(e) => handleJsonFieldChange('financial_metrics', 'gross_profit', parseFloat(e.target.value) || 0)}
-                      className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={business.revenue_growth_rate || ''}
+                      onChange={(e) => handleFieldChange('revenue_growth_rate', parseFloat(e.target.value) || 0)}
+                      className="w-full pr-8 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="0"
+                      min="-100"
+                      max="1000"
                     />
+                    <span className="absolute right-3 top-2 text-gray-500">%</span>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Net Profit
+                    Gross Margin (%)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
                     <input
                       type="number"
-                      value={(profile.financial_metrics as any)?.net_profit || ''}
-                      onChange={(e) => handleJsonFieldChange('financial_metrics', 'net_profit', parseFloat(e.target.value) || 0)}
-                      className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={business.gross_margin || ''}
+                      onChange={(e) => handleFieldChange('gross_margin', parseFloat(e.target.value) || 0)}
+                      className="w-full pr-8 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="0"
+                      min="0"
+                      max="100"
                     />
+                    <span className="absolute right-3 top-2 text-gray-500">%</span>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cash Position
+                    Net Margin (%)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
                     <input
                       type="number"
-                      value={(profile.financial_metrics as any)?.cash_position || ''}
-                      onChange={(e) => handleJsonFieldChange('financial_metrics', 'cash_position', parseFloat(e.target.value) || 0)}
-                      className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={business.net_margin || ''}
+                      onChange={(e) => handleFieldChange('net_margin', parseFloat(e.target.value) || 0)}
+                      className="w-full pr-8 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="0"
+                      min="-100"
+                      max="100"
                     />
+                    <span className="absolute right-3 top-2 text-gray-500">%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Margin Health Indicators */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Gross Margin Health</div>
+                  <div className={`text-lg font-semibold ${
+                    (business.gross_margin || 0) >= 50 ? 'text-green-600' :
+                    (business.gross_margin || 0) >= 30 ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`}>
+                    {(business.gross_margin || 0) >= 50 ? 'Excellent' :
+                     (business.gross_margin || 0) >= 30 ? 'Good' :
+                     'Needs Improvement'}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Accounts Receivable Days
-                  </label>
-                  <input
-                    type="number"
-                    value={(profile.financial_metrics as any)?.receivable_days || ''}
-                    onChange={(e) => handleJsonFieldChange('financial_metrics', 'receivable_days', parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="30"
-                    min="0"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Average days to collect payment</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Accounts Payable Days
-                  </label>
-                  <input
-                    type="number"
-                    value={(profile.financial_metrics as any)?.payable_days || ''}
-                    onChange={(e) => handleJsonFieldChange('financial_metrics', 'payable_days', parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="30"
-                    min="0"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Average days to pay suppliers</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Net Asset Position
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
-                    <input
-                      type="number"
-                      value={(profile.financial_metrics as any)?.net_assets || ''}
-                      onChange={(e) => handleJsonFieldChange('financial_metrics', 'net_assets', parseFloat(e.target.value) || 0)}
-                      className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
-                    />
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600 mb-1">Net Margin Health</div>
+                  <div className={`text-lg font-semibold ${
+                    (business.net_margin || 0) >= 20 ? 'text-green-600' :
+                    (business.net_margin || 0) >= 10 ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`}>
+                    {(business.net_margin || 0) >= 20 ? 'Excellent' :
+                     (business.net_margin || 0) >= 10 ? 'Good' :
+                     'Needs Improvement'}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Total assets minus total liabilities</p>
                 </div>
               </div>
             </div>
@@ -593,160 +694,101 @@ export default function BusinessProfilePage() {
           {/* Step 3: Team & Organisation */}
           {currentStep === 3 && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Team & Organisational Structure</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Team & Organisation</h2>
               
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Team
+                    Total Employees *
                   </label>
                   <input
                     type="number"
-                    value={profile.employee_count || ''}
+                    value={business.employee_count || ''}
                     onChange={(e) => handleFieldChange('employee_count', parseInt(e.target.value) || 0)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     min="0"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full-time
-                  </label>
-                  <input
-                    type="number"
-                    value={(profile.team_structure as any)?.full_time || ''}
-                    onChange={(e) => handleJsonFieldChange('team_structure', 'full_time', parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Part-time
-                  </label>
-                  <input
-                    type="number"
-                    value={(profile.team_structure as any)?.part_time || ''}
-                    onChange={(e) => handleJsonFieldChange('team_structure', 'part_time', parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contractors
-                  </label>
-                  <input
-                    type="number"
-                    value={(profile.team_structure as any)?.contractors || ''}
-                    onChange={(e) => handleJsonFieldChange('team_structure', 'contractors', parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Offshore
-                  </label>
-                  <input
-                    type="number"
-                    value={(profile.team_structure as any)?.offshore || ''}
-                    onChange={(e) => handleJsonFieldChange('team_structure', 'offshore', parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    min="0"
-                  />
+                  {business.annual_revenue && business.employee_count && business.employee_count > 0 && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      Revenue per employee: ${Math.round((business.annual_revenue / business.employee_count)).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-800">Key Roles & Leadership</h3>
-                
-                {/* Team Members Table */}
+              {/* Key Roles - Always show 3 rows minimum */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Team Members
+                </label>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Name</th>
-                        <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Role</th>
-                        <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Status</th>
-                        <th className="py-2 px-3 text-sm font-medium text-gray-700"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {((profile.team_structure as any)?.team_members || []).map((member: any, index: number) => (
-                        <tr key={index} className="border-b border-gray-100">
-                          <td className="py-2 px-3">
-                            <input
-                              type="text"
-                              value={member.name || ''}
-                              onChange={(e) => {
-                                const updatedMembers = [...((profile.team_structure as any)?.team_members || [])]
-                                updatedMembers[index] = { ...updatedMembers[index], name: e.target.value }
-                                handleJsonFieldChange('team_structure', 'team_members', updatedMembers)
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 rounded"
-                              placeholder="John Smith"
-                            />
-                          </td>
-                          <td className="py-2 px-3">
-                            <input
-                              type="text"
-                              value={member.role || ''}
-                              onChange={(e) => {
-                                const updatedMembers = [...((profile.team_structure as any)?.team_members || [])]
-                                updatedMembers[index] = { ...updatedMembers[index], role: e.target.value }
-                                handleJsonFieldChange('team_structure', 'team_members', updatedMembers)
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 rounded"
-                              placeholder="CEO"
-                            />
-                          </td>
-                          <td className="py-2 px-3">
-                            <select
-                              value={member.status || ''}
-                              onChange={(e) => {
-                                const updatedMembers = [...((profile.team_structure as any)?.team_members || [])]
-                                updatedMembers[index] = { ...updatedMembers[index], status: e.target.value }
-                                handleJsonFieldChange('team_structure', 'team_members', updatedMembers)
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 rounded"
-                            >
-                              <option value="">Select Status</option>
-                              <option value="Full Time">Full Time</option>
-                              <option value="Part Time">Part Time</option>
-                              <option value="Contractor">Contractor</option>
-                              <option value="Offshore">Offshore</option>
-                            </select>
-                          </td>
-                          <td className="py-2 px-3">
-                            <button
-                              onClick={() => {
-                                const updatedMembers = ((profile.team_structure as any)?.team_members || []).filter((_: any, i: number) => i !== index)
-                                handleJsonFieldChange('team_structure', 'team_members', updatedMembers)
-                              }}
-                              className="text-red-600 hover:text-red-800"
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  
-                  <button
-                    onClick={() => {
-                      const currentMembers = (profile.team_structure as any)?.team_members || []
-                      handleJsonFieldChange('team_structure', 'team_members', [...currentMembers, { name: '', role: '', status: '' }])
-                    }}
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    + Add Team Member
-                  </button>
+                  <div className="grid grid-cols-3 gap-2 mb-2 px-3">
+                    <div className="text-xs font-medium text-gray-600">Role</div>
+                    <div className="text-xs font-medium text-gray-600">Name</div>
+                    <div className="text-xs font-medium text-gray-600">Status</div>
+                  </div>
+                  <div className="space-y-2">
+                    {((business.key_roles as any[] || []).length < 3 
+                      ? [...(business.key_roles as any[] || []), ...Array(3 - (business.key_roles as any[] || []).length).fill({ title: '', name: '', status: '' })]
+                      : (business.key_roles as any[] || [])
+                    ).map((role, index) => (
+                      <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="grid grid-cols-3 gap-2">
+                          <input
+                            type="text"
+                            value={role.title || ''}
+                            onChange={(e) => {
+                              const roles = [...(business.key_roles as any[] || [])]
+                              if (!roles[index]) roles[index] = { title: '', name: '', status: '' }
+                              roles[index] = { ...roles[index], title: e.target.value }
+                              handleJsonFieldChange('key_roles', roles)
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="e.g., CEO, Sales Manager"
+                          />
+                          <input
+                            type="text"
+                            value={role.name || ''}
+                            onChange={(e) => {
+                              const roles = [...(business.key_roles as any[] || [])]
+                              if (!roles[index]) roles[index] = { title: '', name: '', status: '' }
+                              roles[index] = { ...roles[index], name: e.target.value }
+                              handleJsonFieldChange('key_roles', roles)
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="Person's name"
+                          />
+                          <select
+                            value={role.status || ''}
+                            onChange={(e) => {
+                              const roles = [...(business.key_roles as any[] || [])]
+                              if (!roles[index]) roles[index] = { title: '', name: '', status: '' }
+                              roles[index] = { ...roles[index], status: e.target.value }
+                              handleJsonFieldChange('key_roles', roles)
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="">Select Status</option>
+                            <option value="Full Time">Full Time</option>
+                            <option value="Part Time">Part Time</option>
+                            <option value="Casual">Casual</option>
+                            <option value="Virtual Assistant">Virtual Assistant</option>
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {(business.key_roles as any[] || []).length > 3 && (
+                    <button
+                      onClick={() => {
+                        const roles = [...(business.key_roles as any[] || []), { title: '', name: '', status: '' }]
+                        handleJsonFieldChange('key_roles', roles)
+                      }}
+                      className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    >
+                      + Add Another Role
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -757,334 +799,305 @@ export default function BusinessProfilePage() {
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Products & Services</h2>
               
-              <div className="bg-gray-50 rounded-lg p-4">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Product/Service</th>
-                      <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Type</th>
-                      <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">Price ($)</th>
-                      <th className="text-left py-2 px-3 text-sm font-medium text-gray-700">% of Revenue</th>
-                      <th className="py-2 px-3 text-sm font-medium text-gray-700"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {((profile.products_services as any)?.items || []).map((item: any, index: number) => (
-                      <tr key={index} className="border-b border-gray-100">
-                        <td className="py-2 px-3">
-                          <input
-                            type="text"
-                            value={item.name || ''}
-                            onChange={(e) => {
-                              const updatedItems = [...((profile.products_services as any)?.items || [])]
-                              updatedItems[index] = { ...updatedItems[index], name: e.target.value }
-                              handleJsonFieldChange('products_services', 'items', updatedItems)
-                            }}
-                            className="w-full px-2 py-1 border border-gray-300 rounded"
-                            placeholder="Product/Service name"
-                          />
-                        </td>
-                        <td className="py-2 px-3">
-                          <select
-                            value={item.type || ''}
-                            onChange={(e) => {
-                              const updatedItems = [...((profile.products_services as any)?.items || [])]
-                              updatedItems[index] = { ...updatedItems[index], type: e.target.value }
-                              handleJsonFieldChange('products_services', 'items', updatedItems)
-                            }}
-                            className="w-full px-2 py-1 border border-gray-300 rounded"
-                          >
-                            <option value="">Select Type</option>
-                            <option value="Product">Product</option>
-                            <option value="Service">Service</option>
-                            <option value="Subscription">Subscription</option>
-                          </select>
-                        </td>
-                        <td className="py-2 px-3">
-                          <input
-                            type="number"
-                            value={item.price || ''}
-                            onChange={(e) => {
-                              const updatedItems = [...((profile.products_services as any)?.items || [])]
-                              updatedItems[index] = { ...updatedItems[index], price: parseFloat(e.target.value) || 0 }
-                              handleJsonFieldChange('products_services', 'items', updatedItems)
-                            }}
-                            className="w-full px-2 py-1 border border-gray-300 rounded"
-                            placeholder="0"
-                          />
-                        </td>
-                        <td className="py-2 px-3">
-                          <input
-                            type="number"
-                            value={item.revenue_percentage || ''}
-                            onChange={(e) => {
-                              const updatedItems = [...((profile.products_services as any)?.items || [])]
-                              updatedItems[index] = { ...updatedItems[index], revenue_percentage: parseFloat(e.target.value) || 0 }
-                              handleJsonFieldChange('products_services', 'items', updatedItems)
-                            }}
-                            className="w-full px-2 py-1 border border-gray-300 rounded"
-                            placeholder="0"
-                            min="0"
-                            max="100"
-                          />
-                        </td>
-                        <td className="py-2 px-3">
-                          <button
-                            onClick={() => {
-                              const updatedItems = ((profile.products_services as any)?.items || []).filter((_: any, i: number) => i !== index)
-                              handleJsonFieldChange('products_services', 'items', updatedItems)
-                            }}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                
-                <button
-                  onClick={() => {
-                    const currentItems = (profile.products_services as any)?.items || []
-                    handleJsonFieldChange('products_services', 'items', [...currentItems, { name: '', type: '', price: 0, revenue_percentage: 0 }])
-                  }}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  + Add Product/Service
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Unique Value Proposition
-                </label>
-                <textarea
-                  value={(profile.products_services as any)?.value_proposition || ''}
-                  onChange={(e) => handleJsonFieldChange('products_services', 'value_proposition', e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="What makes you different from competitors? Why do customers choose you?"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Step 5: Customer Overview */}
-          {currentStep === 5 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Customer Overview</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Purchase Type
-                  </label>
-                  <select
-                    value={(profile.customer_intelligence as any)?.purchase_type || ''}
-                    onChange={(e) => handleJsonFieldChange('customer_intelligence', 'purchase_type', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select...</option>
-                    <option value="One-time">One-time purchase (e.g., building a home)</option>
-                    <option value="Repeat">Repeat purchase (e.g., consumables)</option>
-                    <option value="Mixed">Mixed (both one-time and repeat)</option>
-                  </select>
-                </div>
-
-                {(profile.customer_intelligence as any)?.purchase_type !== 'One-time' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Total Customers/Clients
-                    </label>
-                    <input
-                      type="number"
-                      value={(profile.customer_intelligence as any)?.total_customers || ''}
-                      onChange={(e) => handleJsonFieldChange('customer_intelligence', 'total_customers', parseInt(e.target.value) || 0)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      min="0"
-                    />
-                  </div>
-                )}
-
-                {(profile.customer_intelligence as any)?.purchase_type === 'One-time' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Projects Completed (Last 12 Months)
-                    </label>
-                    <input
-                      type="number"
-                      value={(profile.customer_intelligence as any)?.projects_completed || ''}
-                      onChange={(e) => handleJsonFieldChange('customer_intelligence', 'projects_completed', parseInt(e.target.value) || 0)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      min="0"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Customer Type
-                  </label>
-                  <select
-                    value={(profile.customer_intelligence as any)?.customer_type || ''}
-                    onChange={(e) => handleJsonFieldChange('customer_intelligence', 'customer_type', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select...</option>
-                    <option value="Individual Consumers">Individual Consumers</option>
-                    <option value="Small Business">Small Business</option>
-                    <option value="Medium Business">Medium Business</option>
-                    <option value="Enterprise">Enterprise</option>
-                    <option value="Government">Government</option>
-                    <option value="Mixed">Mixed</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Geographic Reach
-                  </label>
-                  <select
-                    value={(profile.customer_intelligence as any)?.geographic_reach || ''}
-                    onChange={(e) => handleJsonFieldChange('customer_intelligence', 'geographic_reach', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select...</option>
-                    <option value="Local">Local (City/Region)</option>
-                    <option value="State">State-wide</option>
-                    <option value="National">National</option>
-                    <option value="International">International</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-medium mb-4 text-gray-800">Digital Presence & Database</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Total Social Media Followers
-                    </label>
-                    <input
-                      type="number"
-                      value={(profile.customer_intelligence as any)?.social_followers || ''}
-                      onChange={(e) => handleJsonFieldChange('customer_intelligence', 'social_followers', parseInt(e.target.value) || 0)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Combined across all platforms"
-                      min="0"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Do you have a customer database?
-                    </label>
-                    <select
-                      value={(profile.customer_intelligence as any)?.has_database || ''}
-                      onChange={(e) => handleJsonFieldChange('customer_intelligence', 'has_database', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select...</option>
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                      <option value="Partial">Partial/Informal</option>
-                    </select>
-                  </div>
-
-                  {((profile.customer_intelligence as any)?.has_database === 'Yes' || (profile.customer_intelligence as any)?.has_database === 'Partial') && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Database Size (Contacts)
-                      </label>
-                      <input
-                        type="number"
-                        value={(profile.customer_intelligence as any)?.database_size || ''}
-                        onChange={(e) => handleJsonFieldChange('customer_intelligence', 'database_size', parseInt(e.target.value) || 0)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Current + past + prospective"
-                        min="0"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Target Customer Description
-                </label>
-                <textarea
-                  value={(profile.customer_intelligence as any)?.target_customer || ''}
-                  onChange={(e) => handleJsonFieldChange('customer_intelligence', 'target_customer', e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Describe your ideal customer..."
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Step 6: Strategic Context */}
-          {currentStep === 6 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Strategic Context</h2>
-              
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-amber-800">
-                  Keep this brief - detailed strategic planning will be captured in the diagnostic assessment and strategic wheel modules.
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-blue-800">
+                  <strong>Tip:</strong> If you're a builder who builds houses, that would be a "Service" or "Project-Based" offering.
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Primary Goal (Next 12 Months)
+                  What You Offer
                 </label>
-                <textarea
-                  value={(profile.strategic_context as any)?.primary_goal || ''}
-                  onChange={(e) => handleJsonFieldChange('strategic_context', 'primary_goal', e.target.value)}
-                  rows={2}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="What's your main focus for the next year?"
-                />
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="space-y-3">
+                    {(business.products_services as any[] || [{ name: '', type: '', revenue_percentage: 0 }]).map((item, index) => (
+                      <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <input
+                            type="text"
+                            value={item.name || ''}
+                            onChange={(e) => {
+                              const items = [...(business.products_services as any[] || [])]
+                              items[index] = { ...items[index], name: e.target.value }
+                              handleJsonFieldChange('products_services', items)
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg"
+                            placeholder="e.g., House Construction, Consulting, Web Design"
+                          />
+                          <select
+                            value={item.type || ''}
+                            onChange={(e) => {
+                              const items = [...(business.products_services as any[] || [])]
+                              items[index] = { ...items[index], type: e.target.value }
+                              handleJsonFieldChange('products_services', items)
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg"
+                          >
+                            <option value="">Select Type</option>
+                            {OFFERING_TYPES.map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type="number"
+                                value={item.revenue_percentage || ''}
+                                onChange={(e) => {
+                                  const items = [...(business.products_services as any[] || [])]
+                                  items[index] = { ...items[index], revenue_percentage: parseFloat(e.target.value) || 0 }
+                                  handleJsonFieldChange('products_services', items)
+                                }}
+                                className="w-full pr-8 px-3 py-2 border border-gray-300 rounded-lg"
+                                placeholder="0"
+                                min="0"
+                                max="100"
+                              />
+                              <span className="absolute right-3 top-2 text-gray-500">%</span>
+                            </div>
+                            {(business.products_services as any[] || []).length > 1 && (
+                              <button
+                                onClick={() => {
+                                  const items = (business.products_services as any[] || []).filter((_, i) => i !== index)
+                                  handleJsonFieldChange('products_services', items)
+                                }}
+                                className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const items = [...(business.products_services as any[] || []), { name: '', type: '', revenue_percentage: 0 }]
+                      handleJsonFieldChange('products_services', items)
+                    }}
+                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    + Add Another Offering
+                  </button>
+                </div>
               </div>
 
+              {/* Revenue Mix Visualization */}
+              {business.products_services && (business.products_services as any[]).length > 0 && 
+               (business.products_services as any[]).some(item => item.revenue_percentage > 0) && (
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Revenue Mix</h3>
+                  <div className="space-y-2">
+                    {(business.products_services as any[]).map((item, index) => (
+                      item.revenue_percentage > 0 && (
+                        <div key={index} className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-gray-700">{item.name || 'Unnamed'}</span>
+                              <span className="font-medium">{item.revenue_percentage}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-blue-600 h-2 rounded-full" 
+                                style={{ width: `${item.revenue_percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 5: Customer Segments */}
+          {currentStep === 5 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Customer Segments</h2>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Exit Timeline
+                    Total Customers
                   </label>
-                  <select
-                    value={(profile.strategic_context as any)?.exit_timeline || ''}
-                    onChange={(e) => handleJsonFieldChange('strategic_context', 'exit_timeline', e.target.value)}
+                  <input
+                    type="number"
+                    value={business.total_customers || ''}
+                    onChange={(e) => handleFieldChange('total_customers', parseInt(e.target.value) || 0)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select...</option>
-                    <option value="No exit planned">No exit planned</option>
-                    <option value="1-2 years">1-2 years</option>
-                    <option value="3-5 years">3-5 years</option>
-                    <option value="5-10 years">5-10 years</option>
-                    <option value="10+ years">10+ years</option>
-                  </select>
+                    min="0"
+                  />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Growth Ambition
+                    Customer Concentration (%)
                   </label>
-                  <select
-                    value={(profile.strategic_context as any)?.growth_ambition || ''}
-                    onChange={(e) => handleJsonFieldChange('strategic_context', 'growth_ambition', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={business.customer_concentration || ''}
+                      onChange={(e) => handleFieldChange('customer_concentration', parseFloat(e.target.value) || 0)}
+                      className="w-full pr-8 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="0"
+                      min="0"
+                      max="100"
+                    />
+                    <span className="absolute right-3 top-2 text-gray-500">%</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">% of revenue from top 10 customers</p>
+                </div>
+              </div>
+
+              {/* Customer Segments */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Customer Segments
+                </label>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="space-y-3">
+                    {(business.customer_segments as any[] || [{ name: '', description: '', percentage: 0 }]).map((segment, index) => (
+                      <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <input
+                            type="text"
+                            value={segment.name || ''}
+                            onChange={(e) => {
+                              const segments = [...(business.customer_segments as any[] || [])]
+                              segments[index] = { ...segments[index], name: e.target.value }
+                              handleJsonFieldChange('customer_segments', segments)
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg"
+                            placeholder="Segment Name"
+                          />
+                          <input
+                            type="text"
+                            value={segment.description || ''}
+                            onChange={(e) => {
+                              const segments = [...(business.customer_segments as any[] || [])]
+                              segments[index] = { ...segments[index], description: e.target.value }
+                              handleJsonFieldChange('customer_segments', segments)
+                            }}
+                            className="px-3 py-2 border border-gray-300 rounded-lg md:col-span-2"
+                            placeholder="Description"
+                          />
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type="number"
+                                value={segment.percentage || ''}
+                                onChange={(e) => {
+                                  const segments = [...(business.customer_segments as any[] || [])]
+                                  segments[index] = { ...segments[index], percentage: parseFloat(e.target.value) || 0 }
+                                  handleJsonFieldChange('customer_segments', segments)
+                                }}
+                                className="w-full pr-8 px-3 py-2 border border-gray-300 rounded-lg"
+                                placeholder="0"
+                                min="0"
+                                max="100"
+                              />
+                              <span className="absolute right-3 top-2 text-gray-500">%</span>
+                            </div>
+                            {(business.customer_segments as any[] || []).length > 1 && (
+                              <button
+                                onClick={() => {
+                                  const segments = (business.customer_segments as any[] || []).filter((_, i) => i !== index)
+                                  handleJsonFieldChange('customer_segments', segments)
+                                }}
+                                className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const segments = [...(business.customer_segments as any[] || []), { name: '', description: '', percentage: 0 }]
+                      handleJsonFieldChange('customer_segments', segments)
+                    }}
+                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
-                    <option value="">Select...</option>
-                    <option value="Lifestyle">Lifestyle business</option>
-                    <option value="Steady">Steady growth (10-20% pa)</option>
-                    <option value="Moderate">Moderate growth (20-50% pa)</option>
-                    <option value="Aggressive">Aggressive growth (50%+ pa)</option>
-                    <option value="Hypergrowth">Hypergrowth (2x+ pa)</option>
-                  </select>
+                    + Add Segment
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 6: Current Situation (formerly Strategic Context) */}
+          {currentStep === 6 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Situation</h2>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-amber-800">
+                  This provides critical context for AI recommendations. Be specific and honest about your challenges and opportunities.
+                </p>
+              </div>
+
+              {/* Top Challenges */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Top 3 Current Challenges
+                </label>
+                <div className="space-y-3">
+                  {[0, 1, 2].map((index) => (
+                    <div key={index}>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center font-semibold text-sm">
+                          {index + 1}
+                        </div>
+                        <textarea
+                          value={(business.top_challenges || [])[index] || ''}
+                          onChange={(e) => {
+                            const challenges = [...(business.top_challenges || ['', '', ''])]
+                            challenges[index] = e.target.value
+                            handleFieldChange('top_challenges', challenges)
+                          }}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          rows={2}
+                          placeholder={`Challenge ${index + 1}: Be specific about what's holding you back...`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Growth Opportunities */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Top 3 Growth Opportunities
+                </label>
+                <div className="space-y-3">
+                  {[0, 1, 2].map((index) => (
+                    <div key={index}>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-semibold text-sm">
+                          {index + 1}
+                        </div>
+                        <textarea
+                          value={(business.growth_opportunities || [])[index] || ''}
+                          onChange={(e) => {
+                            const opportunities = [...(business.growth_opportunities || ['', '', ''])]
+                            opportunities[index] = e.target.value
+                            handleFieldChange('growth_opportunities', opportunities)
+                          }}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          rows={2}
+                          placeholder={`Opportunity ${index + 1}: What could accelerate your growth...`}
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1106,39 +1119,57 @@ export default function BusinessProfilePage() {
             </button>
 
             <button
-              onClick={() => setCurrentStep(Math.min(STEPS.length, currentStep + 1))}
-              disabled={currentStep === STEPS.length}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
-                currentStep === STEPS.length
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+              onClick={manualSave}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-all flex items-center gap-2"
             >
-              Next
-              <ArrowRight className="w-5 h-5" />
+              <Save className="w-5 h-5" />
+              Save Changes
             </button>
+
+            {currentStep < STEPS.length && (
+              <button
+                onClick={() => setCurrentStep(Math.min(STEPS.length, currentStep + 1))}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium transition-all"
+              >
+                Next
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            )}
+            
+            {currentStep === STEPS.length && (
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium transition-all"
+              >
+                Complete
+                <CheckCircle className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Completion Card */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800">Profile Completion</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                A complete profile enables more accurate AI coaching recommendations
-              </p>
-            </div>
-            <div>
+        {/* Profile Summary Card */}
+        {calculateCompletion() >= 80 && (
+          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-6 mt-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5" />
+                  Profile Complete!
+                </h3>
+                <p className="text-sm opacity-90 mt-1">
+                  Your comprehensive business context is ready to power AI-driven insights
+                </p>
+              </div>
               <button
                 onClick={() => router.push('/dashboard')}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-6 py-2 bg-white text-green-600 rounded-lg hover:bg-gray-100 transition-colors font-medium"
               >
-                Return to Dashboard
+                View Dashboard
               </button>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
