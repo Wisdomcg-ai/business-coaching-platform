@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface CommunicationsAlignmentData {
   // Communication Strategy
@@ -41,7 +41,7 @@ interface CommunicationsAlignmentData {
 
 export default function CommunicationsAlignmentPage() {
   const router = useRouter();
-  // supabase client imported from lib
+  const supabase = createClientComponentClient();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [wheelId, setWheelId] = useState<string | null>(null);

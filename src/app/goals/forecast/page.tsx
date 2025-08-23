@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function QuarterlyForecastPage() {
   const router = useRouter();
-  // supabase client imported from lib
+  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [visionTargets, setVisionTargets] = useState<any>(null);

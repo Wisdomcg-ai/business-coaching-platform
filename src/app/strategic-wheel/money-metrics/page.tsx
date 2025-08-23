@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface MoneyMetricsData {
   // Financial Goals (12 months)
@@ -38,7 +38,7 @@ interface MoneyMetricsData {
 
 export default function MoneyMetricsPage() {
   const router = useRouter();
-  // supabase client imported from lib
+  const supabase = createClientComponentClient();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [wheelId, setWheelId] = useState<string | null>(null);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -63,7 +63,7 @@ export default function SwotEditPage() {
   const router = useRouter();
   const params = useParams();
   const swotId = params.id as string;
-  // supabase client imported from lib
+  const supabase = createClient();
 
   const categories = [
     { 

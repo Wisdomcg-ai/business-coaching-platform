@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import type { Database } from '@/types/supabase'
 import { 
   ArrowLeft,
@@ -608,7 +608,7 @@ const BUSINESS_ENGINES = [
 
 export default function RevenueRoadmap() {
   const router = useRouter()
-  // supabase client imported from lib
+  const supabase = createClient()
   const [business, setBusiness] = useState<Business | null>(null)
   const [currentStage, setCurrentStage] = useState<typeof REVENUE_STAGES[0] | null>(null)
   const [expandedEngines, setExpandedEngines] = useState<string[]>(['attract'])

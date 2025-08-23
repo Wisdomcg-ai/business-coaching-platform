@@ -2,9 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { Database } from '@/types/database.types';
-import { saveAssessment } from '@/lib/assessment-service';
 import { ChevronRight, ChevronLeft, Check, AlertCircle } from 'lucide-react';
 
 interface Question {
@@ -711,8 +708,6 @@ export default function AssessmentPage() {
   const sections = ['Business Foundation', 'Strategic Wheel', 'Profitability Health', 'Business Engines', 'Success Disciplines'];
   const currentSection = currentQuestion.section;
   const currentSectionIndex = sections.indexOf(currentSection);
-  const questionsInSection = questions.filter(q => q.section === currentSection).length;
-  const currentQuestionInSection = questions.filter((q, i) => q.section === currentSection && i <= currentQuestionIndex).length;
 
   // Add keyboard navigation
   useEffect(() => {
@@ -754,7 +749,7 @@ export default function AssessmentPage() {
   }
 
   function handleYesNoGroup(questionId: string, value: 'yes' | 'no') {
-    const points = value === 'yes' ? 1.25 : 0; // Each yes/no in a group worth 1.25 points (5 questions = max 6.25)
+    const points = value === 'yes' ? 1.25 : 0; // Each yes/no in a group worth 1.25 points
     setAnswers({
       ...answers,
       [questionId]: { 
@@ -790,39 +785,112 @@ export default function AssessmentPage() {
     return !!answers[currentQuestion.id];
   }
 
+  function calculateSectionScores() {
+    const sectionScores: Record<string, number> = {
+      foundation: 0,
+      strategic_wheel: 0,
+      profitability: 0,
+      engines: 0,
+      disciplines: 0
+    };
+
+    // Calculate scores for each section based on answers
+    Object.entries(answers).forEach(([questionId, answer]) => {
+      const question = questions.find(q => q.id === questionId || 
+        q.questions?.some(sq => sq.id === questionId));
+      
+      if (question) {
+        const points = answer.points || 0;
+        
+        switch(question.section) {
+          case 'Business Foundation':
+            sectionScores.foundation += points;
+            break;
+          case 'Strategic Wheel':
+            sectionScores.strategic_wheel += points;
+            break;
+          case 'Profitability Health':
+            sectionScores.profitability += points;
+            break;
+          case 'Business Engines':
+            sectionScores.engines += points;
+            break;
+          case 'Success Disciplines':
+            sectionScores.disciplines += points;
+            break;
+        }
+      }
+    });
+
+    return sectionScores;
+  }
+
   async function handleSubmit() {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/auth/login');
-        return;
-      }
-
-      // Calculate scores
-      const totalScore = Object.values(answers).reduce((sum: number, answer: any) => 
-        sum + (answer.points || 0), 0
-      );
-
+      // Calculate scores for each section
+      const sectionScores = calculateSectionScores();
+      
+      // Calculate total score
+      const totalScore = Object.values(sectionScores).reduce((sum, score) => sum + score, 0);
+      const maxScore = 290; // Maximum possible score
+      const percentage = Math.round((totalScore / maxScore) * 100);
+      
+      // Determine health status
+      let healthStatus = '';
+      if (percentage >= 90) healthStatus = 'THRIVING';
+      else if (percentage >= 80) healthStatus = 'STRONG';
+      else if (percentage >= 70) healthStatus = 'STABLE';
+      else if (percentage >= 60) healthStatus = 'BUILDING';
+      else if (percentage >= 50) healthStatus = 'STRUGGLING';
+      else healthStatus = 'URGENT';
+      
       // Get revenue stage from first question
-      const revenueStage = answers['q1']?.value || 'unknown';
-
-      // Save assessment
-      const assessmentId = await saveAssessment({
-        userId: user.id,
-        answers,
+      const revenueStage = answers['q1']?.label || 'unknown';
+      
+      // Create assessment result object
+      const assessmentResult = {
+        id: `assessment-${Date.now()}`,
+        userId: 'temp-user-001',
+        completedAt: new Date().toISOString(),
         totalScore,
-        maxScore: 290,
-        completionPercentage: 100,
-        revenueStage
-      });
-
+        maxScore,
+        percentage,
+        healthStatus,
+        revenueStage,
+        sectionScores,
+        answers
+      };
+      
+      // Save to localStorage
+      localStorage.setItem('latestAssessment', JSON.stringify(assessmentResult));
+      localStorage.setItem('assessmentAnswers', JSON.stringify(answers));
+      localStorage.setItem('assessmentResults', JSON.stringify({
+        totalScore,
+        percentage,
+        healthStatus,
+        revenueStage,
+        sections: [
+          { name: 'Business Foundation', score: sectionScores.foundation, max: 40, percentage: Math.round((sectionScores.foundation / 40) * 100) },
+          { name: 'Strategic Wheel', score: sectionScores.strategic_wheel, max: 60, percentage: Math.round((sectionScores.strategic_wheel / 60) * 100) },
+          { name: 'Profitability Health', score: sectionScores.profitability, max: 30, percentage: Math.round((sectionScores.profitability / 30) * 100) },
+          { name: 'Business Engines', score: sectionScores.engines, max: 100, percentage: Math.round((sectionScores.engines / 100) * 100) },
+          { name: 'Success Disciplines', score: sectionScores.disciplines, max: 60, percentage: Math.round((sectionScores.disciplines / 60) * 100) }
+        ]
+      }));
+      
+      // Get all assessments and add this one
+      const existingAssessments = JSON.parse(localStorage.getItem('assessments') || '[]');
+      existingAssessments.push(assessmentResult);
+      localStorage.setItem('assessments', JSON.stringify(existingAssessments));
+      
       // Redirect to results page
-      router.push(`/assessment/${assessmentId}`);
-    } catch (err) {
-      console.error('Error submitting assessment:', err);
+      router.push('/assessment/results');
+      
+    } catch (error) {
+      console.error('Error submitting assessment:', error);
       setError('Failed to save assessment. Please try again.');
       setIsSubmitting(false);
     }
@@ -1030,4 +1098,3 @@ export default function AssessmentPage() {
     </div>
   );
 }
-

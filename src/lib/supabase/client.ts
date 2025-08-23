@@ -1,3 +1,8 @@
-// Re-export the supabase client
-export { supabase } from '@/lib/supabase'
-export { supabase as createClient } from '@/lib/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import type { Database } from '@/types/database.types'
+
+export function createClient() {
+  return createClientComponentClient<Database>()
+}
+
+export const supabase = createClient()

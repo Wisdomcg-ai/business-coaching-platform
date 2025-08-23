@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 
 export default function TestPage() {
   const [message, setMessage] = useState('Testing...')
@@ -9,7 +9,7 @@ export default function TestPage() {
   useEffect(() => {
     async function test() {
       try {
-  // supabase client imported from lib
+        const supabase = createClient()
         const { data, error } = await supabase.from('profiles').select('count')
         
         if (error) {

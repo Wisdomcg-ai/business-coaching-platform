@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import type { Database } from '@/types/supabase'
 import { 
   ArrowLeft, 
@@ -83,7 +83,7 @@ const OFFERING_TYPES = [
 
 export default function EnhancedBusinessProfile() {
   const router = useRouter()
-  // supabase client imported from lib
+  const supabase = createClient()
   
   const [currentStep, setCurrentStep] = useState(1)
   const [business, setBusiness] = useState<Partial<Business>>({})

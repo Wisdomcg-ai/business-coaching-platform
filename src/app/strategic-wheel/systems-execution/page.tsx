@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { ArrowLeft, Save, Info } from 'lucide-react'
 
 interface SystemsExecutionData {
@@ -48,7 +48,7 @@ interface SystemsExecutionData {
 
 export default function SystemsExecutionPage() {
   const router = useRouter()
-  // supabase client imported from lib
+  const supabase = createClientComponentClient()
   const saveTimeoutRef = useRef<NodeJS.Timeout>()
   const lastSavedDataRef = useRef<string>('')
   
@@ -108,12 +108,16 @@ export default function SystemsExecutionPage() {
   const loadExistingData = async () => {
     try {
       setLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/auth/login')
+        return
       }
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('business_id')
-        .eq('id', 'temp-user')
+        .eq('id', session.user.id)
         .single()
 
       if (profileError) {

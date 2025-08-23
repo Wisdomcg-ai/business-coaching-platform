@@ -1,674 +1,717 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  ArrowLeft, 
+  ChevronDown,
+  ChevronUp,
+  Target,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle,
+  ChevronRight
+} from 'lucide-react';
 
-export default function AssessmentResultsPage() {
-  const router = useRouter()
-  const [results, setResults] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [saveStatus, setSaveStatus] = useState('')
-  const supabase = createClientComponentClient()
+// Map question IDs to Success Disciplines
+const disciplineMapping = {
+  'q50': 'Decision-Making',
+  'q51': 'Technology & AI',
+  'q52': 'Growth Mindset',
+  'q53': 'Leadership',
+  'q54': 'Personal Mastery',
+  'q55': 'Operational Excellence',
+  'q56': 'Resource Optimization',
+  'q57': 'Financial Acumen',
+  'q58': 'Accountability',
+  'q59': 'Customer Experience',
+  'q60': 'Resilience & Renewal',
+  'q61': 'Time Management'
+};
+
+// Revenue roadmap recommendations
+const recommendationsByStage = {
+  'foundation': [
+    { title: 'Define Your Ideal Customer', area: 'Marketing', action: 'Interview your 3 best customers this week' },
+    { title: 'Document Sales Process', area: 'Sales', action: 'Write your sales steps in 5 bullet points' },
+    { title: 'Weekly Money Meeting', area: 'Finance', action: 'Schedule 30 minutes weekly to review finances' }
+  ],
+  'traction': [
+    { title: 'Focus Marketing Channels', area: 'Marketing', action: 'Double down on your best performing channel' },
+    { title: 'Hire Key Person', area: 'Team', action: 'List top 5 tasks to delegate' },
+    { title: 'Create SOPs', area: 'Systems', action: 'Document your most important process' }
+  ],
+  'scaling': [
+    { title: 'Build Sales System', area: 'Sales', action: 'Script your discovery call questions' },
+    { title: 'Team Performance Rhythms', area: 'Team', action: 'Schedule weekly 1-on-1s with direct reports' },
+    { title: 'Operations Manual', area: 'Systems', action: 'List your top 10 processes to document' }
+  ],
+  'optimization': [
+    { title: 'Marketing Automation', area: 'Marketing', action: 'Set up one email automation sequence' },
+    { title: 'Sales Team Structure', area: 'Sales', action: 'Define ideal sales hire profile' },
+    { title: 'Leadership Development', area: 'Team', action: 'Assess each leader strengths and gaps' }
+  ]
+};
+
+export default function SimplifiedResultsPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showDisciplines, setShowDisciplines] = useState(false);
+  const [showEngines, setShowEngines] = useState(false);
+  
+  // Core data
+  const [score, setScore] = useState(0);
+  const [revenueStage, setRevenueStage] = useState('');
+  const [sections, setSections] = useState<any[]>([]);
+  const [disciplines, setDisciplines] = useState<any[]>([]);
+  const [engines, setEngines] = useState<any[]>([]);
+  const [contextMessage, setContextMessage] = useState('');
 
   useEffect(() => {
-    loadResults()
-  }, [])
+    loadAndProcessResults();
+  }, []);
 
-  const loadResults = async () => {
+  const loadAndProcessResults = () => {
     try {
-      // First try to get results from localStorage (just completed)
-      const storedResults = localStorage.getItem('assessmentResults')
-      const storedAnswers = localStorage.getItem('assessmentAnswers')
+      // Load data from localStorage
+      const answersData = localStorage.getItem('assessmentAnswers');
+      const resultsData = localStorage.getItem('assessmentResults');
       
-      if (storedResults) {
-        // Fresh assessment just completed
-        const parsedResults = JSON.parse(storedResults)
-        const parsedAnswers = storedAnswers ? JSON.parse(storedAnswers) : {}
-        
-        // Add detailed breakdowns
-        parsedResults.engineScores = calculateEngineScores(parsedAnswers)
-        parsedResults.disciplineBreakdown = calculateDisciplineBreakdown(parsedAnswers)
-        
-        setResults(parsedResults)
-        await saveToDatabase(parsedResults)
-      } else {
-        // Load from database
-        await loadFromDatabase()
+      if (!answersData || !resultsData) {
+        setLoading(false);
+        return;
       }
+      
+      const answers = JSON.parse(answersData);
+      const results = JSON.parse(resultsData);
+      
+      // Fix percentage calculation (use corrected scoring)
+      const correctedScore = calculateCorrectedScore(answers);
+      setScore(correctedScore);
+      
+      // Get revenue stage from q1
+      const revenueAnswer = answers.q1?.label || answers.q1?.value || 'Unknown';
+      setRevenueStage(formatRevenueStage(revenueAnswer));
+      
+      // Recalculate sections with correct scoring
+      const correctedSections = calculateSectionScores(answers);
+      setSections(correctedSections);
+      
+      // Calculate Success Disciplines scores
+      const disciplineScores = calculateDisciplineScores(answers);
+      setDisciplines(disciplineScores);
+      
+      // Calculate Business Engines breakdown
+      const engineBreakdown = calculateEngineBreakdown(answers);
+      setEngines(engineBreakdown);
+      
+      // Generate context message
+      const message = generateContextMessage(revenueAnswer, correctedScore);
+      setContextMessage(message);
+      
     } catch (error) {
-      console.error('Error loading results:', error)
-      setSaveStatus('Error loading results')
+      console.error('Error processing results:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const calculateEngineScores = (answers: any) => {
-    // Calculate overall scores for each engine
-    const scoreMap: { [key: string]: number } = {
-      'Under 20 leads': 25,
-      '20-50 leads': 50,
-      '50-100 leads': 75,
-      '100+ leads': 100,
-      'No consistent channels': 20,
-      '1-2 inconsistent sources': 40,
-      '3-4 regular sources': 70,
-      '5+ systematic channels': 100,
-      'No process at all': 20,
-      "Have a process but don't follow it": 40,
-      'Have a process and follow it sometimes': 60,
-      'Have a process and follow it consistently': 85,
-      'Have a documented process and follow it consistently': 100,
-      "Under 15% or don't track": 25,
-      '15-25%': 50,
-      '25-40%': 75,
-      'Over 40%': 100,
-      'Under 60%': 30,
-      '60-75%': 55,
-      '75-90%': 80,
-      'Over 90%': 100,
-      'Reactive hiring when desperate': 25,
-      'Basic hiring process': 50,
-      'Good hiring with defined criteria': 75,
-      'Systematic recruitment of A-players': 100,
-      'No formal performance management': 20,
-      'Occasional informal feedback': 45,
-      'Regular reviews without clear criteria': 65,
-      'Systematic reviews against core values and job KPIs': 100,
-      "Most processes exist only in people's heads": 20,
-      'Some processes documented': 45,
-      'Most key processes documented': 70,
-      'All processes documented and optimized': 100,
-      'Never audit compliance': 20,
-      'Only when problems arise': 40,
-      'Annual system audits': 65,
-      'Quarterly audits with improvements': 100,
-      'No budget or forecast': 20,
-      'Basic revenue/expense tracking': 45,
-      'Annual budget created': 70,
-      'Detailed budget with monthly variance analysis': 100,
-      'No cash flow forecasting': 20,
-      'Check bank balance when needed': 40,
-      'Monthly cash flow review': 65,
-      '13-week rolling cash flow forecast': 100,
-      "Don't measure systematically": 20,
-      'Occasional informal feedback': 45,
-      'Regular satisfaction surveys': 70,
-      'Comprehensive feedback system with action plans': 100
-    }
-
-    // Calculate Attract Engine Score
-    let attractScore = 0
-    let attractCount = 0
-    if (answers.monthlyLeads) {
-      attractScore += scoreMap[answers.monthlyLeads] || 40
-      attractCount++
-    }
-    if (answers.marketingChannels) {
-      attractScore += scoreMap[answers.marketingChannels] || 40
-      attractCount++
-    }
-    if (answers.marketingProcess) {
-      attractScore += scoreMap[answers.marketingProcess] || 40
-      attractCount++
-    }
-    // Add yes/no questions
-    const attractSystems = answers.attract_systems || {}
-    let attractYesCount = 0
-    Object.values(attractSystems).forEach((answer: any) => {
-      if (answer === 'yes') attractYesCount++
-    })
-    attractScore += (attractYesCount / 4) * 100
-    attractCount++
+  // Calculate corrected score (1 point per yes, not 1.25)
+  const calculateCorrectedScore = (answers: any): number => {
+    let totalPoints = 0;
+    let maxPoints = 290; // Fixed maximum
     
-    const finalAttractScore = attractCount > 0 ? Math.round(attractScore / attractCount) : 50
-
-    // Calculate Convert Engine Score
-    let convertScore = 0
-    let convertCount = 0
-    if (answers.conversionRate) {
-      convertScore += scoreMap[answers.conversionRate] || 40
-      convertCount++
-    }
-    if (answers.salesProcess) {
-      convertScore += scoreMap[answers.salesProcess] || 40
-      convertCount++
-    }
-    // Add yes/no questions
-    const salesCapability = answers.sales_capability || {}
-    let salesYesCount = 0
-    Object.values(salesCapability).forEach((answer: any) => {
-      if (answer === 'yes') salesYesCount++
-    })
-    convertScore += (salesYesCount / 4) * 100
-    convertCount++
+    // Get all section scores
+    const sections = calculateSectionScores(answers);
     
-    const transactionValue = answers.transaction_value || {}
-    let transactionYesCount = 0
-    Object.values(transactionValue).forEach((answer: any) => {
-      if (answer === 'yes') transactionYesCount++
-    })
-    convertScore += (transactionYesCount / 4) * 100
-    convertCount++
+    // Sum up all section scores
+    sections.forEach(section => {
+      totalPoints += section.score;
+    });
     
-    const finalConvertScore = convertCount > 0 ? Math.round(convertScore / convertCount) : 45
+    // Calculate percentage
+    const percentage = Math.round((totalPoints / maxPoints) * 100);
+    return percentage;
+  };
 
-    // Calculate Deliver Engine Score
-    let deliverScore = 0
-    let deliverCount = 0
-    if (answers.customerDelight) {
-      deliverScore += scoreMap[answers.customerDelight] || 50
-      deliverCount++
-    }
-    if (answers.deliveryProcess) {
-      deliverScore += scoreMap[answers.deliveryProcess] || 50
-      deliverCount++
-    }
-    if (answers.satisfactionTracking) {
-      deliverScore += scoreMap[answers.satisfactionTracking] || 45
-      deliverCount++
-    }
-    if (answers.talentStrategy) {
-      deliverScore += scoreMap[answers.talentStrategy] || 50
-      deliverCount++
-    }
-    if (answers.processDocumentation) {
-      deliverScore += scoreMap[answers.processDocumentation] || 40
-      deliverCount++
-    }
-    
-    const finalDeliverScore = deliverCount > 0 ? Math.round(deliverScore / deliverCount) : 55
+  // Calculate section scores with correct maximums
+  const calculateSectionScores = (answers: any): any[] => {
+    const sections: any[] = [
+      {
+        name: 'Business Foundation',
+        questions: ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'],
+        max: 40
+      },
+      {
+        name: 'Strategic Wheel',
+        questions: ['q7', 'q8', 'q9', 'q10', 'q11', 'q13', 'q14', 'q15', 'q16', 'q17', 'q18', 'q19', 'q20'],
+        max: 60
+      },
+      {
+        name: 'Profitability Health',
+        questions: ['q22', 'q23', 'q24', 'q25', 'q26'],
+        max: 30
+      },
+      {
+        name: 'Business Engines',
+        questions: ['q27', 'q28', 'q30', 'q31', 'q33', 'q34', 'q35', 'q39', 'q40', 'q42', 'q43', 'q45', 'q46', 'q49'],
+        subQuestions: ['q30a', 'q30b', 'q30c', 'q30d', 'q33a', 'q33b', 'q33c', 'q33d', 'q34a', 'q34b', 'q34c', 'q34d', 'q39a', 'q39b', 'q39c', 'q39d', 'q42a', 'q42b', 'q42c', 'q42d', 'q45a', 'q45b', 'q45c', 'q45d', 'q49a', 'q49b', 'q49c', 'q49d'],
+        max: 100
+      },
+      {
+        name: 'Success Disciplines',
+        questions: ['q50', 'q51', 'q52', 'q53', 'q54', 'q55', 'q56', 'q57', 'q58', 'q59', 'q60', 'q61'],
+        subQuestions: [], // Handled separately
+        max: 60
+      }
+    ];
 
-    // Calculate Finance Engine Score
-    let financeScore = 0
-    let financeCount = 0
-    if (answers.budgetForecast) {
-      financeScore += scoreMap[answers.budgetForecast] || 45
-      financeCount++
-    }
-    if (answers.cashFlowForecast) {
-      financeScore += scoreMap[answers.cashFlowForecast] || 50
-      financeCount++
-    }
-    // Add yes/no questions
-    const workingCapital = answers.working_capital || {}
-    let capitalYesCount = 0
-    Object.values(workingCapital).forEach((answer: any) => {
-      if (answer === 'yes') capitalYesCount++
-    })
-    financeScore += (capitalYesCount / 4) * 100
-    financeCount++
-    
-    const finalFinanceScore = financeCount > 0 ? Math.round(financeScore / financeCount) : 50
-
-    return {
-      attract: finalAttractScore,
-      convert: finalConvertScore,
-      deliver: finalDeliverScore,
-      finance: finalFinanceScore
-    }
-  }
-
-  const calculateDisciplineBreakdown = (answers: any) => {
-    const disciplines = [
-      { id: 'discipline_decision', name: 'Decision-Making' },
-      { id: 'discipline_technology', name: 'Technology & AI' },
-      { id: 'discipline_growth', name: 'Growth Mindset' },
-      { id: 'discipline_leadership', name: 'Leadership' },
-      { id: 'discipline_personal', name: 'Personal Mastery' },
-      { id: 'discipline_operational', name: 'Operational Excellence' },
-      { id: 'discipline_resource', name: 'Resource Optimization' },
-      { id: 'discipline_financial', name: 'Financial Acumen' },
-      { id: 'discipline_accountability', name: 'Accountability' },
-      { id: 'discipline_customer', name: 'Customer Experience' },
-      { id: 'discipline_resilience', name: 'Resilience & Renewal' },
-      { id: 'discipline_time', name: 'Time Management' }
-    ]
-
-    return disciplines.map(discipline => {
-      const disciplineAnswers = answers?.[discipline.id] || {}
-      let yesCount = 0
+    return sections.map(section => {
+      let sectionScore = 0;
+      let maxPossible = 0;
       
-      // Count "yes" answers for this discipline
-      Object.values(disciplineAnswers).forEach((answer: any) => {
-        if (answer === 'yes') yesCount++
-      })
+      // Handle Success Disciplines differently
+      if (section.name === 'Success Disciplines') {
+        section.questions.forEach(qBase => {
+          ['a', 'b', 'c', 'd', 'e'].forEach(letter => {
+            const qId = `${qBase}${letter}`;
+            if (answers[qId]?.value === 'yes') {
+              sectionScore += 1; // 1 point per yes
+            }
+          });
+        });
+        maxPossible = section.max;
+      } else {
+        // Handle regular questions
+        section.questions.forEach(qId => {
+          const answer = answers[qId];
+          if (answer?.points !== undefined) {
+            sectionScore += answer.points;
+          }
+          // Track maximum possible for scaling
+          maxPossible += 10; // Assume each question has max 10 points
+        });
+        
+        // Handle sub-questions (yes/no)
+        if (section.subQuestions) {
+          section.subQuestions.forEach(qId => {
+            const answer = answers[qId];
+            if (answer?.value === 'yes') {
+              sectionScore += 1; // 1 point per yes, not 1.25
+            }
+            maxPossible += 1; // Each yes/no has max 1 point
+          });
+        }
+      }
       
-      // Calculate percentage (5 questions per discipline)
-      const score = (yesCount / 5) * 100
+      // Scale Strategic Wheel to fit 60 points max
+      if (section.name === 'Strategic Wheel') {
+        // Scale the score: (actual/maxPossible) * desiredMax
+        const scaledScore = (sectionScore / maxPossible) * section.max;
+        sectionScore = Math.round(scaledScore);
+      }
+      
+      // For other sections, if maxPossible doesn't match section.max, scale appropriately
+      if (section.name !== 'Success Disciplines' && section.name !== 'Strategic Wheel' && maxPossible !== section.max) {
+        const scaledScore = (sectionScore / maxPossible) * section.max;
+        sectionScore = Math.round(scaledScore);
+      }
+      
+      // Calculate percentage
+      const percentage = Math.round((sectionScore / section.max) * 100);
       
       return {
-        name: discipline.name,
-        score: Math.round(score)
+        name: section.name,
+        score: sectionScore,
+        max: section.max,
+        percentage: Math.min(percentage, 100) // Cap at 100%
+      };
+    });
+  };
+
+  // Calculate Success Disciplines scores
+  const calculateDisciplineScores = (answers: any): any[] => {
+    const scores: any[] = [];
+    
+    Object.entries(disciplineMapping).forEach(([qId, disciplineName]) => {
+      let yesCount = 0;
+      let totalCount = 5;
+      
+      // Check each sub-question (a, b, c, d, e)
+      ['a', 'b', 'c', 'd', 'e'].forEach(letter => {
+        const questionKey = `${qId}${letter}`;
+        if (answers[questionKey]?.value === 'yes') {
+          yesCount++;
+        }
+      });
+      
+      const percentage = Math.round((yesCount / totalCount) * 100);
+      scores.push({
+        name: disciplineName,
+        score: yesCount,
+        percentage,
+        status: percentage >= 60 ? 'good' : percentage >= 40 ? 'medium' : 'needs-work'
+      });
+    });
+    
+    return scores.sort((a, b) => a.percentage - b.percentage);
+  };
+
+  // Calculate Business Engines breakdown
+  const calculateEngineBreakdown = (answers: any): any[] => {
+    const engines = [
+      {
+        name: 'Attract Engine',
+        questions: ['q27', 'q28'], // Lead volume, marketing channels
+        subQuestions: ['q30a', 'q30b', 'q30c', 'q30d'],
+        max: 20
+      },
+      {
+        name: 'Convert Engine',
+        questions: ['q31'], // Conversion rate
+        subQuestions: ['q33a', 'q33b', 'q33c', 'q33d', 'q34a', 'q34b', 'q34c', 'q34d'],
+        max: 20
+      },
+      {
+        name: 'Deliver - Customer',
+        questions: ['q35'], // Customer delight
+        subQuestions: ['q39a', 'q39b', 'q39c', 'q39d'],
+        max: 20
+      },
+      {
+        name: 'Deliver - People',
+        questions: ['q40'], // Talent strategy
+        subQuestions: ['q42a', 'q42b', 'q42c', 'q42d'],
+        max: 15
+      },
+      {
+        name: 'Deliver - Systems',
+        questions: ['q43'], // Process documentation
+        subQuestions: ['q45a', 'q45b', 'q45c', 'q45d'],
+        max: 15
+      },
+      {
+        name: 'Finance Engine',
+        questions: ['q46'], // Budget/forecast
+        subQuestions: ['q49a', 'q49b', 'q49c', 'q49d'],
+        max: 10
       }
-    })
-  }
+    ];
 
-  const saveToDatabase = async (assessmentResults: any) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setSaveStatus('Not logged in')
-        return
-      }
-
-      const assessmentData = {
-        user_id: user.id,
-        assessment_data: assessmentResults,
-        completion_percentage: 100,
-        total_percentage: assessmentResults.percentage || 0,
-        health_status: assessmentResults.healthStatus || '',
-        revenue_stage: assessmentResults.revenueStage || '',
-        foundation_score: assessmentResults.sections?.find((s: any) => s.name === 'Business Foundation')?.percentage || 0,
-        strategic_wheel_score: assessmentResults.sections?.find((s: any) => s.name === 'Strategic Wheel')?.percentage || 0,
-        profitability_score: assessmentResults.sections?.find((s: any) => s.name === 'Profitability Health')?.percentage || 0,
-        engines_score: assessmentResults.sections?.find((s: any) => s.name === 'Business Engines')?.percentage || 0,
-        disciplines_score: assessmentResults.sections?.find((s: any) => s.name === 'Success Disciplines')?.percentage || 0,
-        biggest_constraint: assessmentResults.insights?.biggestConstraint || '',
-        biggest_opportunity: assessmentResults.insights?.biggestOpportunity || '',
-        ninety_day_priority: assessmentResults.insights?.ninetyDayPriority || '',
-        help_needed: assessmentResults.insights?.helpNeeded || '',
-        completed_at: new Date().toISOString()
-      }
-
-      const { error } = await supabase
-        .from('assessments')
-        .insert([assessmentData])
-
-      if (error) {
-        console.error('Save error:', error)
-        setSaveStatus('Error saving')
-      } else {
-        setSaveStatus('Assessment saved successfully!')
-        localStorage.removeItem('assessmentResults')
-        localStorage.removeItem('assessmentAnswers')
-      }
-    } catch (error) {
-      console.error('Error saving:', error)
-    }
-  }
-
-  const loadFromDatabase = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('assessments')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (!error && data?.assessment_data) {
-        const results = data.assessment_data
-        
-        // If breakdowns aren't in the saved data, create them
-        if (!results.engineScores) {
-          results.engineScores = {
-            attract: 65,
-            convert: 55,
-            deliver: 70,
-            finance: 50
+    return engines.map(engine => {
+      let engineScore = 0;
+      let maxPossible = 0;
+      
+      // Calculate score from regular questions
+      engine.questions.forEach(qId => {
+        const answer = answers[qId];
+        if (answer?.points !== undefined) {
+          engineScore += answer.points;
+          maxPossible += 10; // Each question typically has max 10
+        }
+      });
+      
+      // Calculate score from sub-questions (yes/no)
+      if (engine.subQuestions) {
+        engine.subQuestions.forEach(qId => {
+          const answer = answers[qId];
+          if (answer) {
+            if (answer.value === 'yes') {
+              engineScore += 1; // 1 point per yes
+            }
+            maxPossible += 1;
           }
-        }
-        if (!results.disciplineBreakdown) {
-          results.disciplineBreakdown = calculateDisciplineBreakdown({})
-        }
-        
-        setResults(results)
+        });
       }
-    } catch (error) {
-      console.error('Error loading from database:', error)
-    }
-  }
+      
+      // Scale to the engine's max points if we have any questions answered
+      const scaledScore = maxPossible > 0 ? (engineScore / maxPossible) * engine.max : 0;
+      const finalScore = Math.round(scaledScore);
+      const percentage = Math.round((finalScore / engine.max) * 100);
+      
+      return {
+        name: engine.name,
+        score: finalScore,
+        max: engine.max,
+        percentage: Math.min(percentage, 100)
+      };
+    });
+  };
 
-  const getScoreColor = (percentage: number) => {
-    if (percentage >= 70) return 'text-green-600'
-    if (percentage >= 50) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const getScoreBgColor = (percentage: number) => {
-    if (percentage >= 70) return 'bg-green-50 border-green-200'
-    if (percentage >= 50) return 'bg-yellow-50 border-yellow-200'
-    return 'bg-red-50 border-red-200'
-  }
-
-  const getProgressBarColor = (percentage: number) => {
-    if (percentage >= 70) return 'bg-gradient-to-r from-green-500 to-green-600'
-    if (percentage >= 50) return 'bg-gradient-to-r from-yellow-500 to-yellow-600'
-    return 'bg-gradient-to-r from-red-500 to-red-600'
-  }
-
-  const getPerformanceLevel = (percentage: number) => {
-    if (percentage >= 90) return 'Mastery Level'
-    if (percentage >= 80) return 'Excellence'
-    if (percentage >= 70) return 'Proficiency'
-    if (percentage >= 60) return 'Development'
-    if (percentage >= 50) return 'Foundation'
-    return 'Getting Started'
-  }
-
-  const getBusinessStage = (stage: string) => {
+  // Format revenue stage for display
+  const formatRevenueStage = (value: string): string => {
     const stageMap: { [key: string]: string } = {
-      'Under $250K': 'Foundation',
-      '$250K - $1M': 'Traction',
-      '$1M - $3M': 'Scaling',
-      '$3M - $5M': 'Optimization',
-      '$5M - $10M': 'Leadership',
-      '$10M+': 'Mastery'
-    }
-    return stageMap[stage] || stage
-  }
+      'under_250k': 'Under $250K',
+      '250k_1m': '$250K - $1M',
+      '1m_3m': '$1M - $3M',
+      '3m_5m': '$3M - $5M',
+      '5m_10m': '$5M - $10M',
+      'over_10m': 'Over $10M'
+    };
+    return stageMap[value] || value;
+  };
 
-  const getEngineRating = (score: number) => {
-    if (score >= 80) return 'Excellent'
-    if (score >= 60) return 'Good'
-    if (score >= 40) return 'Developing'
-    return 'Needs Focus'
-  }
+  // Generate context message based on revenue and score
+  const generateContextMessage = (revenue: string, score: number): string => {
+    const revenueLevel = revenue.includes('3m') || revenue.includes('5m') || revenue.includes('10m') ? 'high' :
+                         revenue.includes('1m') ? 'medium' : 'low';
+    const scoreLevel = score >= 70 ? 'high' : score >= 50 ? 'medium' : 'low';
+    
+    const messages: { [key: string]: string } = {
+      'high-high': 'Excellent foundations at scale. Ready for exponential growth.',
+      'high-medium': 'Good business at scale. Strengthen foundations to reduce risk.',
+      'high-low': '⚠️ Vulnerable at scale. Critical to strengthen foundations.',
+      'medium-high': 'Strong foundations with traction. Time to accelerate.',
+      'medium-medium': 'Scaling steadily. Keep strengthening while you grow.',
+      'medium-low': 'Found product-market fit. Build systems to scale sustainably.',
+      'low-high': 'Exceptional foundations. Focus on revenue generation.',
+      'low-medium': 'Building momentum. Good progress, keep going.',
+      'low-low': 'Foundation stage. Perfect time to build right.'
+    };
+    
+    return messages[`${revenueLevel}-${scoreLevel}`] || 'Building your business foundation.';
+  };
+
+  // Get score color and emoji
+  const getScoreDisplay = (score: number) => {
+    if (score >= 70) return { color: 'text-green-600', emoji: '🟢', label: 'STRONG' };
+    if (score >= 50) return { color: 'text-yellow-600', emoji: '🟡', label: 'DEVELOPING' };
+    return { color: 'text-red-600', emoji: '🔴', label: 'NEEDS FOCUS' };
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading your results...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!results) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">No assessment results found</p>
-          <Link href="/assessment" className="text-blue-600 hover:underline">
-            Take Assessment
-          </Link>
-        </div>
-      </div>
-    )
-  }
+  const scoreDisplay = getScoreDisplay(score);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white py-12">
-      <div className="max-w-5xl mx-auto px-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* Simple Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="flex items-center text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Back
+            </button>
+            <h1 className="text-lg font-medium text-gray-900">Assessment Results</h1>
+            <div className="w-20"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content - Simple and Clean */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Save Status */}
-        {saveStatus && (
-          <div className={`mb-4 p-4 rounded-lg ${
-            saveStatus.includes('success') 
-              ? 'bg-green-50 border border-green-200 text-green-700'
-              : saveStatus.includes('Error')
-              ? 'bg-red-50 border border-red-200 text-red-700'
-              : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
+        {/* Score Card - The Main Focus */}
+        <div className="bg-white rounded-lg shadow-lg p-8 mb-6 text-center">
+          <h2 className="text-sm uppercase tracking-wider text-gray-500 mb-4">
+            YOUR BUSINESS SCORE
+          </h2>
+          
+          <div className="mb-6">
+            <span className={`text-6xl font-bold ${scoreDisplay.color}`}>
+              {score}%
+            </span>
+            <span className="text-4xl ml-3">{scoreDisplay.emoji}</span>
+          </div>
+          
+          <div className="mb-6">
+            <p className="text-lg font-medium text-gray-900 mb-2">
+              Revenue Stage: {revenueStage}
+            </p>
+            <p className="text-sm text-gray-600 max-w-md mx-auto">
+              {contextMessage}
+            </p>
+          </div>
+          
+          <div className={`inline-block px-4 py-2 rounded-full ${
+            score >= 70 ? 'bg-green-100 text-green-800' :
+            score >= 50 ? 'bg-yellow-100 text-yellow-800' :
+            'bg-red-100 text-red-800'
           }`}>
-            {saveStatus}
-          </div>
-        )}
-
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Your Business Diagnostic Report
-          </h1>
-          <p className="text-lg text-gray-600">
-            Comprehensive analysis of your business performance and opportunities
-          </p>
-        </div>
-
-        {/* Overall Score Card */}
-        <div className={`mb-8 p-8 rounded-xl shadow-lg border-2 ${getScoreBgColor(results.percentage || 0)}`}>
-          <div className="text-center">
-            <div className="mb-4">
-              <span className={`text-6xl font-bold ${getScoreColor(results.percentage || 0)}`}>
-                {results.percentage || 0}%
-              </span>
-              <p className="text-2xl font-semibold text-gray-700 mt-2">
-                Overall Business Score
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              <div className="bg-white/70 rounded-lg p-4">
-                <p className="text-sm text-gray-600">Performance Level</p>
-                <p className={`text-xl font-bold ${getScoreColor(results.percentage || 0)}`}>
-                  {getPerformanceLevel(results.percentage || 0)}
-                </p>
-              </div>
-              <div className="bg-white/70 rounded-lg p-4">
-                <p className="text-sm text-gray-600">Business Stage</p>
-                <p className="text-xl font-bold text-gray-800">
-                  {getBusinessStage(results.revenueStage || '')}
-                </p>
-              </div>
-            </div>
+            <span className="font-medium">{scoreDisplay.label}</span>
           </div>
         </div>
 
-        {/* Section Scores */}
-        {results.sections && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Section Performance
-            </h2>
-            <div className="space-y-4">
-              {results.sections.map((section: any, index: number) => {
-                const icons = ['🏢', '🎯', '💰', '⚙️', '💪']
-                return (
-                  <div key={section.name}>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium text-gray-700 flex items-center">
-                        <span className="mr-2 text-xl">{icons[index]}</span>
-                        {section.name}
-                      </span>
-                      <span className={`font-bold ${getScoreColor(section.percentage)}`}>
-                        {section.percentage}%
-                      </span>
+
+
+        {/* Expandable Details Section */}
+        <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <h3 className="text-lg font-semibold text-gray-900">
+              Detailed Section Analysis
+            </h3>
+            {showDetails ? (
+              <ChevronUp className="h-5 w-5 text-gray-500" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-500" />
+            )}
+          </button>
+          
+          {showDetails && (
+            <div className="mt-6 space-y-6">
+              {/* Main Sections Overview */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">5 Core Sections</h4>
+                {sections.map((section) => (
+                  <div key={section.name} className="mb-3">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-gray-700">{section.name}</span>
+                      <div className="flex items-center">
+                        <span className={`text-sm font-medium mr-2 ${
+                          section.percentage >= 70 ? 'text-green-600' :
+                          section.percentage >= 50 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {section.percentage}%
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          ({section.score}/{section.max} pts)
+                        </span>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className={`h-3 rounded-full transition-all duration-500 ${getProgressBarColor(section.percentage)}`}
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          section.percentage >= 70 ? 'bg-green-500' :
+                          section.percentage >= 50 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
                         style={{ width: `${section.percentage}%` }}
                       />
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+                ))}
+              </div>
 
-        {/* Business Engines - Simplified Overall Scores */}
-        {results.engineScores && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              ⚙️ Business Engines Performance
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { name: 'Attract Engine', icon: '🧲', score: results.engineScores.attract },
-                { name: 'Convert Engine', icon: '💼', score: results.engineScores.convert },
-                { name: 'Deliver Engine', icon: '📦', score: results.engineScores.deliver },
-                { name: 'Finance Engine', icon: '💰', score: results.engineScores.finance }
-              ].map((engine) => (
-                <div key={engine.name} className="bg-gray-50 p-6 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-gray-800 flex items-center">
-                      <span className="mr-2 text-2xl">{engine.icon}</span>
-                      {engine.name}
-                    </h3>
+              {/* Strategic Wheel Components */}
+              <div className="border-t pt-4">
+                <h4 className="font-medium text-gray-900 mb-3">Strategic Wheel Components</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Vision & Purpose</span>
+                    <span className="font-medium">Q7-8</span>
                   </div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-3xl font-bold ${getScoreColor(engine.score)}`}>
-                      {engine.score}%
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      engine.score >= 80 ? 'bg-green-100 text-green-700' :
-                      engine.score >= 60 ? 'bg-blue-100 text-blue-700' :
-                      engine.score >= 40 ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {getEngineRating(engine.score)}
-                    </span>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Strategy & Market</span>
+                    <span className="font-medium">Q9-11</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div
-                      className={`h-3 rounded-full ${getProgressBarColor(engine.score)}`}
-                      style={{ width: `${engine.score}%` }}
-                    />
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">People & Culture</span>
+                    <span className="font-medium">Q13-14</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Systems & Execution</span>
+                    <span className="font-medium">Q15-16</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Money & Metrics</span>
+                    <span className="font-medium">Q17-18</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Communications</span>
+                    <span className="font-medium">Q19-20</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
 
-        {/* Success Disciplines Grid */}
-        {results.disciplineBreakdown && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              💪 Success Disciplines Analysis
-            </h2>
-            <p className="text-gray-600 mb-4">Each discipline scored based on 5 key questions</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {results.disciplineBreakdown.map((discipline: any) => (
-                <div key={discipline.name} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <p className="text-sm font-medium text-gray-700 mb-1">{discipline.name}</p>
-                  <div className="flex items-center justify-between">
-                    <p className={`text-2xl font-bold ${getScoreColor(discipline.score)}`}>
-                      {discipline.score}%
-                    </p>
-                    <div className="text-xs text-gray-500">
-                      ({Math.round(discipline.score / 20)}/5 Yes)
-                    </div>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div
-                      className={`h-2 rounded-full ${getProgressBarColor(discipline.score)}`}
-                      style={{ width: `${discipline.score}%` }}
-                    />
+              {/* Score Summary */}
+              <div className="border-t pt-4">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">Total Score:</span>
+                    <span className="text-lg font-bold text-gray-900">{score}%</span>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* Strengths and Improvements */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center">
-              <span className="text-2xl mr-2">💪</span> Top Strengths
-            </h3>
-            <ul className="space-y-2">
-              {(results.topStrengths || []).map((strength: string, index: number) => (
-                <li key={index} className="flex items-start">
-                  <span className="text-green-500 mr-2">✓</span>
-                  <span className="text-gray-700">{strength}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-amber-700 mb-4 flex items-center">
-              <span className="text-2xl mr-2">🎯</span> Growth Opportunities
-            </h3>
-            <ul className="space-y-2">
-              {(results.improvementAreas || []).map((area: string, index: number) => (
-                <li key={index} className="flex items-start">
-                  <span className="text-amber-500 mr-2">→</span>
-                  <span className="text-gray-700">{area}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          )}
         </div>
 
-        {/* Strategic Insights */}
-        {results.insights && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Strategic Insights
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {results.insights.biggestConstraint && (
-                <div>
-                  <p className="font-semibold text-gray-700 mb-2">Biggest Constraint:</p>
-                  <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">
-                    {results.insights.biggestConstraint}
-                  </p>
-                </div>
-              )}
-              {results.insights.biggestOpportunity && (
-                <div>
-                  <p className="font-semibold text-gray-700 mb-2">Biggest Opportunity:</p>
-                  <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">
-                    {results.insights.biggestOpportunity}
-                  </p>
-                </div>
-              )}
-              {results.insights.ninetyDayPriority && (
-                <div>
-                  <p className="font-semibold text-gray-700 mb-2">90-Day Priority:</p>
-                  <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">
-                    {results.insights.ninetyDayPriority}
-                  </p>
-                </div>
-              )}
-              {results.insights.helpNeeded && (
-                <div>
-                  <p className="font-semibold text-gray-700 mb-2">Help Needed:</p>
-                  <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">
-                    {results.insights.helpNeeded}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Next Steps */}
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg p-8 text-white">
-          <h2 className="text-2xl font-bold mb-4">Your Next Steps</h2>
-          <div className="space-y-3 mb-6">
-            <p className="flex items-start">
-              <span className="mr-2">1.</span>
-              Focus on your top growth opportunities to maximize impact
-            </p>
-            <p className="flex items-start">
-              <span className="mr-2">2.</span>
-              Build on your strengths to create competitive advantage
-            </p>
-            <p className="flex items-start">
-              <span className="mr-2">3.</span>
-              Set clear 90-day goals aligned with your priorities
-            </p>
-          </div>
+        {/* Business Engines - Expandable */}
+        <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
+          <button
+            onClick={() => setShowEngines(!showEngines)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <h3 className="text-lg font-semibold text-gray-900">
+              Business Engines Breakdown
+            </h3>
+            {showEngines ? (
+              <ChevronUp className="h-5 w-5 text-gray-500" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-500" />
+            )}
+          </button>
           
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Link
-              href="/dashboard"
-              className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-center"
+          {showEngines && (
+            <div className="mt-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Your 6 Business Engines performance - focus on areas below 50%
+              </p>
+              
+              <div className="space-y-3">
+                {engines.map((engine) => (
+                  <div key={engine.name}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-700">
+                        {engine.name}
+                      </span>
+                      <div className="flex items-center">
+                        <span className={`text-sm font-bold mr-2 ${
+                          engine.percentage >= 70 ? 'text-green-600' :
+                          engine.percentage >= 50 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {engine.percentage}%
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          ({engine.score}/{engine.max} pts)
+                        </span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          engine.percentage >= 70 ? 'bg-green-500' :
+                          engine.percentage >= 50 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${engine.percentage}%` }}
+                      />
+                    </div>
+                    {engine.percentage < 50 && (
+                      <p className="text-xs text-red-600 mt-1">Priority area for improvement</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Summary box */}
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm font-medium text-blue-900 mb-2">
+                  Engines Needing Attention:
+                </p>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  {engines
+                    .filter(e => e.percentage < 50)
+                    .sort((a, b) => a.percentage - b.percentage)
+                    .slice(0, 3)
+                    .map((e, i) => (
+                      <li key={i}>
+                        • {e.name} ({e.percentage}%)
+                      </li>
+                    ))}
+                  {engines.filter(e => e.percentage < 50).length === 0 && (
+                    <li>All engines performing above 50% - well done!</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Success Disciplines - Expandable */}
+        <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
+          <button
+            onClick={() => setShowDisciplines(!showDisciplines)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <h3 className="text-lg font-semibold text-gray-900">
+              Success Disciplines Analysis
+            </h3>
+            {showDisciplines ? (
+              <ChevronUp className="h-5 w-5 text-gray-500" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-500" />
+            )}
+          </button>
+          
+          {showDisciplines && (
+            <div className="mt-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Focus on disciplines scoring below 60% for maximum impact
+              </p>
+              
+              <div className="space-y-2">
+                {disciplines.map((discipline) => (
+                  <div key={discipline.name} className="flex items-center justify-between py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-700">{discipline.name}</span>
+                    <div className="flex items-center">
+                      <span className={`text-sm font-medium mr-2 ${
+                        discipline.percentage >= 60 ? 'text-green-600' :
+                        discipline.percentage >= 40 ? 'text-yellow-600' :
+                        'text-red-600'
+                      }`}>
+                        {discipline.percentage}%
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({discipline.score}/5)
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Top 3 disciplines to focus on */}
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm font-medium text-blue-900 mb-2">
+                  Top 3 Disciplines to Focus On:
+                </p>
+                <ol className="text-sm text-blue-800 space-y-1">
+                  {disciplines.slice(0, 3).map((d, i) => (
+                    <li key={i}>
+                      {i + 1}. {d.name} ({d.percentage}%)
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Next Steps Call to Action */}
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg p-8 text-center text-white">
+          <h3 className="text-2xl font-bold mb-3">
+            Now Let's Set Your Goals
+          </h3>
+          <p className="mb-6 opacity-90">
+            You know where you are. Let's define where you want to be in 90 days.
+          </p>
+          <div className="flex justify-center space-x-4">
+            <button 
+              onClick={() => router.push('/goals')}
+              className="px-6 py-3 bg-white text-blue-600 rounded-lg hover:bg-gray-100 font-medium flex items-center"
             >
-              Go to Dashboard
-            </Link>
-            <Link
-              href="/strategic-wheel"
-              className="bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors text-center"
+              Set My Goals
+              <ChevronRight className="ml-2 h-5 w-5" />
+            </button>
+            <button 
+              onClick={() => router.push('/dashboard')}
+              className="px-6 py-3 bg-blue-700 text-white rounded-lg hover:bg-blue-800 font-medium"
             >
-              Start Strategic Planning
-            </Link>
+              Back to Dashboard
+            </button>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
