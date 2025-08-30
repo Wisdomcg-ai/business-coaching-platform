@@ -1,60 +1,113 @@
 # Business Coaching Platform - Project Status
-Last Updated: December 2024
-
-## Quick Start for New Claude Chat
-I'm continuing work on my business coaching platform. Please read this PROJECT_STATUS to understand the current state.
+Last Updated: 23 august 2025
 
 ## Project Location
 /Users/mattmalouf/Desktop/business-coaching-platform
 
-## Current Working Features
-✅ Authentication system
-✅ Dashboard (/dashboard)
-✅ Assessment module (/assessment) - 54 questions
-✅ Results page (/assessment/results) - Basic version working
-⚠️ Results page needs enhancement
+## ✅ COMPLETED FEATURES
 
-## Tech Stack
+### Authentication & Navigation
+- ✅ Role-based authentication (Coach vs Client)
+- ✅ Sidebar navigation with Australian spelling
+- ✅ Different menu items based on user role
+- ✅ Collapsible sidebar with sections
+
+### Coach Features
+- ✅ Coach Dashboard (/coach/dashboard)
+  - Overview of all 5 businesses
+  - Health scores and status indicators
+  - Grid/List view toggle
+  - Clients needing attention alerts
+- ✅ Client Switcher in main dashboard
+  - Dropdown to switch between clients
+  - URL tracking with ?client=id parameter
+  - Coach mode indicator
+
+### Client Features  
+- ✅ Main Dashboard (/dashboard)
+  - Business overview with metrics
+  - Goals & Rocks display (mock data)
+  - Review cadence cards
+  - Quick actions
+- ✅ Assessment module (/assessment) - 54 questions
+- ✅ Results page (/assessment/results)
+
+### Database Integration
+- ✅ Supabase connection working
+- ✅ Loading real business data
+- ✅ Loading real assessment data
+- ✅ 5 businesses in database
+- ✅ 5 assessments with scores
+
+## 🔧 CURRENT STATE
+
+### Tech Stack
 - Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS
-- localStorage (no database currently)
-- No Supabase active (commented out)
+- Supabase (PostgreSQL)
+- Lucide React Icons
 
-## Assessment Structure
-Total: 54 questions, 290 points maximum
+### Database Schema
+- businesses table (company info)
+- assessments table (diagnostic results)
+- profiles table (user data)
+- Additional tables ready for features
 
-### Sections & Scoring
-1. Business Foundation (40 pts) - 6 questions
-2. Strategic Wheel (60 pts) - 14 questions
-3. Profitability Health (30 pts) - 5 questions  
-4. Business Engines (100 pts) - 14 questions
-   - Attract Engine (20 pts)
-   - Convert Engine (20 pts)
-   - Deliver-Customer (20 pts)
-   - Deliver-People (15 pts)
-   - Deliver-Systems (15 pts)
-   - Finance Engine (10 pts)
-5. Success Disciplines (60 pts) - 12 disciplines × 5 yes/no
+### Mock Data Still in Use
+- Annual/Quarterly Goals
+- Rocks (Q1 projects)
+- Review dates
+- Focus metrics
 
-## localStorage Keys
-- latestAssessment - Full assessment object
-- assessmentAnswers - Question answers
-- assessmentResults - Calculated results
-- assessments - Array of all assessments
+## 🎯 NEXT PRIORITIES
 
-## Current Issues
-1. Results page scoring alignment needs fixing
-2. Some questions missing from assessment (q12, q21, q29, etc.)
-3. Need better visualizations on results page
-4. Need actionable insights generation
+### Immediate (To-Do List - Starting Next)
+- Create todo_items table
+- Build To-Do List interface
+- Add task assignment
+- Track completion status
 
-## Next Priority
-Fixing the results page with proper scoring and visualizations
+### Soon
+- Stop Doing List
+- Coach Notes (private)
+- 13-Week Cashflow
 
-## Notes for Claude
-- User is a novice, needs complete file contents
-- Using Mac
-- Prefers step-by-step instructions
-- No external dependencies beyond what's installed
-- Want professional UI with good UX
+### Later
+- Questions for Coach module
+- Review templates
+- 90-Day Planning
+- One-Page Strategic Plan
+
+## 📂 KEY FILES
+
+### Core Components
+- `/src/components/layout/sidebar-layout.tsx` - Role-based navigation
+- `/src/app/dashboard/page.tsx` - Main dashboard with client switcher
+- `/src/app/coach/dashboard/page.tsx` - Coach overview dashboard
+- `/src/lib/supabase/client.ts` - Database connection
+
+### Navigation Structure
+- DASHBOARD - Command Centre
+- STRATEGISE - Assessment, SWOT, etc.
+- FINANCES - Dashboards, Cashflow
+- EXECUTE - To-Do, Stop Doing, Accountability
+- GROW - Scorecards, Team
+- INSIGHTS - Reviews
+- BUSINESS - Profile, Settings
+- COACH TOOLS (coach only)
+- SUPPORT (client only)
+
+## 🔐 AUTHENTICATION
+
+### Coach Detection
+Email contains @wisdomcoaching.com.au = Coach role
+All other emails = Client role
+
+### Test Accounts
+Coach: mattmalouf@wisdomcoaching.com.au
+Client: Any other email
+
+## 🚀 HOW TO RUN
+npm run dev
+Open http://localhost:3000

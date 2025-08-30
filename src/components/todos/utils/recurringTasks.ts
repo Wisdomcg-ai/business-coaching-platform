@@ -1,290 +1,284 @@
-// recurringTasks.ts - Handle recurring task patterns and generation
-// Location: /src/components/todos/utils/recurringTasks.ts
+// /src/components/todos/utils/recurringTasks.ts
+// Utilities for managing recurring tasks
 
-import { TodoItem, TodoTags, RecurrenceInfo } from './types';
+import type { Todo } from './types'
+
+export interface RecurrencePattern {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+  interval: number // e.g., every 2 weeks
+  daysOfWeek?: number[] // 0-6, Sunday-Saturday
+  dayOfMonth?: number // 1-31
+  monthOfYear?: number // 1-12
+  endDate?: string
+  occurrences?: number // limit number of occurrences
+}
 
 /**
- * Calculate the next occurrence date based on recurrence pattern
+ * Calculate the next occurrence date for a recurring task
  */
 export function getNextOccurrence(
-  pattern: string,
-  fromDate: Date = new Date()
+  lastDate: Date,
+  pattern: RecurrencePattern
 ): Date | null {
-  const date = new Date(fromDate);
-  const lowerPattern = pattern.toLowerCase().trim();
+  const next = new Date(lastDate)
   
-  switch (lowerPattern) {
+  switch (pattern.frequency) {
     case 'daily':
-    case 'every day':
-      date.setDate(date.getDate() + 1);
-      return date;
-    
-    case 'weekdays':
-    case 'every weekday':
-      // Move to next weekday
-      do {
-        date.setDate(date.getDate() + 1);
-      } while (date.getDay() === 0 || date.getDay() === 6); // Skip weekends
-      return date;
-    
-    case 'weekly':
-    case 'every week':
-      date.setDate(date.getDate() + 7);
-      return date;
-    
-    case 'monthly':
-    case 'every month':
-      date.setMonth(date.getMonth() + 1);
-      return date;
-    
-    // Specific day patterns
-    case 'every monday':
-      return getNextWeekday(date, 1);
-    case 'every tuesday':
-      return getNextWeekday(date, 2);
-    case 'every wednesday':
-      return getNextWeekday(date, 3);
-    case 'every thursday':
-      return getNextWeekday(date, 4);
-    case 'every friday':
-      return getNextWeekday(date, 5);
-    case 'every saturday':
-      return getNextWeekday(date, 6);
-    case 'every sunday':
-      return getNextWeekday(date, 0);
-    
-    default:
-      // Try to parse custom patterns like "every 3 days"
-      const customMatch = lowerPattern.match(/every\s+(\d+)\s+days?/);
-      if (customMatch) {
-        const days = parseInt(customMatch[1]);
-        date.setDate(date.getDate() + days);
-        return date;
-      }
+      next.setDate(next.getDate() + pattern.interval)
+      break
       
-      return null;
-  }
-}
-
-/**
- * Get next occurrence of a specific weekday
- */
-function getNextWeekday(from: Date, targetDay: number): Date {
-  const date = new Date(from);
-  const currentDay = date.getDay();
-  
-  // Calculate days until target
-  let daysToAdd = targetDay - currentDay;
-  if (daysToAdd <= 0) {
-    daysToAdd += 7; // Next week
-  }
-  
-  date.setDate(date.getDate() + daysToAdd);
-  return date;
-}
-
-/**
- * Create a new task from a completed recurring task
- */
-export function createNextRecurrence(
-  originalTask: TodoItem,
-  completedDate: Date = new Date()
-): Partial<TodoItem> | null {
-  // Check if task has recurrence info
-  const tags = originalTask.tags as TodoTags | null;
-  if (!tags?.recurrence?.pattern) {
-    return null;
-  }
-  
-  const nextDate = getNextOccurrence(tags.recurrence.pattern, completedDate);
-  if (!nextDate) {
-    return null;
-  }
-  
-  // Format date for database
-  const formattedDate = formatDateForDB(nextDate);
-  
-  // Create new task with updated dates
-  const newTask: Partial<TodoItem> = {
-    business_id: originalTask.business_id,
-    title: originalTask.title,
-    description: originalTask.description,
-    assigned_to: originalTask.assigned_to,
-    priority: originalTask.priority,
-    status: 'pending',
-    due_date: formattedDate,
-    scheduled_date: formattedDate,
-    category: originalTask.category,
-    effort_size: originalTask.effort_size,
-    is_published: originalTask.is_published,
-    tags: {
-      ...tags,
-      recurrence: {
-        ...tags.recurrence,
-        created_from: originalTask.id,
-        last_completed: formatDateForDB(completedDate)
+    case 'weekly':
+      if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+        // Find next occurrence on specified days
+        let daysToAdd = 0
+        let found = false
+        
+        for (let i = 1; i <= 7 * pattern.interval; i++) {
+          const checkDate = new Date(lastDate)
+          checkDate.setDate(checkDate.getDate() + i)
+          
+          if (pattern.daysOfWeek.includes(checkDate.getDay())) {
+            daysToAdd = i
+            found = true
+            break
+          }
+        }
+        
+        if (found) {
+          next.setDate(next.getDate() + daysToAdd)
+        } else {
+          return null
+        }
+      } else {
+        next.setDate(next.getDate() + (7 * pattern.interval))
       }
-    }
-  };
-  
-  return newTask;
-}
-
-/**
- * Parse a recurrence pattern from user input
- */
-export function parseRecurrencePattern(input: string): RecurrenceInfo | null {
-  const pattern = detectRecurrencePattern(input);
-  if (!pattern) return null;
-  
-  return {
-    pattern,
-    skip_weekends: pattern === 'weekdays'
-  };
-}
-
-/**
- * Detect recurrence pattern in text
- */
-function detectRecurrencePattern(text: string): string | null {
-  const lowerText = text.toLowerCase();
-  
-  // Check for common patterns
-  const patterns = [
-    { keywords: ['every day', 'daily'], pattern: 'daily' },
-    { keywords: ['every weekday', 'weekdays'], pattern: 'weekdays' },
-    { keywords: ['every week', 'weekly'], pattern: 'weekly' },
-    { keywords: ['every month', 'monthly'], pattern: 'monthly' },
-    { keywords: ['every monday'], pattern: 'every monday' },
-    { keywords: ['every tuesday'], pattern: 'every tuesday' },
-    { keywords: ['every wednesday'], pattern: 'every wednesday' },
-    { keywords: ['every thursday'], pattern: 'every thursday' },
-    { keywords: ['every friday'], pattern: 'every friday' },
-    { keywords: ['every saturday'], pattern: 'every saturday' },
-    { keywords: ['every sunday'], pattern: 'every sunday' },
-  ];
-  
-  for (const { keywords, pattern } of patterns) {
-    if (keywords.some(keyword => lowerText.includes(keyword))) {
-      return pattern;
-    }
+      break
+      
+    case 'monthly':
+      next.setMonth(next.getMonth() + pattern.interval)
+      
+      if (pattern.dayOfMonth) {
+        // Set to specific day of month
+        next.setDate(pattern.dayOfMonth)
+        
+        // Handle months with fewer days
+        if (next.getDate() !== pattern.dayOfMonth) {
+          // Day doesn't exist in this month (e.g., Feb 31)
+          // Set to last day of month
+          next.setDate(0) // Goes to last day of previous month
+        }
+      }
+      break
+      
+    case 'quarterly':
+      next.setMonth(next.getMonth() + (3 * pattern.interval))
+      break
+      
+    case 'yearly':
+      next.setFullYear(next.getFullYear() + pattern.interval)
+      
+      if (pattern.monthOfYear && pattern.dayOfMonth) {
+        next.setMonth(pattern.monthOfYear - 1)
+        next.setDate(pattern.dayOfMonth)
+      }
+      break
   }
   
-  // Check for custom interval pattern (e.g., "every 3 days")
-  const intervalMatch = lowerText.match(/every\s+(\d+)\s+days?/);
-  if (intervalMatch) {
-    return `every ${intervalMatch[1]} days`;
+  // Check if we've exceeded end date or occurrences
+  if (pattern.endDate && next > new Date(pattern.endDate)) {
+    return null
   }
   
-  return null;
+  return next
 }
 
 /**
- * Format date for database storage
+ * Generate upcoming occurrences for a recurring task
  */
-function formatDateForDB(date: Date): string {
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * Get human-readable description of recurrence
- */
-export function getRecurrenceDescription(pattern: string): string {
-  const descriptions: Record<string, string> = {
-    'daily': 'Every day',
-    'weekdays': 'Every weekday (Mon-Fri)',
-    'weekly': 'Every week',
-    'monthly': 'Every month',
-    'every monday': 'Every Monday',
-    'every tuesday': 'Every Tuesday',
-    'every wednesday': 'Every Wednesday',
-    'every thursday': 'Every Thursday',
-    'every friday': 'Every Friday',
-    'every saturday': 'Every Saturday',
-    'every sunday': 'Every Sunday',
-  };
-  
-  if (descriptions[pattern]) {
-    return descriptions[pattern];
-  }
-  
-  // Handle custom patterns
-  const intervalMatch = pattern.match(/every\s+(\d+)\s+days?/);
-  if (intervalMatch) {
-    const days = intervalMatch[1];
-    return `Every ${days} day${days === '1' ? '' : 's'}`;
-  }
-  
-  return pattern;
-}
-
-/**
- * Check if a date falls on a weekend
- */
-export function isWeekend(date: Date): boolean {
-  const day = date.getDay();
-  return day === 0 || day === 6;
-}
-
-/**
- * Get all occurrence dates for a pattern within a date range
- */
-export function getOccurrencesInRange(
-  pattern: string,
+export function generateOccurrences(
   startDate: Date,
-  endDate: Date,
-  maxOccurrences: number = 100
+  pattern: RecurrencePattern,
+  count: number = 10
 ): Date[] {
-  const occurrences: Date[] = [];
-  let currentDate = new Date(startDate);
-  let count = 0;
+  const occurrences: Date[] = []
+  let currentDate = new Date(startDate)
+  let generated = 0
   
-  while (currentDate <= endDate && count < maxOccurrences) {
-    const nextDate = getNextOccurrence(pattern, currentDate);
-    if (!nextDate || nextDate > endDate) {
-      break;
-    }
+  while (generated < count) {
+    const next = getNextOccurrence(currentDate, pattern)
     
-    occurrences.push(new Date(nextDate));
-    currentDate = nextDate;
-    count++;
+    if (!next) break
+    
+    occurrences.push(next)
+    currentDate = next
+    generated++
+    
+    // Safety check to prevent infinite loops
+    if (generated > 100) break
   }
   
-  return occurrences;
+  return occurrences
 }
 
 /**
- * Validate if a recurrence pattern is valid
+ * Create a new task from a recurring template
  */
-export function isValidRecurrencePattern(pattern: string): boolean {
-  // Try to get next occurrence - if it returns null, pattern is invalid
-  const testDate = getNextOccurrence(pattern);
-  return testDate !== null;
-}
-
-/**
- * Check if a task should recur based on its tags
- */
-export function shouldTaskRecur(task: TodoItem): boolean {
-  const tags = task.tags as TodoTags | null;
-  return !!(tags?.recurrence?.pattern && isValidRecurrencePattern(tags.recurrence.pattern));
-}
-
-/**
- * Update recurrence info after task completion
- */
-export function updateRecurrenceInfo(
-  currentInfo: RecurrenceInfo,
-  completedDate: Date = new Date()
-): RecurrenceInfo {
-  const nextDate = getNextOccurrence(currentInfo.pattern, completedDate);
-  
+export function createTaskFromRecurring(
+  template: Todo,
+  dueDate: Date
+): Partial<Todo> {
   return {
-    ...currentInfo,
-    last_completed: formatDateForDB(completedDate),
-    next_due: nextDate ? formatDateForDB(nextDate) : undefined
-  };
+    ...template,
+    id: undefined, // Will be generated by database
+    parent_task_id: template.id,
+    due_date: dueDate.toISOString(),
+    status: 'pending',
+    completed_at: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_recurring: false, // The instance is not recurring
+    recurrence_pattern: null
+  }
+}
+
+/**
+ * Check if a task should generate a new occurrence
+ */
+export function shouldGenerateNextOccurrence(
+  task: Todo,
+  pattern: RecurrencePattern
+): boolean {
+  if (!task.is_recurring || !pattern) return false
+  
+  // Only generate next if current is completed
+  if (task.status !== 'completed') return false
+  
+  // Check if we've reached occurrence limit
+  if (pattern.occurrences) {
+    // Would need to count existing occurrences in database
+    // This is simplified - you'd query for count of tasks with parent_task_id
+    return true
+  }
+  
+  // Check if we've passed end date
+  if (pattern.endDate && new Date() > new Date(pattern.endDate)) {
+    return false
+  }
+  
+  return true
+}
+
+/**
+ * Parse recurrence pattern from natural language
+ */
+export function parseRecurrencePattern(text: string): RecurrencePattern | null {
+  const lower = text.toLowerCase()
+  
+  // Daily patterns
+  if (lower.includes('every day') || lower.includes('daily')) {
+    return { frequency: 'daily', interval: 1 }
+  }
+  if (lower.includes('every other day')) {
+    return { frequency: 'daily', interval: 2 }
+  }
+  
+  // Weekly patterns
+  if (lower.includes('every week') || lower.includes('weekly')) {
+    return { frequency: 'weekly', interval: 1 }
+  }
+  if (lower.includes('every monday')) {
+    return { frequency: 'weekly', interval: 1, daysOfWeek: [1] }
+  }
+  if (lower.includes('every tuesday')) {
+    return { frequency: 'weekly', interval: 1, daysOfWeek: [2] }
+  }
+  if (lower.includes('every wednesday')) {
+    return { frequency: 'weekly', interval: 1, daysOfWeek: [3] }
+  }
+  if (lower.includes('every thursday')) {
+    return { frequency: 'weekly', interval: 1, daysOfWeek: [4] }
+  }
+  if (lower.includes('every friday')) {
+    return { frequency: 'weekly', interval: 1, daysOfWeek: [5] }
+  }
+  if (lower.includes('weekdays')) {
+    return { frequency: 'weekly', interval: 1, daysOfWeek: [1, 2, 3, 4, 5] }
+  }
+  if (lower.includes('weekends')) {
+    return { frequency: 'weekly', interval: 1, daysOfWeek: [0, 6] }
+  }
+  
+  // Monthly patterns
+  if (lower.includes('every month') || lower.includes('monthly')) {
+    return { frequency: 'monthly', interval: 1 }
+  }
+  if (lower.match(/every (\d+)(st|nd|rd|th)/)) {
+    const match = lower.match(/every (\d+)/)
+    if (match) {
+      return { frequency: 'monthly', interval: 1, dayOfMonth: parseInt(match[1]) }
+    }
+  }
+  
+  // Quarterly
+  if (lower.includes('quarterly') || lower.includes('every quarter')) {
+    return { frequency: 'quarterly', interval: 1 }
+  }
+  
+  // Yearly
+  if (lower.includes('yearly') || lower.includes('annually') || lower.includes('every year')) {
+    return { frequency: 'yearly', interval: 1 }
+  }
+  
+  return null
+}
+
+/**
+ * Format recurrence pattern for display
+ */
+export function formatRecurrencePattern(pattern: RecurrencePattern): string {
+  const freq = pattern.frequency
+  const interval = pattern.interval
+  
+  let base = ''
+  
+  if (interval === 1) {
+    base = freq === 'daily' ? 'Daily' :
+           freq === 'weekly' ? 'Weekly' :
+           freq === 'monthly' ? 'Monthly' :
+           freq === 'quarterly' ? 'Quarterly' :
+           freq === 'yearly' ? 'Yearly' : ''
+  } else {
+    base = `Every ${interval} ${freq.replace('ly', '')}s`
+  }
+  
+  // Add day specifications
+  if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const dayNames = pattern.daysOfWeek.map(d => days[d]).join(', ')
+    base += ` on ${dayNames}`
+  }
+  
+  if (pattern.dayOfMonth) {
+    base += ` on the ${pattern.dayOfMonth}${getOrdinalSuffix(pattern.dayOfMonth)}`
+  }
+  
+  if (pattern.endDate) {
+    base += ` until ${new Date(pattern.endDate).toLocaleDateString()}`
+  }
+  
+  if (pattern.occurrences) {
+    base += ` (${pattern.occurrences} times)`
+  }
+  
+  return base
+}
+
+function getOrdinalSuffix(day: number): string {
+  if (day > 3 && day < 21) return 'th'
+  switch (day % 10) {
+    case 1: return 'st'
+    case 2: return 'nd'
+    case 3: return 'rd'
+    default: return 'th'
+  }
 }
