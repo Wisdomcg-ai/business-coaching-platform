@@ -19,7 +19,11 @@ import { SwotStatisticsCard } from '@/components/swot/SwotStatisticsCard';
 import { createClientComponentClient } from '@/lib/supabase';
 import { Plus, Save, FileText, Clock, CheckCircle, AlertCircle, TrendingUp, Users, Download, History } from 'lucide-react';
 
-export default function SwotPage() {
+// Test user ID - replace with actual auth in production
+const TEST_USER_ID = 'test-user-123';
+const TEST_BUSINESS_ID = 'test-business-123';
+
+export default function SwotTestPage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
   
@@ -46,16 +50,9 @@ export default function SwotPage() {
       setLoading(true);
       setError(null);
       
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setError('Please log in to access SWOT analysis');
-        return;
-      }
-      
-      // For demo purposes, using user.id as business_id
-      // In production, get the actual business_id from user's profile
-      const businessId = user.id;
+      // Using test IDs instead of auth
+      const businessId = TEST_BUSINESS_ID;
+      const userId = TEST_USER_ID;
       
       // Check if SWOT exists for this quarter
       const { data: existingSwot, error: fetchError } = await supabase
@@ -84,54 +81,47 @@ export default function SwotPage() {
       
       if (fetchError && fetchError.code !== 'PGRST116') {
         // PGRST116 means no rows returned, which is fine
-        throw fetchError;
+        console.log('No existing SWOT found, will create new one');
       }
       
       if (existingSwot) {
         setSwotAnalysis(existingSwot);
         organizeSwotItems(existingSwot.swot_items || []);
       } else {
-        // Create new SWOT analysis
+        // Create new SWOT analysis directly
         const { data: newSwot, error: createError } = await supabase
-          .rpc('create_quarterly_swot', {
-            p_business_id: businessId,
-            p_quarter: currentQuarter.quarter,
-            p_year: currentQuarter.year,
-            p_created_by: user.id
-          });
-        
-        if (createError) throw createError;
-        
-        // Fetch the newly created SWOT with its items
-        const { data: createdSwot, error: refetchError } = await supabase
           .from('swot_analyses')
-          .select(`
-            *,
-            swot_items (
-              id,
-              category,
-              title,
-              description,
-              impact_level,
-              likelihood,
-              priority_order,
-              status,
-              tags,
-              created_at,
-              updated_at
-            )
-          `)
-          .eq('id', newSwot)
+          .insert({
+            business_id: businessId,
+            quarter: currentQuarter.quarter,
+            year: currentQuarter.year,
+            type: 'quarterly',
+            status: 'draft',
+            title: `Q${currentQuarter.quarter} ${currentQuarter.year} SWOT Analysis`,
+            created_by: userId
+          })
+          .select()
           .single();
         
-        if (refetchError) throw refetchError;
+        if (createError) {
+          console.error('Error creating SWOT:', createError);
+          setError('Failed to create SWOT analysis');
+          return;
+        }
         
-        setSwotAnalysis(createdSwot);
-        organizeSwotItems(createdSwot.swot_items || []);
+        if (newSwot) {
+          setSwotAnalysis(newSwot);
+          setSwotItems({
+            strengths: [],
+            weaknesses: [],
+            opportunities: [],
+            threats: []
+          });
+        }
       }
     } catch (err) {
       console.error('Error loading SWOT analysis:', err);
-      setError('Failed to load SWOT analysis. Please try again.');
+      setError('Failed to load SWOT analysis. Please check your Supabase connection.');
     } finally {
       setLoading(false);
     }
@@ -194,9 +184,6 @@ export default function SwotPage() {
     if (!swotAnalysis) return;
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
       const { data: newItem, error } = await supabase
         .from('swot_items')
         .insert({
@@ -208,7 +195,7 @@ export default function SwotPage() {
           likelihood: category === 'opportunity' || category === 'threat' ? 3 : null,
           priority_order: swotItems[`${category}s` as keyof SwotGridData].length,
           status: 'active',
-          created_by: user.id
+          created_by: TEST_USER_ID
         })
         .select()
         .single();
@@ -322,7 +309,7 @@ export default function SwotPage() {
       const opportunitiesScore = swotItems.opportunities.length * 1.5;
       const threatsScore = swotItems.threats.length * -1.5;
       const rawScore = strengthsScore + weaknessesScore + opportunitiesScore + threatsScore;
-      const normalizedScore = Math.max(0, Math.min(100, 50 + (rawScore / totalItems) * 10));
+      const normalizedScore = Math.max(0, Math.min(100, 50 + (rawScore / Math.max(totalItems, 1)) * 10));
       
       // Update SWOT analysis
       const { error } = await supabase
@@ -382,7 +369,7 @@ export default function SwotPage() {
   const handleExport = () => {
     // This would trigger the export component
     console.log('Exporting SWOT analysis...');
-    // Implementation would use the SwotExport component
+    alert('Export functionality will be implemented next!');
   };
   
   // Calculate statistics
@@ -417,6 +404,13 @@ export default function SwotPage() {
   
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Test Mode Banner */}
+      <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2">
+        <p className="text-sm text-yellow-800 text-center">
+          ⚠️ Test Mode - Using test user ID. In production, this will use actual authentication.
+        </p>
+      </div>
+      
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -447,7 +441,7 @@ export default function SwotPage() {
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => router.push('/swot/history')}
+                    onClick={() => alert('History page coming soon!')}
                     className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                   >
                     <History className="h-4 w-4 mr-2" />
@@ -455,7 +449,7 @@ export default function SwotPage() {
                   </button>
                   
                   <button
-                    onClick={() => router.push('/swot/compare')}
+                    onClick={() => alert('Compare feature coming soon!')}
                     className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                   >
                     <TrendingUp className="h-4 w-4 mr-2" />
