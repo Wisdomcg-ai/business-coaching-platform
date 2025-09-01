@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import type { Database } from '@/types/supabase'
+import EnhancedKPIModal from '@/components/EnhancedKPIModal'
 import { 
   Target, 
   TrendingUp, 
@@ -271,6 +272,44 @@ function debounce<T extends (...args: any[]) => any>(
   }
 }
 
+// Helper function to map business industry to KPI library keys
+function mapIndustryToKPIKey(industry: string | null): keyof typeof KPI_LIBRARY.byIndustry | null {
+  if (!industry) return null
+  
+  const normalized = industry.toLowerCase()
+  
+  // Check for trades-related industries
+  if (normalized.includes('trade') || 
+      normalized.includes('electric') || 
+      normalized.includes('plumb') || 
+      normalized.includes('hvac') ||
+      normalized.includes('building') ||
+      normalized.includes('construction')) {
+    return 'trades'
+  }
+  
+  // Check for professional services
+  if (normalized.includes('professional') || 
+      normalized.includes('consult') ||
+      normalized.includes('legal') ||
+      normalized.includes('account') ||
+      normalized.includes('finance') ||
+      normalized.includes('insurance')) {
+    return 'professional'
+  }
+  
+  // Check for retail
+  if (normalized.includes('retail') || 
+      normalized.includes('shop') ||
+      normalized.includes('store') ||
+      normalized.includes('ecommerce') ||
+      normalized.includes('e-commerce')) {
+    return 'retail'
+  }
+  
+  return null
+}
+
 export default function GoalsPage() {
   const router = useRouter()
   const supabase = createClientComponentClient<Database>()
@@ -281,6 +320,7 @@ export default function GoalsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(true)
+  const [showKPIModal, setShowKPIModal] = useState(false)
   
   // Business and assessment data
   const [business, setBusiness] = useState<Business | null>(null)
@@ -528,6 +568,17 @@ export default function GoalsPage() {
     return REVENUE_STAGES[revenue as keyof typeof REVENUE_STAGES] || REVENUE_STAGES['0-250K']
   }, [business])
   
+  // Get the relevant industry key for KPIs
+  const industryKey = useMemo(() => {
+    return mapIndustryToKPIKey(business?.industry || null)
+  }, [business])
+  
+  // Get filtered industry KPIs
+  const relevantIndustryKPIs = useMemo(() => {
+    if (!industryKey) return []
+    return KPI_LIBRARY.byIndustry[industryKey] || []
+  }, [industryKey])
+  
   // Generate smart suggestions based on assessment
   const smartSuggestions = useMemo(() => {
     const suggestions = []
@@ -620,6 +671,12 @@ export default function GoalsPage() {
                     {healthScore}%
                   </span>
                 </div>
+                {business?.industry && (
+                  <div className="flex items-center gap-2 border-l pl-4">
+                    <span className="text-gray-600">Industry:</span>
+                    <span className="font-medium text-gray-900">{business.industry}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -954,19 +1011,17 @@ export default function GoalsPage() {
                     Key Performance Indicators
                   </h3>
                   <button
-                    onClick={() => {
-                      const kpiModal = document.getElementById('kpi-modal')
-                      if (kpiModal) {
-                        kpiModal.classList.toggle('hidden')
-                      }
-                    }}
+                    onClick={() => setShowKPIModal(true)}
                     className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
                   >
                     <Plus className="h-4 w-4" />
                     Add KPI
                   </button>
                 </div>
-                <p className="text-sm text-gray-600">Track your most important metrics</p>
+                <p className="text-sm text-gray-600">
+                  Track your most important metrics
+                  {industryKey && <span className="font-medium"> for {business?.industry}</span>}
+                </p>
               </div>
               
               {/* KPI Cards Grid - Beautiful Display */}
@@ -974,7 +1029,7 @@ export default function GoalsPage() {
                 {((visionTarget as any).kpis || []).map((kpi: any, index: number) => {
                   // Find icon from library
                   const kpiData = [...(KPI_LIBRARY.byStage[revenueStageInfo.name as keyof typeof KPI_LIBRARY.byStage] || []), 
-                                   ...(KPI_LIBRARY.byIndustry.trades || [])]
+                                   ...relevantIndustryKPIs]
                                   .find(k => k.name === kpi.name)
                   const Icon = kpiData?.icon || Target
                   const category = kpiData?.category || 'Custom'
@@ -1036,12 +1091,7 @@ export default function GoalsPage() {
                 
                 {/* Add KPI Card */}
                 <button
-                  onClick={() => {
-                    const kpiModal = document.getElementById('kpi-modal')
-                    if (kpiModal) {
-                      kpiModal.classList.remove('hidden')
-                    }
-                  }}
+                  onClick={() => setShowKPIModal(true)}
                   className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-indigo-400 hover:shadow-md transition-all flex flex-col items-center justify-center min-h-[150px] group"
                 >
                   <Plus className="h-8 w-8 text-gray-400 group-hover:text-indigo-500 mb-2" />
@@ -1056,11 +1106,17 @@ export default function GoalsPage() {
                   <div>
                     <div className="text-sm font-medium text-indigo-900 mb-1">
                       Recommended KPIs for {revenueStageInfo.name} Stage
+                      {industryKey && <span> in {business?.industry}</span>}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {(KPI_LIBRARY.byStage[revenueStageInfo.name as keyof typeof KPI_LIBRARY.byStage] || KPI_LIBRARY.byStage.FOUNDATION)
-                        .filter(kpi => !((visionTarget as any).kpis || []).some((k: any) => k.name === kpi.name))
-                        .slice(0, 3)
+                      {/* Combine stage and industry KPIs, filter out existing ones */}
+                      {[...(KPI_LIBRARY.byStage[revenueStageInfo.name as keyof typeof KPI_LIBRARY.byStage] || KPI_LIBRARY.byStage.FOUNDATION),
+                        ...relevantIndustryKPIs]
+                        .filter((kpi, index, self) => 
+                          self.findIndex(k => k.name === kpi.name) === index && // Remove duplicates
+                          !((visionTarget as any).kpis || []).some((k: any) => k.name === kpi.name) // Remove already added
+                        )
+                        .slice(0, 4)
                         .map((kpi, idx) => (
                           <button
                             key={idx}
@@ -1261,114 +1317,25 @@ export default function GoalsPage() {
               )}
             </div>
             
-            {/* KPI Selection Modal */}
-            <div id="kpi-modal" className="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
-                <div className="p-6 border-b">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900">Select or Create KPI</h3>
-                    <button
-                      onClick={() => document.getElementById('kpi-modal')?.classList.add('hidden')}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <XCircle className="h-6 w-6" />
-                    </button>
-                  </div>
-                  <div className="mt-3">
-                    <input
-                      type="text"
-                      placeholder="Type custom KPI name and press Enter..."
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          const kpis = (visionTarget as any).kpis || []
-                          kpis.push({ name: (e.target as HTMLInputElement).value, target: '', unit: '#' })
-                          const updated = { ...visionTarget, kpis } as any
-                          setVisionTarget(updated)
-                          autoSave(updated, 'vision')
-                          ;(e.target as HTMLInputElement).value = ''
-                          document.getElementById('kpi-modal')?.classList.add('hidden')
-                        }
-                      }}
-                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-                
-                <div className="p-6 overflow-y-auto max-h-[60vh]">
-                  <div className="space-y-6">
-                    {/* Stage-Specific KPIs */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">
-                        Recommended for {revenueStageInfo.name} Stage
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(KPI_LIBRARY.byStage[revenueStageInfo.name as keyof typeof KPI_LIBRARY.byStage] || KPI_LIBRARY.byStage.FOUNDATION).map((kpi, idx) => {
-                          const Icon = kpi.icon
-                          return (
-                            <button
-                              key={idx}
-                              onClick={() => {
-                                const kpis = (visionTarget as any).kpis || []
-                                kpis.push({ name: kpi.name, target: '', unit: kpi.unit })
-                                const updated = { ...visionTarget, kpis } as any
-                                setVisionTarget(updated)
-                                autoSave(updated, 'vision')
-                                document.getElementById('kpi-modal')?.classList.add('hidden')
-                              }}
-                              className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-indigo-50 transition text-left"
-                            >
-                              <Icon className="h-5 w-5 text-indigo-600" />
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">{kpi.name}</div>
-                                <div className="text-xs text-gray-500">{kpi.category} • {kpi.unit}</div>
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    
-                    {/* Industry-Specific KPIs */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">Industry Specific</h4>
-                      <div className="space-y-2">
-                        {Object.entries(KPI_LIBRARY.byIndustry).map(([industry, kpis]) => (
-                          <details key={industry} className="border rounded-lg">
-                            <summary className="px-4 py-2 cursor-pointer hover:bg-gray-50 capitalize">
-                              {industry} Industry
-                            </summary>
-                            <div className="p-2 grid grid-cols-2 gap-2">
-                              {kpis.map((kpi, idx) => {
-                                const Icon = kpi.icon
-                                return (
-                                  <button
-                                    key={idx}
-                                    onClick={() => {
-                                      const kpisArray = (visionTarget as any).kpis || []
-                                      kpisArray.push({ name: kpi.name, target: '', unit: kpi.unit })
-                                      const updated = { ...visionTarget, kpis: kpisArray } as any
-                                      setVisionTarget(updated)
-                                      autoSave(updated, 'vision')
-                                      document.getElementById('kpi-modal')?.classList.add('hidden')
-                                    }}
-                                    className="flex items-center gap-2 p-2 bg-gray-50 rounded hover:bg-indigo-50 transition text-left text-sm"
-                                  >
-                                    <Icon className="h-4 w-4 text-indigo-600" />
-                                    <span>{kpi.name}</span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </details>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Enhanced KPI Modal */}
+            <EnhancedKPIModal
+              isOpen={showKPIModal}
+              onClose={() => setShowKPIModal(false)}
+              onSelectKPI={(kpi) => {
+                const kpis = (visionTarget as any).kpis || []
+                kpis.push(kpi)
+                const updated = { ...visionTarget, kpis } as any
+                setVisionTarget(updated)
+                autoSave(updated, 'vision')
+                setShowKPIModal(false)
+              }}
+              existingKPIs={(visionTarget as any).kpis || []}
+              businessIndustry={business?.industry || null}
+              businessRevenue={business?.current_revenue || '0-250K'}
+              revenueStage={revenueStageInfo}
+            />
             
-            {/* Roadmap Browser Modal */}
+            {/* Roadmap Browser Modal - Keep existing */}
             <div id="roadmap-modal" className="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
                 <div className="p-6 border-b">
@@ -1423,7 +1390,7 @@ export default function GoalsPage() {
           </div>
         )}
         
-        {/* Annual Plan Tab */}
+        {/* Annual Plan Tab - Keep existing */}
         {activeTab === 'annual' && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -1554,7 +1521,7 @@ export default function GoalsPage() {
           </div>
         )}
         
-        {/* Quarterly Rocks Tab */}
+        {/* Quarterly Rocks Tab - Keep existing */}
         {activeTab === 'quarterly' && (
           <div className="space-y-6">
             {/* Current Quarter Header */}
