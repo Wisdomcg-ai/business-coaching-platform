@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, TrendingUp, Users, DollarSign, Target, ArrowRight } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { X, TrendingUp, Users, DollarSign, Target, ArrowRight, Calculator, Info } from 'lucide-react'
 
 interface ProfitCalculatorProps {
   isOpen: boolean
   onClose: () => void
   onSave: (data: any) => void
-  businessId: string
+  businessId?: string
+  industry?: string
 }
 
 interface CalculatedKPI {
@@ -19,27 +19,45 @@ interface CalculatedKPI {
   frequency: string
 }
 
-// Industry-specific configurations
+// Simplified industry configurations
 const INDUSTRY_CONFIGS = {
+  'general': {
+    name: 'General Business',
+    icon: '💼',
+    profitDrivers: {
+      revenue: {
+        avgTransactionValue: { label: 'Average Sale Value', default: 2000, prefix: '$' },
+        transactionsPerMonth: { label: 'Sales Per Month', default: 50 },
+        customerRetention: { label: 'Customer Retention (%)', default: 80, suffix: '%' }
+      },
+      costs: {
+        directCosts: { label: 'Direct Costs (%)', default: 40, suffix: '%' },
+        overheadCosts: { label: 'Overhead (%)', default: 30, suffix: '%' },
+        marketingCosts: { label: 'Marketing (%)', default: 10, suffix: '%' }
+      }
+    },
+    suggestedKPIs: [
+      { category: 'financial', name: 'Monthly Revenue', frequency: 'monthly' },
+      { category: 'financial', name: 'Gross Profit Margin', frequency: 'monthly' },
+      { category: 'sales', name: 'New Customers', frequency: 'monthly' },
+      { category: 'sales', name: 'Conversion Rate', frequency: 'weekly' }
+    ]
+  },
+  
   'building_construction': {
     name: 'Building & Construction',
     icon: '🏗️',
     profitDrivers: {
       revenue: {
-        avgProjectValue: { label: 'Average Project Value', default: 150000 },
+        avgProjectValue: { label: 'Average Project Value', default: 150000, prefix: '$' },
         projectsPerYear: { label: 'Projects Per Year', default: 12 },
-        changeOrderPercent: { label: 'Change Orders (%)', default: 10 }
+        changeOrderPercent: { label: 'Change Orders (%)', default: 10, suffix: '%' }
       },
       costs: {
-        materialsCostPercent: { label: 'Materials Cost (%)', default: 35 },
-        labourCostPercent: { label: 'Labour Cost (%)', default: 30 },
-        subcontractorPercent: { label: 'Subcontractor (%)', default: 15 },
-        overheadPercent: { label: 'Overhead (%)', default: 10 }
-      },
-      efficiency: {
-        reworkPercent: { label: 'Rework/Defects (%)', default: 3 },
-        projectEfficiency: { label: 'Project Efficiency (%)', default: 85 },
-        cashFlowDays: { label: 'Cash Collection Days', default: 45 }
+        materialsCost: { label: 'Materials Cost (%)', default: 35, suffix: '%' },
+        labourCost: { label: 'Labour Cost (%)', default: 30, suffix: '%' },
+        subcontractorCost: { label: 'Subcontractor (%)', default: 15, suffix: '%' },
+        overheadCost: { label: 'Overhead (%)', default: 10, suffix: '%' }
       }
     },
     suggestedKPIs: [
@@ -48,98 +66,51 @@ const INDUSTRY_CONFIGS = {
       { category: 'sales', name: 'Projects Won', frequency: 'monthly' },
       { category: 'sales', name: 'Quote Conversion Rate', frequency: 'monthly' },
       { category: 'operations', name: 'Project Completion Time', frequency: 'quarterly' },
-      { category: 'operations', name: 'Rework Percentage', frequency: 'monthly' },
-      { category: 'people', name: 'Labour Productivity', frequency: 'weekly' },
-      { category: 'people', name: 'Subcontractor Performance', frequency: 'monthly' }
+      { category: 'operations', name: 'Rework Percentage', frequency: 'monthly' }
     ]
   },
   
-  'trades': {
-    name: 'Trades (Electrical/Plumbing/HVAC)',
-    icon: '🔧',
+  'fitness': {
+    name: 'Fitness & Gym',
+    icon: '💪',
     profitDrivers: {
       revenue: {
-        avgJobValue: { label: 'Average Job Value', default: 2500 },
-        jobsPerWeek: { label: 'Jobs Per Week', default: 10 },
-        hourlyRate: { label: 'Hourly Labour Rate', default: 120 },
-        emergencyPremium: { label: 'Emergency Premium (%)', default: 50 }
+        totalMembers: { label: 'Total Members', default: 500 },
+        avgMembershipFee: { label: 'Avg Membership Fee', default: 80, prefix: '$' },
+        ptSessionsMonth: { label: 'PT Sessions/Month', default: 200 },
+        ptSessionRate: { label: 'PT Session Rate', default: 70, prefix: '$' }
       },
       costs: {
-        materialsMarkup: { label: 'Materials Markup (%)', default: 30 },
-        labourCostPercent: { label: 'Labour Cost (%)', default: 35 },
-        vehicleCostPercent: { label: 'Vehicle/Travel (%)', default: 8 },
-        overheadPercent: { label: 'Overhead (%)', default: 15 }
-      },
-      efficiency: {
-        firstTimeFixRate: { label: 'First Time Fix Rate (%)', default: 85 },
-        utilizationRate: { label: 'Technician Utilisation (%)', default: 75 },
-        callbackRate: { label: 'Callback Rate (%)', default: 5 }
+        rentCost: { label: 'Rent/Facility (%)', default: 25, suffix: '%' },
+        staffCost: { label: 'Staff Cost (%)', default: 35, suffix: '%' },
+        equipmentCost: { label: 'Equipment (%)', default: 10, suffix: '%' },
+        marketingCost: { label: 'Marketing (%)', default: 8, suffix: '%' }
       }
     },
     suggestedKPIs: [
-      { category: 'financial', name: 'Gross Margin per Job', frequency: 'weekly' },
-      { category: 'financial', name: 'Revenue per Technician', frequency: 'monthly' },
-      { category: 'sales', name: 'Jobs Completed', frequency: 'weekly' },
-      { category: 'operations', name: 'First Time Fix Rate', frequency: 'weekly' },
-      { category: 'operations', name: 'Average Job Duration', frequency: 'weekly' },
-      { category: 'people', name: 'Technician Utilisation', frequency: 'daily' },
-      { category: 'marketing', name: 'Service Calls Booked', frequency: 'weekly' }
-    ]
-  },
-  
-  'allied_health': {
-    name: 'Allied Health',
-    icon: '🏥',
-    profitDrivers: {
-      revenue: {
-        sessionsPerWeek: { label: 'Sessions Per Week', default: 30 },
-        avgSessionFee: { label: 'Average Session Fee', default: 120 },
-        groupSessionPercent: { label: 'Group Sessions (%)', default: 20 },
-        packageDealPercent: { label: 'Package Deals (%)', default: 40 }
-      },
-      costs: {
-        practitionerCostPercent: { label: 'Practitioner Cost (%)', default: 45 },
-        roomRentPercent: { label: 'Room/Rent (%)', default: 15 },
-        adminCostPercent: { label: 'Admin Cost (%)', default: 10 },
-        marketingPercent: { label: 'Marketing (%)', default: 5 }
-      },
-      efficiency: {
-        cancellationRate: { label: 'Cancellation Rate (%)', default: 10 },
-        utilizationRate: { label: 'Room Utilisation (%)', default: 70 },
-        clientRetention: { label: 'Client Retention (%)', default: 80 }
-      }
-    },
-    suggestedKPIs: [
-      { category: 'financial', name: 'Revenue per Practitioner', frequency: 'monthly' },
-      { category: 'operations', name: 'Sessions Delivered', frequency: 'weekly' },
-      { category: 'operations', name: 'Cancellation Rate', frequency: 'weekly' },
-      { category: 'marketing', name: 'New Client Enquiries', frequency: 'weekly' },
-      { category: 'people', name: 'Practitioner Utilisation', frequency: 'weekly' },
-      { category: 'sales', name: 'Package Conversion Rate', frequency: 'monthly' }
+      { category: 'financial', name: 'Revenue per Member', frequency: 'monthly' },
+      { category: 'operations', name: 'Member Check-ins', frequency: 'daily' },
+      { category: 'sales', name: 'New Memberships', frequency: 'weekly' },
+      { category: 'sales', name: 'Member Retention Rate', frequency: 'monthly' },
+      { category: 'people', name: 'PT Utilisation Rate', frequency: 'weekly' }
     ]
   },
   
   'professional_services': {
     name: 'Professional Services',
-    icon: '💼',
+    icon: '👔',
     profitDrivers: {
       revenue: {
-        billableHoursMonth: { label: 'Billable Hours/Month', default: 120 },
-        hourlyRate: { label: 'Average Hourly Rate', default: 200 },
-        retainerPercent: { label: 'Retainer Revenue (%)', default: 40 },
-        projectValue: { label: 'Avg Project Value', default: 15000 }
+        billableHours: { label: 'Billable Hours/Month', default: 120 },
+        hourlyRate: { label: 'Average Hourly Rate', default: 200, prefix: '$' },
+        retainerClients: { label: 'Retainer Clients', default: 5 },
+        projectValue: { label: 'Avg Project Value', default: 15000, prefix: '$' }
       },
       costs: {
-        salaryPercent: { label: 'Salary Cost (%)', default: 50 },
-        officePercent: { label: 'Office/Admin (%)', default: 15 },
-        technologyPercent: { label: 'Technology (%)', default: 5 },
-        marketingPercent: { label: 'Marketing (%)', default: 7 }
-      },
-      efficiency: {
-        utilizationRate: { label: 'Utilisation Rate (%)', default: 70 },
-        writeOffPercent: { label: 'Write-offs (%)', default: 5 },
-        collectionDays: { label: 'Collection Days', default: 30 },
-        clientRetention: { label: 'Client Retention (%)', default: 85 }
+        salaryCost: { label: 'Salary Cost (%)', default: 50, suffix: '%' },
+        officeCost: { label: 'Office/Admin (%)', default: 15, suffix: '%' },
+        techCost: { label: 'Technology (%)', default: 5, suffix: '%' },
+        marketingCost: { label: 'Marketing (%)', default: 7, suffix: '%' }
       }
     },
     suggestedKPIs: [
@@ -147,125 +118,17 @@ const INDUSTRY_CONFIGS = {
       { category: 'financial', name: 'Billable Utilisation', frequency: 'weekly' },
       { category: 'operations', name: 'Project Delivery Time', frequency: 'monthly' },
       { category: 'sales', name: 'New Client Acquisition', frequency: 'monthly' },
-      { category: 'people', name: 'Team Utilisation Rate', frequency: 'weekly' },
-      { category: 'marketing', name: 'Proposal Win Rate', frequency: 'monthly' }
-    ]
-  },
-  
-  'fitness_facility': {
-    name: 'Fitness Facility (with PT)',
-    icon: '💪',
-    profitDrivers: {
-      revenue: {
-        totalMembers: { label: 'Total Members', default: 500 },
-        avgMembershipFee: { label: 'Avg Membership Fee', default: 80 },
-        ptSessionsMonth: { label: 'PT Sessions/Month', default: 200 },
-        ptSessionRate: { label: 'PT Session Rate', default: 70 },
-        groupClassRevenue: { label: 'Group Class Revenue', default: 3000 }
-      },
-      costs: {
-        rentPercent: { label: 'Rent/Facility (%)', default: 25 },
-        staffPercent: { label: 'Staff Cost (%)', default: 35 },
-        equipmentPercent: { label: 'Equipment (%)', default: 10 },
-        marketingPercent: { label: 'Marketing (%)', default: 8 }
-      },
-      efficiency: {
-        memberRetention: { label: 'Member Retention (%)', default: 85 },
-        ptConversion: { label: 'PT Conversion (%)', default: 15 },
-        classUtilisation: { label: 'Class Utilisation (%)', default: 70 },
-        peakUtilisation: { label: 'Peak Hour Usage (%)', default: 80 }
-      }
-    },
-    suggestedKPIs: [
-      { category: 'financial', name: 'Revenue per Member', frequency: 'monthly' },
-      { category: 'operations', name: 'Member Check-ins', frequency: 'daily' },
-      { category: 'sales', name: 'New Memberships', frequency: 'weekly' },
-      { category: 'sales', name: 'PT Package Sales', frequency: 'weekly' },
-      { category: 'people', name: 'PT Utilisation Rate', frequency: 'weekly' },
-      { category: 'marketing', name: 'Trial Conversions', frequency: 'weekly' }
-    ]
-  },
-  
-  'ecommerce': {
-    name: 'E-commerce',
-    icon: '🛒',
-    profitDrivers: {
-      revenue: {
-        avgOrderValue: { label: 'Average Order Value', default: 85 },
-        ordersPerMonth: { label: 'Orders Per Month', default: 500 },
-        conversionRate: { label: 'Conversion Rate (%)', default: 2.5 },
-        repeatPurchaseRate: { label: 'Repeat Purchase (%)', default: 30 }
-      },
-      costs: {
-        productCostPercent: { label: 'Product Cost (%)', default: 40 },
-        shippingPercent: { label: 'Shipping (%)', default: 10 },
-        marketingPercent: { label: 'Marketing/CAC (%)', default: 15 },
-        platformFeesPercent: { label: 'Platform Fees (%)', default: 5 }
-      },
-      efficiency: {
-        cartAbandonRate: { label: 'Cart Abandon Rate (%)', default: 70 },
-        returnRate: { label: 'Return Rate (%)', default: 10 },
-        customerLifetimeValue: { label: 'Customer LTV', default: 250 },
-        emailConversion: { label: 'Email Conversion (%)', default: 5 }
-      }
-    },
-    suggestedKPIs: [
-      { category: 'financial', name: 'Gross Margin per Order', frequency: 'daily' },
-      { category: 'marketing', name: 'Customer Acquisition Cost', frequency: 'monthly' },
-      { category: 'sales', name: 'Conversion Rate', frequency: 'daily' },
-      { category: 'operations', name: 'Order Fulfilment Time', frequency: 'daily' },
-      { category: 'marketing', name: 'Email Open Rate', frequency: 'weekly' },
-      { category: 'sales', name: 'Average Order Value', frequency: 'weekly' }
-    ]
-  },
-  
-  'hospitality': {
-    name: 'Hospitality',
-    icon: '🍽️',
-    profitDrivers: {
-      revenue: {
-        avgTransactionValue: { label: 'Avg Transaction Value', default: 45 },
-        transactionsPerDay: { label: 'Transactions Per Day', default: 80 },
-        beveragePercent: { label: 'Beverage Sales (%)', default: 30 },
-        repeatCustomerPercent: { label: 'Repeat Customers (%)', default: 40 }
-      },
-      costs: {
-        foodCostPercent: { label: 'Food Cost (%)', default: 30 },
-        beverageCostPercent: { label: 'Beverage Cost (%)', default: 25 },
-        labourCostPercent: { label: 'Labour Cost (%)', default: 30 },
-        overheadPercent: { label: 'Overhead (%)', default: 10 }
-      },
-      efficiency: {
-        tableUtilisation: { label: 'Table Turnover Rate', default: 2.5 },
-        wastagePercent: { label: 'Wastage (%)', default: 5 },
-        staffProductivity: { label: 'Sales per Staff Hour', default: 150 },
-        peakCapacity: { label: 'Peak Capacity (%)', default: 85 }
-      }
-    },
-    suggestedKPIs: [
-      { category: 'financial', name: 'Daily Revenue', frequency: 'daily' },
-      { category: 'financial', name: 'Food Cost Percentage', frequency: 'weekly' },
-      { category: 'operations', name: 'Table Turnover', frequency: 'daily' },
-      { category: 'sales', name: 'Average Transaction Value', frequency: 'daily' },
-      { category: 'people', name: 'Labour Cost Percentage', frequency: 'weekly' },
-      { category: 'marketing', name: 'Customer Reviews Rating', frequency: 'weekly' }
+      { category: 'people', name: 'Team Utilisation Rate', frequency: 'weekly' }
     ]
   }
 }
 
-export default function ProfitCalculator({ isOpen, onClose, onSave, businessId }: ProfitCalculatorProps) {
-  const [industry, setIndustry] = useState<string>('professional_services')
-  const [loading, setLoading] = useState(true)
+export default function ProfitCalculator({ isOpen, onClose, onSave, businessId, industry = 'general' }: ProfitCalculatorProps) {
   const [activeTab, setActiveTab] = useState<'pathway' | 'drivers' | 'kpis'>('pathway')
-  
-  // Profit pathway state
-  const [targetMonthlyProfit, setTargetMonthlyProfit] = useState<number>(20000)
-  const [profitMargin, setProfitMargin] = useState<number>(15)
-  
-  // Industry-specific driver values
+  const [targetMonthlyProfit, setTargetMonthlyProfit] = useState(10000)
+  const [profitMargin, setProfitMargin] = useState(15)
+  const [selectedIndustry, setSelectedIndustry] = useState(industry)
   const [driverValues, setDriverValues] = useState<any>({})
-  
-  // Calculated values
   const [calculations, setCalculations] = useState({
     monthlyRevenue: 0,
     yearlyRevenue: 0,
@@ -276,94 +139,41 @@ export default function ProfitCalculator({ isOpen, onClose, onSave, businessId }
     suggestedKPIs: [] as CalculatedKPI[]
   })
 
-  // Fetch business profile on mount
-  useEffect(() => {
-    const fetchBusinessProfile = async () => {
-      if (!businessId) return
-      
-      try {
-        const { data, error } = await supabase
-          .from('business_profiles')
-          .select('industry')
-          .eq('id', businessId)
-          .single()
-        
-        if (error) throw error
-        
-        if (data?.industry) {
-          const industryKey = mapIndustryToConfig(data.industry)
-          setIndustry(industryKey)
-          
-          // Initialize driver values with defaults
-          const config = INDUSTRY_CONFIGS[industryKey as keyof typeof INDUSTRY_CONFIGS]
-          if (config) {
-            const defaults: any = {}
-            Object.entries(config.profitDrivers).forEach(([section, drivers]) => {
-              Object.entries(drivers).forEach(([key, driver]) => {
-                defaults[key] = driver.default
-              })
-            })
-            setDriverValues(defaults)
-            
-            // Set default profit margin based on industry
-            const defaultMargins: any = {
-              building_construction: 12,
-              trades: 20,
-              allied_health: 30,
-              professional_services: 35,
-              fitness_facility: 25,
-              ecommerce: 15,
-              hospitality: 10
-            }
-            setProfitMargin(defaultMargins[industryKey] || 15)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching business profile:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    if (isOpen) {
-      fetchBusinessProfile()
-    }
-  }, [businessId, isOpen])
-
-  // Map industry strings to config keys
+  // Map industry string to config key
   const mapIndustryToConfig = (industryStr: string): string => {
     const normalized = industryStr.toLowerCase().replace(/\s+/g, '_')
     
     if (normalized.includes('building') || normalized.includes('construction')) {
       return 'building_construction'
     }
-    if (normalized.includes('trade') || normalized.includes('electric') || 
-        normalized.includes('plumb') || normalized.includes('hvac')) {
-      return 'trades'
-    }
-    if (normalized.includes('allied') || normalized.includes('health') || 
-        normalized.includes('physio') || normalized.includes('psych')) {
-      return 'allied_health'
-    }
     if (normalized.includes('fitness') || normalized.includes('gym')) {
-      return 'fitness_facility'
+      return 'fitness'
     }
-    if (normalized.includes('ecom') || normalized.includes('online') || 
-        normalized.includes('retail')) {
-      return 'ecommerce'
-    }
-    if (normalized.includes('hospit') || normalized.includes('restaurant') || 
-        normalized.includes('cafe') || normalized.includes('food')) {
-      return 'hospitality'
+    if (normalized.includes('professional') || normalized.includes('consulting')) {
+      return 'professional_services'
     }
     
-    return 'professional_services'
+    return 'general'
   }
+
+  // Initialize driver values based on industry
+  useEffect(() => {
+    const configKey = mapIndustryToConfig(selectedIndustry)
+    const config = INDUSTRY_CONFIGS[configKey as keyof typeof INDUSTRY_CONFIGS] || INDUSTRY_CONFIGS.general
+    
+    const defaults: any = {}
+    Object.entries(config.profitDrivers).forEach(([category, drivers]) => {
+      Object.entries(drivers).forEach(([key, driver]) => {
+        defaults[key] = driver.default
+      })
+    })
+    setDriverValues(defaults)
+  }, [selectedIndustry])
 
   // Recalculate when inputs change
   useEffect(() => {
-    const config = INDUSTRY_CONFIGS[industry as keyof typeof INDUSTRY_CONFIGS]
-    if (!config) return
+    const configKey = mapIndustryToConfig(selectedIndustry)
+    const config = INDUSTRY_CONFIGS[configKey as keyof typeof INDUSTRY_CONFIGS] || INDUSTRY_CONFIGS.general
     
     // Calculate revenue from profit target
     const monthlyRevenue = profitMargin > 0 ? (targetMonthlyProfit / (profitMargin / 100)) : 0
@@ -378,47 +188,32 @@ export default function ProfitCalculator({ isOpen, onClose, onSave, businessId }
     let customersNeeded = 0
     let leadsNeeded = 0
     
-    switch (industry) {
-      case 'building_construction':
-        const avgProjectValue = driverValues.avgProjectValue || 150000
-        const projectsPerYear = Math.ceil(yearlyRevenue / avgProjectValue)
-        customersNeeded = projectsPerYear
-        leadsNeeded = Math.ceil(projectsPerYear * 4) // Assume 25% conversion
-        break
-        
-      case 'trades':
-        const jobsPerWeek = driverValues.jobsPerWeek || 10
-        customersNeeded = jobsPerWeek * 52
-        leadsNeeded = Math.ceil(customersNeeded * 2) // Assume 50% conversion
-        break
-        
-      case 'fitness_facility':
-        const avgMembershipFee = driverValues.avgMembershipFee || 80
-        customersNeeded = Math.ceil(monthlyRevenue / avgMembershipFee)
-        leadsNeeded = Math.ceil(customersNeeded * 5) // Assume 20% conversion
-        break
-        
-      case 'ecommerce':
-        const avgOrderValue = driverValues.avgOrderValue || 85
-        customersNeeded = Math.ceil(monthlyRevenue / avgOrderValue)
-        leadsNeeded = Math.ceil(customersNeeded * 40) // Assume 2.5% conversion
-        break
-        
-      default:
-        customersNeeded = Math.ceil(monthlyRevenue / 2000)
-        leadsNeeded = Math.ceil(customersNeeded * 3)
+    if (configKey === 'building_construction') {
+      const avgProjectValue = driverValues.avgProjectValue || 150000
+      const projectsPerYear = Math.ceil(yearlyRevenue / avgProjectValue)
+      customersNeeded = projectsPerYear
+      leadsNeeded = Math.ceil(projectsPerYear * 4) // Assume 25% conversion
+    } else if (configKey === 'fitness') {
+      const avgMembershipFee = driverValues.avgMembershipFee || 80
+      customersNeeded = Math.ceil(monthlyRevenue / avgMembershipFee)
+      leadsNeeded = Math.ceil(customersNeeded * 5) // Assume 20% conversion
+    } else if (configKey === 'professional_services') {
+      const hourlyRate = driverValues.hourlyRate || 200
+      const billableHours = driverValues.billableHours || 120
+      const monthlyBillable = hourlyRate * billableHours
+      customersNeeded = Math.ceil(monthlyRevenue / (monthlyBillable / 10)) // Assume 10 clients
+      leadsNeeded = Math.ceil(customersNeeded * 3)
+    } else {
+      const avgTransaction = driverValues.avgTransactionValue || 2000
+      customersNeeded = Math.ceil(monthlyRevenue / avgTransaction)
+      leadsNeeded = Math.ceil(customersNeeded * 3)
     }
     
     // Generate KPI suggestions with calculated targets
     const suggestedKPIs = config.suggestedKPIs.map(kpi => ({
       ...kpi,
       current_value: '0',
-      target_value: calculateKPITarget(kpi, {
-        monthlyRevenue,
-        customersNeeded,
-        industry,
-        driverValues
-      })
+      target_value: calculateKPITarget(kpi, monthlyRevenue, customersNeeded)
     }))
     
     setCalculations({
@@ -430,22 +225,26 @@ export default function ProfitCalculator({ isOpen, onClose, onSave, businessId }
       leadsNeeded,
       suggestedKPIs
     })
-  }, [targetMonthlyProfit, profitMargin, industry, driverValues])
+  }, [targetMonthlyProfit, profitMargin, selectedIndustry, driverValues])
 
   // Calculate KPI targets based on business goals
-  const calculateKPITarget = (kpi: any, context: any): string => {
-    const { monthlyRevenue, customersNeeded, industry } = context
-    
-    // Industry-specific KPI calculations
-    switch (`${kpi.category}-${kpi.name}`) {
-      case 'financial-Daily Revenue':
-        return `$${Math.round(monthlyRevenue / 30)}`
-      case 'sales-New Memberships':
-        return `${Math.round(customersNeeded / 52)}`
-      case 'operations-Sessions Delivered':
-        return `${Math.round(customersNeeded * 4)}`
-      case 'people-Labour Productivity':
-        return `$${Math.round(monthlyRevenue / 160 / 5)}` // Revenue per hour per person
+  const calculateKPITarget = (kpi: any, monthlyRevenue: number, customersNeeded: number): string => {
+    switch (kpi.name) {
+      case 'Monthly Revenue':
+        return `$${Math.round(monthlyRevenue).toLocaleString()}`
+      case 'Daily Revenue':
+        return `$${Math.round(monthlyRevenue / 30).toLocaleString()}`
+      case 'New Customers':
+      case 'New Memberships':
+        return `${Math.round(customersNeeded / 12)}`
+      case 'Gross Profit Margin':
+        return `${profitMargin + 20}%`
+      case 'Conversion Rate':
+        return '25%'
+      case 'Member Retention Rate':
+        return '85%'
+      case 'Billable Utilisation':
+        return '75%'
       default:
         return 'TBD'
     }
@@ -469,8 +268,9 @@ export default function ProfitCalculator({ isOpen, onClose, onSave, businessId }
       monthlyGrossProfit: calculations.monthlyGrossProfit,
       yearlyGrossProfit: calculations.yearlyGrossProfit,
       customersNeeded: calculations.customersNeeded,
+      leadsNeeded: calculations.leadsNeeded,
       suggestedKPIs: calculations.suggestedKPIs,
-      industry,
+      industry: selectedIndustry,
       driverValues
     }
     onSave(data)
@@ -478,36 +278,54 @@ export default function ProfitCalculator({ isOpen, onClose, onSave, businessId }
 
   if (!isOpen) return null
 
-  const config = INDUSTRY_CONFIGS[industry as keyof typeof INDUSTRY_CONFIGS]
-  if (!config) return null
+  const configKey = mapIndustryToConfig(selectedIndustry)
+  const config = INDUSTRY_CONFIGS[configKey as keyof typeof INDUSTRY_CONFIGS] || INDUSTRY_CONFIGS.general
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <span>{config.icon}</span>
-              Profit Calculator - {config.name}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Industry-specific profit pathway and drivers
-            </p>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <span>{config.icon}</span>
+                Profit Calculator
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Calculate revenue needed to achieve your profit goals
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 p-1"
+            >
+              <X className="h-6 w-6" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+        </div>
+
+        {/* Industry Selector */}
+        <div className="px-6 py-3 bg-gray-50 border-b">
+          <label className="text-sm font-medium text-gray-700 mr-3">Industry:</label>
+          <select
+            value={configKey}
+            onChange={(e) => setSelectedIndustry(e.target.value)}
+            className="px-3 py-1 border rounded-lg text-sm"
           >
-            <X className="h-6 w-6" />
-          </button>
+            <option value="general">General Business</option>
+            <option value="building_construction">Building & Construction</option>
+            <option value="fitness">Fitness & Gym</option>
+            <option value="professional_services">Professional Services</option>
+          </select>
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-4 mb-6 border-b">
+        <div className="flex space-x-4 px-6 pt-4 border-b">
           <button
             onClick={() => setActiveTab('pathway')}
             className={`pb-2 px-1 ${activeTab === 'pathway' 
-              ? 'border-b-2 border-blue-600 text-blue-600' 
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
               : 'text-gray-600 hover:text-gray-900'}`}
           >
             Profit Pathway
@@ -515,7 +333,7 @@ export default function ProfitCalculator({ isOpen, onClose, onSave, businessId }
           <button
             onClick={() => setActiveTab('drivers')}
             className={`pb-2 px-1 ${activeTab === 'drivers' 
-              ? 'border-b-2 border-blue-600 text-blue-600' 
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
               : 'text-gray-600 hover:text-gray-900'}`}
           >
             Industry Drivers
@@ -523,221 +341,268 @@ export default function ProfitCalculator({ isOpen, onClose, onSave, businessId }
           <button
             onClick={() => setActiveTab('kpis')}
             className={`pb-2 px-1 ${activeTab === 'kpis' 
-              ? 'border-b-2 border-blue-600 text-blue-600' 
+              ? 'border-b-2 border-blue-600 text-blue-600 font-medium' 
               : 'text-gray-600 hover:text-gray-900'}`}
           >
             Suggested KPIs
           </button>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <>
-            {/* Profit Pathway Tab */}
-            {activeTab === 'pathway' && (
-              <div className="space-y-6">
-                {/* Visual Pathway */}
-                <div className="bg-gradient-to-r from-blue-50 to-green-50 p-6 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4">Your Pathway to Profit</h3>
-                  <div className="flex items-center justify-between">
-                    <div className="text-center">
-                      <Target className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-                      <div className="font-semibold">Leads</div>
-                      <div className="text-2xl font-bold text-blue-600">
-                        {calculations.leadsNeeded.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-600">per year</div>
-                    </div>
-                    
-                    <ArrowRight className="h-6 w-6 text-gray-400" />
-                    
-                    <div className="text-center">
-                      <Users className="h-8 w-8 mx-auto mb-2 text-indigo-600" />
-                      <div className="font-semibold">Customers</div>
-                      <div className="text-2xl font-bold text-indigo-600">
-                        {calculations.customersNeeded.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-600">needed</div>
-                    </div>
-                    
-                    <ArrowRight className="h-6 w-6 text-gray-400" />
-                    
-                    <div className="text-center">
-                      <DollarSign className="h-8 w-8 mx-auto mb-2 text-green-600" />
-                      <div className="font-semibold">Revenue</div>
-                      <div className="text-2xl font-bold text-green-600">
-                        ${calculations.monthlyRevenue.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-600">per month</div>
-                    </div>
-                    
-                    <ArrowRight className="h-6 w-6 text-gray-400" />
-                    
-                    <div className="text-center bg-green-100 p-4 rounded-lg">
-                      <TrendingUp className="h-8 w-8 mx-auto mb-2 text-green-700" />
-                      <div className="font-semibold">Net Profit</div>
-                      <div className="text-2xl font-bold text-green-700">
-                        ${targetMonthlyProfit.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-600">per month</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Profit Inputs */}
-                <div className="grid grid-cols-2 gap-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Profit Pathway Tab */}
+          {activeTab === 'pathway' && (
+            <div className="space-y-6">
+              {/* Input Section */}
+              <div className="bg-blue-50 rounded-lg p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Set Your Profit Target</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Target Monthly Profit
                     </label>
-                    <div className="flex items-center">
-                      <span className="mr-2">$</span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
                       <input
                         type="number"
                         value={targetMonthlyProfit}
                         onChange={(e) => setTargetMonthlyProfit(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
-                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Target Net Margin %
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Net Profit Margin (%)
                     </label>
-                    <div className="flex items-center">
+                    <div className="relative">
                       <input
                         type="number"
                         value={profitMargin}
                         onChange={(e) => setProfitMargin(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full pr-8 pl-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      <span className="ml-2">%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Calculated Results */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-3">Calculated Targets:</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <div className="text-sm text-gray-600">Monthly Revenue</div>
-                      <div className="text-xl font-bold">${calculations.monthlyRevenue.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">Yearly Revenue</div>
-                      <div className="text-xl font-bold">${calculations.yearlyRevenue.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">Monthly Gross Profit</div>
-                      <div className="text-xl font-bold">${calculations.monthlyGrossProfit.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600">Yearly Net Profit</div>
-                      <div className="text-xl font-bold">${(targetMonthlyProfit * 12).toLocaleString()}</div>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
 
-            {/* Industry Drivers Tab */}
-            {activeTab === 'drivers' && (
-              <div className="space-y-6">
-                {Object.entries(config.profitDrivers).map(([section, drivers]) => (
-                  <div key={section} className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="font-semibold mb-3 capitalize">{section} Drivers</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      {Object.entries(drivers).map(([key, driver]) => (
-                        <div key={key}>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            {driver.label}
-                          </label>
-                          <div className="flex items-center">
-                            {key.includes('Percent') || key.includes('Rate') ? (
-                              <>
-                                <input
-                                  type="number"
-                                  value={driverValues[key] || driver.default}
-                                  onChange={(e) => updateDriverValue(key, Number(e.target.value))}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <span className="ml-2">%</span>
-                              </>
-                            ) : key.includes('Value') || key.includes('Rate') || key.includes('Revenue') ? (
-                              <>
-                                <span className="mr-2">$</span>
-                                <input
-                                  type="number"
-                                  value={driverValues[key] || driver.default}
-                                  onChange={(e) => updateDriverValue(key, Number(e.target.value))}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                              </>
-                            ) : (
-                              <input
-                                type="number"
-                                value={driverValues[key] || driver.default}
-                                onChange={(e) => updateDriverValue(key, Number(e.target.value))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            )}
-                          </div>
+              {/* Calculations Display */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-600">Monthly Revenue Needed</span>
+                    <DollarSign className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ${calculations.monthlyRevenue.toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-600">Yearly Revenue Needed</span>
+                    <TrendingUp className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ${calculations.yearlyRevenue.toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-600">Monthly Gross Profit</span>
+                    <Target className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ${calculations.monthlyGrossProfit.toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-600">Customers Needed</span>
+                    <Users className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {calculations.customersNeeded}
+                  </p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-600">Leads Needed</span>
+                    <ArrowRight className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {calculations.leadsNeeded}
+                  </p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-600">Gross Margin</span>
+                    <Calculator className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {Math.min(profitMargin + 20, 50)}%
+                  </p>
+                </div>
+              </div>
+
+              {/* Pathway Visual */}
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Your Profit Pathway</h3>
+                <div className="flex items-center justify-between space-x-2 overflow-x-auto">
+                  <div className="flex-shrink-0 text-center">
+                    <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-2">
+                      <span className="text-2xl font-bold text-blue-600">
+                        {calculations.leadsNeeded}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600">Leads</p>
+                  </div>
+                  <ArrowRight className="text-gray-400 flex-shrink-0" />
+                  <div className="flex-shrink-0 text-center">
+                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-2">
+                      <span className="text-2xl font-bold text-green-600">
+                        {calculations.customersNeeded}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600">Customers</p>
+                  </div>
+                  <ArrowRight className="text-gray-400 flex-shrink-0" />
+                  <div className="flex-shrink-0 text-center">
+                    <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mb-2">
+                      <span className="text-lg font-bold text-purple-600">
+                        ${(calculations.monthlyRevenue / 1000).toFixed(0)}k
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600">Revenue/mo</p>
+                  </div>
+                  <ArrowRight className="text-gray-400 flex-shrink-0" />
+                  <div className="flex-shrink-0 text-center">
+                    <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mb-2">
+                      <span className="text-lg font-bold text-yellow-700">
+                        ${(targetMonthlyProfit / 1000).toFixed(0)}k
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600">Profit/mo</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Industry Drivers Tab */}
+          {activeTab === 'drivers' && (
+            <div className="space-y-6">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <Info className="w-5 h-5 text-yellow-600 mt-0.5 mr-2" />
+                  <p className="text-sm text-yellow-800">
+                    Adjust these industry-specific drivers to see how they impact your profit targets
+                  </p>
+                </div>
+              </div>
+
+              {Object.entries(config.profitDrivers).map(([category, drivers]) => (
+                <div key={category} className="bg-white border rounded-lg p-6">
+                  <h3 className="font-semibold text-gray-900 mb-4 capitalize">
+                    {category} Drivers
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(drivers).map(([key, driver]) => (
+                      <div key={key}>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {driver.label}
+                        </label>
+                        <div className="relative">
+                          {driver.prefix && (
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                              {driver.prefix}
+                            </span>
+                          )}
+                          <input
+                            type="number"
+                            value={driverValues[key] || driver.default}
+                            onChange={(e) => updateDriverValue(key, Number(e.target.value))}
+                            className={`w-full py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              driver.prefix ? 'pl-8 pr-3' : driver.suffix ? 'pr-8 pl-3' : 'px-3'
+                            }`}
+                          />
+                          {driver.suffix && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                              {driver.suffix}
+                            </span>
+                          )}
                         </div>
-                      ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Suggested KPIs Tab */}
+          {activeTab === 'kpis' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Based on your profit targets and industry, here are the KPIs you should track:
+              </p>
+              
+              <div className="grid gap-4">
+                {calculations.suggestedKPIs.map((kpi, index) => (
+                  <div key={index} className="bg-white border rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">{kpi.name}</h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Track {kpi.frequency} • Category: {kpi.category}
+                        </p>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="text-sm text-gray-500">Target</p>
+                        <p className="text-lg font-semibold text-gray-900">{kpi.target_value}</p>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
 
-            {/* Suggested KPIs Tab */}
-            {activeTab === 'kpis' && (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600 mb-4">
-                  These KPIs will be automatically added to your goals based on your industry and targets.
+              <div className="bg-blue-50 rounded-lg p-4 mt-6">
+                <p className="text-sm text-blue-800">
+                  💡 These KPIs will be automatically added to your goals when you save the calculator results
                 </p>
-                <div className="space-y-2">
-                  {calculations.suggestedKPIs.map((kpi, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                      <div className="flex items-center space-x-4">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded capitalize">
-                          {kpi.category}
-                        </span>
-                        <span className="font-medium">{kpi.name}</span>
-                        <span className="text-sm text-gray-500">({kpi.frequency})</span>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <span className="text-sm text-gray-600">Target:</span>
-                        <span className="font-semibold">{kpi.target_value}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
-            )}
+            </div>
+          )}
+        </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-4 pt-6 mt-6 border-t">
+        {/* Footer */}
+        <div className="p-6 border-t bg-gray-50">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-600">
+              Ready to set your 3-year goals based on these calculations?
+            </p>
+            <div className="flex space-x-3">
               <button
                 onClick={onClose}
-                className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 text-gray-700 hover:text-gray-900"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                Apply to Goals & KPIs
+                Use These Targets
               </button>
             </div>
-          </>
-        )}
+          </div>
+        </div>
       </div>
     </div>
   )
