@@ -1,135 +1,50 @@
-// /src/app/todo/client/page.tsx
-// Stage 1: Client page with Supabase integration
-
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import Link from 'next/link'
-import TodoManager from '@/components/TodoManager'
+import { createClient } from '@/lib/supabase/client'
+import dynamic from 'next/dynamic'
 
-export default function TodoClientPage() {
-  const router = useRouter()
-  const supabase = createClientComponentClient()
-  
-  const [loading, setLoading] = useState(true)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [businessId, setBusinessId] = useState<string | null>(null)
-  const [businessName, setBusinessName] = useState<string>('')
-  
-  useEffect(() => {
-    loadUserData()
-  }, [])
-  
-  const loadUserData = async () => {
-    try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/login')
-        return
-      }
-      
-      setUserId(user.id)
-      
-      // Get user's profile and business
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('business_id, role')
-        .eq('id', user.id)
-        .single()
-      
-      if (!profile) {
-        alert('Profile not found. Please complete your setup.')
-        router.push('/dashboard')
-        return
-      }
-      
-      // Check if user is a client
-      if (profile.role !== 'client') {
-        router.push('/todo/coach')
-        return
-      }
-      
-      setBusinessId(profile.business_id)
-      
-      // Get business name
-      const { data: business } = await supabase
-        .from('businesses')
-        .select('name')
-        .eq('id', profile.business_id)
-        .single()
-      
-      if (business) {
-        setBusinessName(business.name)
-      }
-      
-    } catch (error) {
-      console.error('Error loading user data:', error)
-      alert('Failed to load user data. Please try again.')
-      router.push('/dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }
-  
-  if (loading) {
-    return (
+// This fixes the 'use client' error by loading TodoManagerV2 dynamically
+const TodoManagerV2 = dynamic(
+  () => import('@/components/todos/TodoManagerV2'),
+  { 
+    ssr: false,
+    loading: () => (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="text-gray-600">Loading Todo Manager...</p>
       </div>
     )
   }
+)
+
+export default function TodosV2Page() {
+  const router = useRouter()
+  const supabase = createClient()
+  const [ready, setReady] = useState(false)
   
-  if (!userId || !businessId) {
+  // Your IDs
+  const userId = '52343ba5-7da0-4d76-8f5f-73f336164aa6'
+  const businessId = '8a4cf97b-604f-4117-8fef-610b33ab9dab'
+  
+  useEffect(() => {
+    // Simple check that we're ready
+    setReady(true)
+  }, [])
+  
+  if (!ready) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Unable to load todo system.</p>
-          <Link href="/dashboard" className="text-blue-600 hover:underline mt-2 inline-block">
-            Return to Dashboard
-          </Link>
-        </div>
+        <p className="text-gray-600">Initializing...</p>
       </div>
     )
   }
   
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                ← Back to Dashboard
-              </Link>
-              <div className="h-6 w-px bg-gray-300" />
-              <h1 className="text-xl font-semibold text-gray-900">Task Management</h1>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">
-                {businessName || 'My Business'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <TodoManager
-          businessId={businessId}
-          userId={userId}
-          userRole="client"
-          supabase={supabase}
-        />
-      </div>
-    </div>
+    <TodoManagerV2
+      userId={userId}
+      businessId={businessId}
+      userRole="coach"
+    />
   )
 }

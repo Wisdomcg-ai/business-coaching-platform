@@ -5,61 +5,54 @@ import { useRouter } from 'next/navigation'
 import { 
   ChevronRight, ChevronLeft, Save, Target, TrendingUp, Calendar, Users, 
   CheckCircle, AlertCircle, Clock, Plus, Trash2, DollarSign, Calculator,
-  BarChart, ArrowRight, Edit2, X, Check, Rocket, Trophy, Timer,
-  MapPin, Filter, User, Flag, ChevronDown, ChevronUp, Percent,
-  Building2, Package, Heart, Brain, Settings, Eye, EyeOff, Copy,
-  AlertTriangle, Info, GripVertical, ListChecks, Loader2, WifiOff
+  X, Timer, MapPin, Info, ChevronDown, ChevronUp,
+  Package, Heart, Brain, Settings, ListChecks, Loader2,
+  Home, Car, GraduationCap, Plane, Sparkles, Edit2, User, Star,
+  BarChart3, Percent, Hash, Activity, HelpCircle
 } from 'lucide-react'
 import ProfitCalculator from '@/components/ProfitCalculator'
+import EnhancedKPIModal from '@/components/EnhancedKPIModal'
+import StrategicInitiatives from '@/components/strategic-initiatives'
+import AnnualPlan from '@/components/AnnualPlan'
 import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
-import { RealtimeChannel } from '@supabase/supabase-js'
 
 // Type definitions
-type DbBusinessProfile = Database['public']['Tables']['business_profiles']['Row']
-type DbStrategicGoal = Database['public']['Tables']['strategic_goals']['Row']
-type DbKPI = Database['public']['Tables']['kpis']['Row']
-type DbStrategicInitiative = Database['public']['Tables']['strategic_initiatives']['Row']
-type DbNinetyDaySprint = Database['public']['Tables']['ninety_day_sprints']['Row']
-type DbSprintMilestone = Database['public']['Tables']['sprint_milestones']['Row']
-
-interface BHAG {
-  statement: string
-  metrics: string
-  deadline: string
+interface FinancialData {
+  revenue: { current: number; year1: number; year2: number; year3: number }
+  grossProfit: { current: number; year1: number; year2: number; year3: number }
+  grossMargin: { current: number; year1: number; year2: number; year3: number }
+  netProfit: { current: number; year1: number; year2: number; year3: number }
+  netMargin: { current: number; year1: number; year2: number; year3: number }
+  customers: { current: number; year1: number; year2: number; year3: number }
+  employees: { current: number; year1: number; year2: number; year3: number }
 }
 
-interface ThreeYearGoal {
-  id: string
-  category: 'revenue' | 'profit' | 'customers' | 'operations' | 'team' | 'market'
-  metric: string
-  currentValue: number
-  year1Target: number
-  year2Target: number
-  year3Target: number
-  unit: '$' | '%' | '#'
-}
-
-interface SelectedKPI {
+interface KPIData {
   id: string
   name: string
+  friendlyName?: string
   category: string
   currentValue: number
   year1Target: number
   year2Target: number
   year3Target: number
   unit: string
-  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly'
+  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annual'
+  description?: string
+  isStandard?: boolean
+  isIndustry?: boolean
+  isCustom?: boolean
 }
 
-interface StrategicItem {
+interface LifeGoal {
   id: string
+  category: 'property' | 'vehicle' | 'investment' | 'education' | 'travel' | 'family' | 'lifestyle' | 'freedom'
   title: string
-  category: 'attract' | 'convert' | 'deliver' | 'delight' | 'systems' | 'people' | 'profit' | 'strategy'
-  isFromRoadmap: boolean
-  customSource?: string
-  selected: boolean
-  quarterAssignment?: 'q1' | 'q2' | 'q3' | 'q4' | null
+  targetAmount?: number
+  targetYear: 'year1' | 'year2' | 'year3'
+  description?: string
+  completed: boolean
 }
 
 interface NinetyDayItem {
@@ -76,106 +69,493 @@ interface NinetyDayItem {
   }[]
 }
 
-// Revenue Roadmap Data
-const REVENUE_ROADMAP = {
-  foundation: {
-    range: '$0-250K',
-    items: [
-      { title: 'Define core service/product offering', category: 'strategy' },
-      { title: 'Set up basic website and online presence', category: 'attract' },
-      { title: 'Create sales process and pricing', category: 'convert' },
-      { title: 'Document core delivery process', category: 'deliver' },
-      { title: 'Set up accounting and invoicing', category: 'systems' },
-      { title: 'Get first 10 customers', category: 'convert' },
-      { title: 'Build customer feedback system', category: 'delight' }
-    ]
-  },
-  growth: {
-    range: '$250K-1M',
-    items: [
-      { title: 'Hire first key employee', category: 'people' },
-      { title: 'Implement CRM system', category: 'systems' },
-      { title: 'Develop marketing strategy', category: 'attract' },
-      { title: 'Create customer onboarding process', category: 'deliver' },
-      { title: 'Build referral program', category: 'delight' },
-      { title: 'Establish KPI dashboard', category: 'profit' },
-      { title: 'Develop sales playbook', category: 'convert' },
-      { title: 'Create employee training program', category: 'people' }
-    ]
-  },
-  scale: {
-    range: '$1M-5M',
-    items: [
-      { title: 'Build management team', category: 'people' },
-      { title: 'Expand to new market segment', category: 'strategy' },
-      { title: 'Launch second product/service line', category: 'strategy' },
-      { title: 'Implement quality management system', category: 'deliver' },
-      { title: 'Build strategic partnerships', category: 'strategy' },
-      { title: 'Create customer success program', category: 'delight' },
-      { title: 'Upgrade technology stack', category: 'systems' },
-      { title: 'Develop predictable sales engine', category: 'convert' }
-    ]
-  },
-  optimize: {
-    range: '$5M+',
-    items: [
-      { title: 'International expansion planning', category: 'strategy' },
-      { title: 'Build acquisition strategy', category: 'strategy' },
-      { title: 'Create innovation lab', category: 'strategy' },
-      { title: 'Implement ERP system', category: 'systems' },
-      { title: 'Develop franchise/licensing model', category: 'strategy' },
-      { title: 'Build corporate university', category: 'people' },
-      { title: 'Establish board of advisors', category: 'strategy' },
-      { title: 'Create succession planning', category: 'people' }
-    ]
+// Industry-specific KPIs database - INCLUDING ALLIED HEALTH
+const INDUSTRY_KPIS: Record<string, KPIData[]> = {
+  building_construction: [
+    {
+      id: 'project-pipeline',
+      name: 'Project Pipeline Value',
+      friendlyName: 'Total value of projects in pipeline',
+      category: 'Sales',
+      currentValue: 2000000,
+      year1Target: 3000000,
+      year2Target: 5000000,
+      year3Target: 8000000,
+      unit: 'currency',
+      frequency: 'monthly',
+      description: 'Total value of potential projects',
+      isIndustry: true
+    },
+    {
+      id: 'quote-conversion',
+      name: 'Quote to Job %',
+      friendlyName: 'Percentage of quotes that convert',
+      category: 'Sales',
+      currentValue: 25,
+      year1Target: 35,
+      year2Target: 40,
+      year3Target: 45,
+      unit: 'percentage',
+      frequency: 'monthly',
+      description: 'Quote to job conversion rate',
+      isIndustry: true
+    },
+    {
+      id: 'avg-project-value',
+      name: 'Avg Project Value',
+      friendlyName: 'Average project contract value',
+      category: 'Sales',
+      currentValue: 75000,
+      year1Target: 100000,
+      year2Target: 150000,
+      year3Target: 200000,
+      unit: 'currency',
+      frequency: 'monthly',
+      description: 'Average value per project',
+      isIndustry: true
+    }
+  ],
+  allied_health: [
+    {
+      id: 'patient-satisfaction',
+      name: 'Patient Satisfaction',
+      friendlyName: 'Average patient satisfaction score',
+      category: 'Customer',
+      currentValue: 8,
+      year1Target: 9,
+      year2Target: 9.2,
+      year3Target: 9.5,
+      unit: 'number',
+      frequency: 'monthly',
+      description: 'Patient satisfaction score (out of 10)',
+      isIndustry: true
+    },
+    {
+      id: 'appointment-utilization',
+      name: 'Appointment Utilization',
+      friendlyName: 'Percentage of appointments booked',
+      category: 'Operations',
+      currentValue: 75,
+      year1Target: 85,
+      year2Target: 90,
+      year3Target: 92,
+      unit: 'percentage',
+      frequency: 'weekly',
+      description: 'Booked appointments vs available slots',
+      isIndustry: true
+    },
+    {
+      id: 'patient-retention',
+      name: 'Patient Retention Rate',
+      friendlyName: 'Percentage of patients retained',
+      category: 'Customer',
+      currentValue: 80,
+      year1Target: 85,
+      year2Target: 88,
+      year3Target: 90,
+      unit: 'percentage',
+      frequency: 'quarterly',
+      description: 'Percentage of patients returning for follow-up care',
+      isIndustry: true
+    }
+  ],
+  professional_services: [
+    {
+      id: 'billable-rate',
+      name: 'Avg Billable Rate',
+      friendlyName: 'Average hourly billable rate',
+      category: 'Financial',
+      currentValue: 150,
+      year1Target: 175,
+      year2Target: 200,
+      year3Target: 250,
+      unit: 'currency',
+      frequency: 'monthly',
+      description: 'Average rate charged per hour',
+      isIndustry: true
+    },
+    {
+      id: 'utilization',
+      name: 'Team Utilization',
+      friendlyName: 'Percentage of billable hours',
+      category: 'Productivity',
+      currentValue: 65,
+      year1Target: 75,
+      year2Target: 80,
+      year3Target: 85,
+      unit: 'percentage',
+      frequency: 'weekly',
+      description: 'Billable hours vs total hours',
+      isIndustry: true
+    },
+    {
+      id: 'client-retention',
+      name: 'Client Retention',
+      friendlyName: 'Percentage of clients retained',
+      category: 'Customer',
+      currentValue: 80,
+      year1Target: 85,
+      year2Target: 90,
+      year3Target: 92,
+      unit: 'percentage',
+      frequency: 'annual',
+      description: 'Annual client retention rate',
+      isIndustry: true
+    }
+  ],
+  retail: [
+    {
+      id: 'same-store-sales',
+      name: 'Same Store Sales Growth',
+      friendlyName: 'Year over year sales growth',
+      category: 'Sales',
+      currentValue: 5,
+      year1Target: 8,
+      year2Target: 10,
+      year3Target: 12,
+      unit: 'percentage',
+      frequency: 'monthly',
+      description: 'YoY growth for same locations',
+      isIndustry: true
+    },
+    {
+      id: 'inventory-turnover',
+      name: 'Inventory Turnover',
+      friendlyName: 'Times inventory sold per year',
+      category: 'Operations',
+      currentValue: 6,
+      year1Target: 8,
+      year2Target: 10,
+      year3Target: 12,
+      unit: 'number',
+      frequency: 'quarterly',
+      description: 'How quickly inventory sells',
+      isIndustry: true
+    },
+    {
+      id: 'avg-transaction',
+      name: 'Avg Transaction Value',
+      friendlyName: 'Average sale amount',
+      category: 'Sales',
+      currentValue: 85,
+      year1Target: 100,
+      year2Target: 120,
+      year3Target: 150,
+      unit: 'currency',
+      frequency: 'daily',
+      description: 'Average value per transaction',
+      isIndustry: true
+    }
+  ]
+}
+
+// Life goal categories - Professional colors (no amber/yellow)
+const LIFE_GOAL_CATEGORIES = {
+  property: { label: 'Property', icon: Home, color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  vehicle: { label: 'Vehicle', icon: Car, color: 'bg-green-100 text-green-800 border-green-200' },
+  investment: { label: 'Investment', icon: TrendingUp, color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  education: { label: 'Education', icon: GraduationCap, color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+  travel: { label: 'Travel', icon: Plane, color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  family: { label: 'Family', icon: Heart, color: 'bg-rose-100 text-rose-800 border-rose-200' },
+  lifestyle: { label: 'Lifestyle', icon: Sparkles, color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  freedom: { label: 'Freedom', icon: DollarSign, color: 'bg-teal-100 text-teal-800 border-teal-200' }
+}
+
+const LIFE_GOAL_SUGGESTIONS = {
+  property: [
+    'Buy dream home',
+    'Purchase investment property',
+    'Build holiday home',
+    'Buy coastal property',
+    'Acquire rental properties'
+  ],
+  vehicle: [
+    'Buy luxury car',
+    'Purchase family 4WD',
+    'Get a boat',
+    'Buy a caravan',
+    'Upgrade to electric vehicle'
+  ],
+  investment: [
+    'Build share portfolio',
+    'Max out superannuation',
+    'Create passive income streams',
+    'Invest in ASX shares',
+    'Build emergency fund (12 months)'
+  ],
+  education: [
+    'Kids university fund',
+    'Executive MBA',
+    'Professional certifications',
+    'Learn new skills',
+    'Private school fees'
+  ],
+  travel: [
+    'Annual family holidays',
+    'European adventure',
+    'Visit all continents',
+    'Pacific cruise',
+    'Outback adventure'
+  ],
+  family: [
+    'More family time',
+    'Support parents retirement',
+    'Family experiences fund',
+    'Children activities fund',
+    'Family health & wellness'
+  ],
+  lifestyle: [
+    'Work 4-day week',
+    'Take sabbatical',
+    'Join golf club',
+    'Personal trainer',
+    'Beach lifestyle'
+  ],
+  freedom: [
+    'Financial independence',
+    'Retire by age 50',
+    'Work optional by 45',
+    'Build generational wealth',
+    'Complete time freedom'
+  ]
+}
+
+// Helper functions
+const formatDollar = (value: number): string => {
+  return value.toLocaleString('en-AU')
+}
+
+const parseDollarInput = (value: string): number => {
+  return Number(value.replace(/,/g, ''))
+}
+
+const formatUnit = (value: number | string, unit: string): string => {
+  if (unit === '$' || unit === 'currency') {
+    return `$${formatDollar(Number(value))}`
+  } else if (unit === '%' || unit === 'percentage') {
+    return `${value}%`
+  } else if (unit === '#' || unit === 'number') {
+    return formatDollar(Number(value))
+  } else {
+    return `${value}`
   }
 }
 
-const CATEGORY_CONFIG = {
-  attract: { label: 'Attract (Marketing)', icon: Target, color: 'bg-blue-100 text-blue-700' },
-  convert: { label: 'Convert (Sales)', icon: TrendingUp, color: 'bg-green-100 text-green-700' },
-  deliver: { label: 'Deliver (Operations)', icon: Package, color: 'bg-purple-100 text-purple-700' },
-  delight: { label: 'Delight (Customer)', icon: Heart, color: 'bg-pink-100 text-pink-700' },
-  systems: { label: 'Systems & Process', icon: Settings, color: 'bg-gray-100 text-gray-700' },
-  people: { label: 'People & Culture', icon: Users, color: 'bg-orange-100 text-orange-700' },
-  profit: { label: 'Profit & Finance', icon: DollarSign, color: 'bg-yellow-100 text-yellow-700' },
-  strategy: { label: 'Strategy & Growth', icon: Brain, color: 'bg-indigo-100 text-indigo-700' }
+// Get unit label for display
+const getUnitLabel = (unit: string): string => {
+  switch(unit) {
+    case 'currency': return '($)'
+    case 'percentage': return '(%)'
+    case 'number': return '(#)'
+    default: return ''
+  }
 }
 
-// Predefined KPI Options
-const KPI_OPTIONS = {
-  financial: [
-    { id: 'revenue-growth', name: 'Revenue Growth Rate', unit: '%', frequency: 'monthly' },
-    { id: 'gross-margin', name: 'Gross Margin', unit: '%', frequency: 'monthly' },
-    { id: 'net-margin', name: 'Net Margin', unit: '%', frequency: 'monthly' },
-    { id: 'cash-flow', name: 'Cash Flow', unit: '$', frequency: 'monthly' },
-    { id: 'arr', name: 'Annual Recurring Revenue', unit: '$', frequency: 'monthly' },
-    { id: 'ltv', name: 'Customer Lifetime Value', unit: '$', frequency: 'quarterly' }
-  ],
-  sales: [
-    { id: 'leads', name: 'Monthly Leads', unit: '#', frequency: 'monthly' },
-    { id: 'conversion-rate', name: 'Conversion Rate', unit: '%', frequency: 'monthly' },
-    { id: 'cac', name: 'Customer Acquisition Cost', unit: '$', frequency: 'monthly' },
-    { id: 'sales-cycle', name: 'Sales Cycle Length', unit: 'days', frequency: 'monthly' },
-    { id: 'pipeline-value', name: 'Pipeline Value', unit: '$', frequency: 'weekly' },
-    { id: 'win-rate', name: 'Win Rate', unit: '%', frequency: 'monthly' }
-  ],
-  operations: [
-    { id: 'customer-satisfaction', name: 'Customer Satisfaction', unit: '%', frequency: 'quarterly' },
-    { id: 'nps', name: 'Net Promoter Score', unit: '#', frequency: 'quarterly' },
-    { id: 'retention-rate', name: 'Customer Retention Rate', unit: '%', frequency: 'monthly' },
-    { id: 'churn-rate', name: 'Churn Rate', unit: '%', frequency: 'monthly' },
-    { id: 'delivery-time', name: 'Average Delivery Time', unit: 'days', frequency: 'weekly' },
-    { id: 'quality-score', name: 'Quality Score', unit: '%', frequency: 'weekly' }
-  ],
-  people: [
-    { id: 'employee-satisfaction', name: 'Employee Satisfaction', unit: '%', frequency: 'quarterly' },
-    { id: 'employee-retention', name: 'Employee Retention', unit: '%', frequency: 'quarterly' },
-    { id: 'productivity', name: 'Productivity Index', unit: '#', frequency: 'monthly' },
-    { id: 'training-hours', name: 'Training Hours', unit: 'hours', frequency: 'monthly' },
-    { id: 'team-size', name: 'Team Size', unit: '#', frequency: 'monthly' },
-    { id: 'revenue-per-employee', name: 'Revenue per Employee', unit: '$', frequency: 'quarterly' }
-  ]
+// KPI Info Card Component - Fixed positioning
+function KPIInfoCard({ kpi, isVisible }: { kpi: KPIData; isVisible: boolean }) {
+  if (!isVisible) return null
+  
+  return (
+    <div className="absolute z-50 left-6 top-8 w-72 bg-white rounded-lg shadow-xl border border-gray-200 p-4">
+      <div className="absolute -top-2 left-4 w-4 h-4 bg-white border-l border-t border-gray-200 rotate-45"></div>
+      <div className="space-y-2 relative">
+        <h4 className="font-semibold text-gray-900">{kpi.name}</h4>
+        {kpi.friendlyName && (
+          <p className="text-sm text-gray-600">{kpi.friendlyName}</p>
+        )}
+        {kpi.description && (
+          <p className="text-sm text-gray-500">{kpi.description}</p>
+        )}
+        <div className="flex gap-4 text-sm">
+          <div>
+            <span className="text-gray-500">Category:</span>
+            <span className="ml-1 font-medium">{kpi.category}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Frequency:</span>
+            <span className="ml-1 font-medium capitalize">{kpi.frequency}</span>
+          </div>
+        </div>
+        {kpi.isStandard && (
+          <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">Standard KPI</span>
+        )}
+        {kpi.isIndustry && (
+          <span className="inline-block px-2 py-1 text-xs bg-green-100 text-green-700 rounded">Industry KPI</span>
+        )}
+        {kpi.isCustom && (
+          <span className="inline-block px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded">Custom KPI</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Custom KPI Modal Component - Enhanced Design
+function CustomKPIModal({ isOpen, onClose, onSave }: any) {
+  const [customKPI, setCustomKPI] = useState({
+    name: '',
+    friendlyName: '',
+    category: 'Sales',
+    unit: 'currency',
+    frequency: 'monthly' as const,
+    description: ''
+  })
+  
+  const handleSave = () => {
+    if (customKPI.name) {
+      onSave({
+        ...customKPI,
+        id: `custom-${Date.now()}`,
+        currentValue: 0,
+        year1Target: 0,
+        year2Target: 0,
+        year3Target: 0,
+        isCustom: true
+      })
+      setCustomKPI({
+        name: '',
+        friendlyName: '',
+        category: 'Sales',
+        unit: 'currency',
+        frequency: 'monthly',
+        description: ''
+      })
+      onClose()
+    }
+  }
+  
+  if (!isOpen) return null
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 rounded-t-xl">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-white">Create Custom KPI</h3>
+            <button 
+              onClick={onClose} 
+              className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X className="h-5 w-5 text-white" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Body */}
+        <div className="p-6 space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              KPI Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={customKPI.name}
+              onChange={(e) => setCustomKPI({ ...customKPI, name: e.target.value })}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder="e.g., Customer Lifetime Value"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Display Name <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={customKPI.friendlyName}
+              onChange={(e) => setCustomKPI({ ...customKPI, friendlyName: e.target.value })}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder="e.g., Average customer spend over lifetime"
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Category
+              </label>
+              <select
+                value={customKPI.category}
+                onChange={(e) => setCustomKPI({ ...customKPI, category: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+              >
+                <option value="Sales">Sales</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Financial">Financial</option>
+                <option value="Operations">Operations</option>
+                <option value="Customer">Customer</option>
+                <option value="People">People</option>
+                <option value="Productivity">Productivity</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Unit
+              </label>
+              <select
+                value={customKPI.unit}
+                onChange={(e) => setCustomKPI({ ...customKPI, unit: e.target.value })}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+              >
+                <option value="currency">Dollar ($)</option>
+                <option value="percentage">Percentage (%)</option>
+                <option value="number">Number (#)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Tracking Frequency
+            </label>
+            <select
+              value={customKPI.frequency}
+              onChange={(e) => setCustomKPI({ ...customKPI, frequency: e.target.value as any })}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="annual">Annual</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Description <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <textarea
+              value={customKPI.description}
+              onChange={(e) => setCustomKPI({ ...customKPI, description: e.target.value })}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+              rows={3}
+              placeholder="Brief description of what this KPI measures"
+            />
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div className="bg-gray-50 px-6 py-4 rounded-b-xl flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!customKPI.name}
+            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+          >
+            Create KPI
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function GoalsPage() {
@@ -189,290 +569,428 @@ export default function GoalsPage() {
   const [businessProfileId, setBusinessProfileId] = useState<string | null>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [showProfitCalculator, setShowProfitCalculator] = useState(false)
-  const [isKPIModalOpen, setIsKPIModalOpen] = useState(false)
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
-  const [realtimeChannel, setRealtimeChannel] = useState<RealtimeChannel | null>(null)
+  const [yearType, setYearType] = useState<'FY' | 'CY'>('FY')
+  const [hoveredKPI, setHoveredKPI] = useState<string | null>(null)
   
-  // Data states
-  const [bhag, setBhag] = useState<BHAG>({
-    statement: '',
-    metrics: '',
-    deadline: '10 years'
+  // Collapsed sections state
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  
+  // Business data
+  const [industry, setIndustry] = useState('building_construction')
+  const [currentRevenue, setCurrentRevenue] = useState(500000)
+  const [businessProfile, setBusinessProfile] = useState<any>(null)
+  
+  // Financial data - Now includes customers and employees
+  const [financialData, setFinancialData] = useState<FinancialData>({
+    revenue: { current: 500000, year1: 750000, year2: 1500000, year3: 3000000 },
+    grossProfit: { current: 200000, year1: 337500, year2: 675000, year3: 1350000 },
+    grossMargin: { current: 40, year1: 45, year2: 45, year3: 45 },
+    netProfit: { current: 50000, year1: 112500, year2: 300000, year3: 600000 },
+    netMargin: { current: 10, year1: 15, year2: 20, year3: 20 },
+    customers: { current: 100, year1: 150, year2: 300, year3: 500 },
+    employees: { current: 2, year1: 4, year2: 8, year3: 15 }
   })
   
-  const [threeYearGoals, setThreeYearGoals] = useState<ThreeYearGoal[]>([
-    {
-      id: 'revenue',
-      category: 'revenue',
-      metric: 'Annual Revenue',
-      currentValue: 500000,
-      year1Target: 750000,
-      year2Target: 1500000,
-      year3Target: 3000000,
-      unit: '$'
-    },
-    {
-      id: 'profit',
-      category: 'profit',
-      metric: 'Net Profit',
-      currentValue: 50000,
-      year1Target: 112500,
-      year2Target: 300000,
-      year3Target: 750000,
-      unit: '$'
-    }
-  ])
+  // KPIs
+  const [kpis, setKpis] = useState<KPIData[]>([])
+  const [showKPIModal, setShowKPIModal] = useState(false)
+  const [showCustomKPIModal, setShowCustomKPIModal] = useState(false)
   
-  const [selectedKPIs, setSelectedKPIs] = useState<SelectedKPI[]>([])
-  const [strategicItems, setStrategicItems] = useState<StrategicItem[]>([])
+  // Life Goals
+  const [lifeGoals, setLifeGoals] = useState<LifeGoal[]>([])
+  const [showLifeGoalModal, setShowLifeGoalModal] = useState(false)
+  const [editingLifeGoal, setEditingLifeGoal] = useState<LifeGoal | null>(null)
+  
+  // Strategic items
   const [ninetyDayItems, setNinetyDayItems] = useState<NinetyDayItem[]>([])
-  const [currentRevenue, setCurrentRevenue] = useState(500000)
 
-  // Initialize and load data on mount
+  // Database operations
+  const saveFinancialData = useCallback(async (data: FinancialData) => {
+    if (isSaving) return // Prevent concurrent saves
+    
+    try {
+      setIsSaving(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const financialRecord = {
+        user_id: user.id,
+        revenue_current: data.revenue.current,
+        revenue_1_year: data.revenue.year1,
+        revenue_2_year: data.revenue.year2,
+        revenue_3_year: data.revenue.year3,
+        gross_profit_current: data.grossProfit.current,
+        gross_profit_1_year: data.grossProfit.year1,
+        gross_profit_2_year: data.grossProfit.year2,
+        gross_profit_3_year: data.grossProfit.year3,
+        gross_margin_current: data.grossMargin.current,
+        gross_margin_1_year: data.grossMargin.year1,
+        gross_margin_2_year: data.grossMargin.year2,
+        gross_margin_3_year: data.grossMargin.year3,
+        net_profit_current: data.netProfit.current,
+        net_profit_1_year: data.netProfit.year1,
+        net_profit_2_year: data.netProfit.year2,
+        net_profit_3_year: data.netProfit.year3,
+        net_margin_current: data.netMargin.current,
+        net_margin_1_year: data.netMargin.year1,
+        net_margin_2_year: data.netMargin.year2,
+        net_margin_3_year: data.netMargin.year3,
+        customers_current: data.customers.current,
+        customers_1_year: data.customers.year1,
+        customers_2_year: data.customers.year2,
+        customers_3_year: data.customers.year3,
+        employees_current: data.employees.current,
+        employees_1_year: data.employees.year1,
+        employees_2_year: data.employees.year2,
+        employees_3_year: data.employees.year3,
+        year_type: yearType,
+        industry: industry
+      }
+
+      const { error } = await supabase
+        .from('strategic_goals')
+        .upsert(financialRecord, { onConflict: 'user_id' })
+
+      if (error) throw error
+    } catch (err) {
+      console.error('Error saving financial data:', err)
+      setError('Failed to save financial data')
+    } finally {
+      setIsSaving(false)
+    }
+  }, [supabase, yearType, industry, isSaving])
+
+  const saveKPIs = useCallback(async (kpiList: KPIData[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Delete existing KPIs
+      await supabase
+        .from('strategic_kpis')
+        .delete()
+        .eq('user_id', user.id)
+
+      // Insert updated KPIs
+      if (kpiList.length > 0) {
+        const kpiRecords = kpiList.map(kpi => ({
+          user_id: user.id,
+          kpi_id: kpi.id,
+          name: kpi.name,
+          friendly_name: kpi.friendlyName,
+          category: kpi.category,
+          unit: kpi.unit,
+          frequency: kpi.frequency,
+          description: kpi.description,
+          current_value: kpi.currentValue,
+          year1_target: kpi.year1Target,
+          year2_target: kpi.year2Target,
+          year3_target: kpi.year3Target,
+          is_standard: kpi.isStandard || false,
+          is_industry: kpi.isIndustry || false,
+          is_custom: kpi.isCustom || false
+        }))
+
+        const { error } = await supabase
+          .from('strategic_kpis')
+          .insert(kpiRecords)
+
+        if (error) throw error
+      }
+    } catch (err) {
+      console.error('Error saving KPIs:', err)
+      setError('Failed to save KPIs')
+    }
+  }, [supabase])
+
+  const saveLifeGoals = useCallback(async (goals: LifeGoal[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Delete existing life goals
+      await supabase
+        .from('life_goals')
+        .delete()
+        .eq('user_id', user.id)
+
+      // Insert updated life goals
+      if (goals.length > 0) {
+        const goalRecords = goals.map(goal => ({
+          user_id: user.id,
+          category: goal.category,
+          title: goal.title,
+          target_amount: goal.targetAmount,
+          target_year: goal.targetYear,
+          description: goal.description,
+          completed: goal.completed
+        }))
+
+        const { error } = await supabase
+          .from('life_goals')
+          .insert(goalRecords)
+
+        if (error) throw error
+      }
+    } catch (err) {
+      console.error('Error saving life goals:', err)
+      setError('Failed to save life goals')
+    }
+  }, [supabase])
+
+  // Auto-save when data changes
+  useEffect(() => {
+    if (!isLoading) {
+      const timeoutId = setTimeout(() => {
+        saveFinancialData(financialData)
+      }, 1000) // Save 1 second after user stops typing
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [financialData, saveFinancialData, isLoading])
+
+  useEffect(() => {
+    if (!isLoading) {
+      const timeoutId = setTimeout(() => {
+        saveKPIs(kpis)
+      }, 1000)
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [kpis, saveKPIs, isLoading])
+
+  useEffect(() => {
+    if (!isLoading) {
+      const timeoutId = setTimeout(() => {
+        saveLifeGoals(lifeGoals)
+      }, 1000)
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [lifeGoals, saveLifeGoals, isLoading])
+
+  // Toggle section collapse
+  const toggleSection = (section: string) => {
+    const newCollapsed = new Set(collapsedSections)
+    if (newCollapsed.has(section)) {
+      newCollapsed.delete(section)
+    } else {
+      newCollapsed.add(section)
+    }
+    setCollapsedSections(newCollapsed)
+  }
+
+  // Initialize on mount
   useEffect(() => {
     initializeAndLoadData()
-    
-    return () => {
-      // Cleanup realtime subscription
-      if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel)
-      }
-    }
   }, [])
-
-  // Save data with debounce
-  const saveToDatabase = useCallback(
-    debounce(async () => {
-      if (!businessProfileId) return
-      setIsSaving(true)
-      
-      try {
-        // Save strategic goals
-        await supabase
-          .from('strategic_goals')
-          .upsert({
-            business_profile_id: businessProfileId,
-            bhag_statement: bhag.statement,
-            bhag_metrics: bhag.metrics,
-            bhag_deadline: bhag.deadline,
-            three_year_goals: threeYearGoals
-          }, { onConflict: 'business_profile_id' })
-        
-        // Save KPIs
-        await Promise.all(selectedKPIs.map(kpi => 
-          supabase
-            .from('kpis')
-            .upsert({
-              business_profile_id: businessProfileId,
-              kpi_id: kpi.id,
-              name: kpi.name,
-              category: kpi.category,
-              current_value: kpi.currentValue,
-              year1_target: kpi.year1Target,
-              year2_target: kpi.year2Target,
-              year3_target: kpi.year3Target,
-              unit: kpi.unit,
-              frequency: kpi.frequency
-            }, { onConflict: 'business_profile_id,kpi_id' })
-        ))
-        
-        // Save strategic initiatives
-        await Promise.all(strategicItems.map((item, index) =>
-          supabase
-            .from('strategic_initiatives')
-            .upsert({
-              id: item.id.startsWith('roadmap-') || item.id.startsWith('custom-') 
-                ? undefined : item.id,
-              business_profile_id: businessProfileId,
-              title: item.title,
-              category: item.category,
-              is_from_roadmap: item.isFromRoadmap,
-              custom_source: item.customSource || null,
-              selected: item.selected,
-              quarter_assignment: item.quarterAssignment,
-              order_index: index
-            })
-        ))
-        
-        // Save ninety day sprints and milestones
-        for (const sprint of ninetyDayItems) {
-          const { data: sprintData } = await supabase
-            .from('ninety_day_sprints')
-            .upsert({
-              id: sprint.id.startsWith('90day-') ? undefined : sprint.id,
-              business_profile_id: businessProfileId,
-              title: sprint.title,
-              owner: sprint.owner || null,
-              due_date: sprint.dueDate,
-              status: sprint.status,
-              quarter: 'q1',
-              year: new Date().getFullYear()
-            })
-            .select()
-            .single()
-          
-          if (sprintData && sprint.milestones.length > 0) {
-            await Promise.all(sprint.milestones.map((milestone, index) =>
-              supabase
-                .from('sprint_milestones')
-                .upsert({
-                  sprint_id: sprintData.id,
-                  description: milestone.description,
-                  completed: milestone.completed,
-                  due_date: milestone.dueDate,
-                  order_index: index
-                })
-            ))
-          }
-        }
-        
-        // Update business profile
-        await supabase
-          .from('business_profiles')
-          .update({ current_revenue: currentRevenue })
-          .eq('id', businessProfileId)
-          
-      } catch (err) {
-        console.error('Error saving data:', err)
-        setError('Failed to save data. Please try again.')
-      } finally {
-        setIsSaving(false)
-      }
-    }, 1000),
-    [businessProfileId, bhag, threeYearGoals, selectedKPIs, strategicItems, ninetyDayItems, currentRevenue]
-  )
-
-  // Auto-save on changes
-  useEffect(() => {
-    if (businessProfileId && !isLoading) {
-      saveToDatabase()
-    }
-  }, [bhag, threeYearGoals, selectedKPIs, strategicItems, ninetyDayItems, currentRevenue])
 
   async function initializeAndLoadData() {
     try {
-      // Check authentication
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError || !user) {
-        router.push('/auth/login')
+      setIsLoading(true)
+      setError(null)
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        setError('Please log in to access your strategic planning')
+        setIsLoading(false)
         return
       }
-
-      // Get or create business profile
-      const { data: profileData, error: profileError } = await supabase
-        .rpc('get_or_create_business_profile')
       
-      if (profileError || !profileData) {
-        throw new Error('Failed to load business profile')
-      }
+      // Load business profile from localStorage
+      const storedProfile = localStorage.getItem('businessProfile')
+      let profileIndustry = 'building_construction'
       
-      setBusinessProfileId(profileData)
-
-      // Load business profile details
-      const { data: profile } = await supabase
-        .from('business_profiles')
-        .select('*')
-        .eq('id', profileData)
-        .single()
-      
-      if (profile) {
-        setCurrentRevenue(profile.current_revenue || 500000)
+      if (storedProfile) {
+        const profile = JSON.parse(storedProfile)
+        profileIndustry = profile.industry || 'building_construction'
+        setIndustry(profileIndustry)
+        setCurrentRevenue(profile.annual_revenue || 500000)
+        setBusinessProfile(profile)
       }
 
-      // Load strategic goals
-      const { data: goals } = await supabase
+      // Load financial data from database
+      const { data: strategicGoals } = await supabase
         .from('strategic_goals')
         .select('*')
-        .eq('business_profile_id', profileData)
+        .eq('user_id', user.id)
         .single()
-      
-      if (goals) {
-        setBhag({
-          statement: goals.bhag_statement || '',
-          metrics: goals.bhag_metrics || '',
-          deadline: goals.bhag_deadline || '10 years'
+
+      if (strategicGoals) {
+        setFinancialData({
+          revenue: {
+            current: strategicGoals.revenue_current,
+            year1: strategicGoals.revenue_1_year,
+            year2: strategicGoals.revenue_2_year,
+            year3: strategicGoals.revenue_3_year
+          },
+          grossProfit: {
+            current: strategicGoals.gross_profit_current,
+            year1: strategicGoals.gross_profit_1_year,
+            year2: strategicGoals.gross_profit_2_year,
+            year3: strategicGoals.gross_profit_3_year
+          },
+          grossMargin: {
+            current: Number(strategicGoals.gross_margin_current),
+            year1: Number(strategicGoals.gross_margin_1_year),
+            year2: Number(strategicGoals.gross_margin_2_year),
+            year3: Number(strategicGoals.gross_margin_3_year)
+          },
+          netProfit: {
+            current: strategicGoals.net_profit_current,
+            year1: strategicGoals.net_profit_1_year,
+            year2: strategicGoals.net_profit_2_year,
+            year3: strategicGoals.net_profit_3_year
+          },
+          netMargin: {
+            current: Number(strategicGoals.net_margin_current),
+            year1: Number(strategicGoals.net_margin_1_year),
+            year2: Number(strategicGoals.net_margin_2_year),
+            year3: Number(strategicGoals.net_margin_3_year)
+          },
+          customers: {
+            current: strategicGoals.customers_current,
+            year1: strategicGoals.customers_1_year,
+            year2: strategicGoals.customers_2_year,
+            year3: strategicGoals.customers_3_year
+          },
+          employees: {
+            current: strategicGoals.employees_current,
+            year1: strategicGoals.employees_1_year,
+            year2: strategicGoals.employees_2_year,
+            year3: strategicGoals.employees_3_year
+          }
         })
-        
-        if (goals.three_year_goals && Array.isArray(goals.three_year_goals)) {
-          setThreeYearGoals(goals.three_year_goals as ThreeYearGoal[])
+        setYearType(strategicGoals.year_type as 'FY' | 'CY')
+        if (strategicGoals.industry) {
+          setIndustry(strategicGoals.industry)
         }
       }
 
-      // Load KPIs
-      const { data: kpis } = await supabase
-        .from('kpis')
+      // Load KPIs from database
+      const { data: savedKPIs } = await supabase
+        .from('strategic_kpis')
         .select('*')
-        .eq('business_profile_id', profileData)
-        .order('created_at', { ascending: true })
-      
-      if (kpis) {
-        setSelectedKPIs(kpis.map(kpi => ({
+        .eq('user_id', user.id)
+
+      if (savedKPIs && savedKPIs.length > 0) {
+        const loadedKPIs = savedKPIs.map((kpi: any) => ({
           id: kpi.kpi_id,
           name: kpi.name,
+          friendlyName: kpi.friendly_name,
           category: kpi.category,
-          currentValue: kpi.current_value,
-          year1Target: kpi.year1_target,
-          year2Target: kpi.year2_target,
-          year3Target: kpi.year3_target,
           unit: kpi.unit,
-          frequency: kpi.frequency as any
-        })))
-      }
-
-      // Load strategic initiatives
-      const { data: initiatives } = await supabase
-        .from('strategic_initiatives')
-        .select('*')
-        .eq('business_profile_id', profileData)
-        .order('order_index', { ascending: true })
-      
-      if (initiatives && initiatives.length > 0) {
-        setStrategicItems(initiatives.map(item => ({
-          id: item.id,
-          title: item.title,
-          category: item.category as any,
-          isFromRoadmap: item.is_from_roadmap,
-          customSource: item.custom_source || undefined,
-          selected: item.selected,
-          quarterAssignment: item.quarter_assignment as any
-        })))
+          frequency: kpi.frequency,
+          description: kpi.description,
+          currentValue: Number(kpi.current_value),
+          year1Target: Number(kpi.year1_target),
+          year2Target: Number(kpi.year2_target),
+          year3Target: Number(kpi.year3_target),
+          isStandard: kpi.is_standard,
+          isIndustry: kpi.is_industry,
+          isCustom: kpi.is_custom
+        }))
+        setKpis(loadedKPIs)
       } else {
-        // Initialize with roadmap items if none exist
-        initializeStrategicItems()
+        // Initialize with standard KPIs if none exist
+        const standardKPIs: KPIData[] = [
+          {
+            id: 'leads',
+            name: 'Leads',
+            friendlyName: 'Number of leads generated',
+            category: 'Marketing',
+            currentValue: 50,
+            year1Target: 100,
+            year2Target: 200,
+            year3Target: 400,
+            unit: 'number',
+            frequency: 'monthly',
+            description: 'Number of qualified leads generated',
+            isStandard: true
+          },
+          {
+            id: 'conversion',
+            name: 'Conversion',
+            friendlyName: 'Lead to customer conversion rate',
+            category: 'Sales',
+            currentValue: 10,
+            year1Target: 15,
+            year2Target: 20,
+            year3Target: 25,
+            unit: 'percentage',
+            frequency: 'monthly',
+            description: 'Percentage of leads that become customers',
+            isStandard: true
+          },
+          {
+            id: 'avg-sale',
+            name: 'Average Sale',
+            friendlyName: 'Average transaction value',
+            category: 'Sales',
+            currentValue: 5000,
+            year1Target: 7500,
+            year2Target: 10000,
+            year3Target: 15000,
+            unit: 'currency',
+            frequency: 'monthly',
+            description: 'Average value per sale',
+            isStandard: true
+          },
+          {
+            id: 'team-size',
+            name: 'Team Size',
+            friendlyName: 'Team headcount',
+            category: 'People',
+            currentValue: strategicGoals?.employees_current || 2,
+            year1Target: strategicGoals?.employees_1_year || 4,
+            year2Target: strategicGoals?.employees_2_year || 8,
+            year3Target: strategicGoals?.employees_3_year || 15,
+            unit: 'number',
+            frequency: 'annual',
+            description: 'Total team members',
+            isStandard: true
+          },
+          {
+            id: 'revenue-per-employee',
+            name: 'Revenue/Employee',
+            friendlyName: 'Revenue per team member',
+            category: 'Productivity',
+            currentValue: strategicGoals ? Math.round(strategicGoals.revenue_current / strategicGoals.employees_current) : 250000,
+            year1Target: strategicGoals ? Math.round(strategicGoals.revenue_1_year / strategicGoals.employees_1_year) : 187500,
+            year2Target: strategicGoals ? Math.round(strategicGoals.revenue_2_year / strategicGoals.employees_2_year) : 187500,
+            year3Target: strategicGoals ? Math.round(strategicGoals.revenue_3_year / strategicGoals.employees_3_year) : 200000,
+            unit: 'currency',
+            frequency: 'annual',
+            description: 'Revenue divided by team size',
+            isStandard: true
+          }
+        ]
+        
+        // Add industry-specific KPIs
+        const industryKPIs = INDUSTRY_KPIS[profileIndustry] || []
+        
+        setKpis([...standardKPIs, ...industryKPIs])
       }
 
-      // Load ninety day sprints with milestones
-      const currentYear = new Date().getFullYear()
-      const { data: sprints } = await supabase
-        .from('ninety_day_sprints')
-        .select(`
-          *,
-          sprint_milestones (*)
-        `)
-        .eq('business_profile_id', profileData)
-        .eq('year', currentYear)
-        .eq('quarter', 'q1')
-        .order('created_at', { ascending: true })
+      // Load life goals from database
+      const { data: savedLifeGoals } = await supabase
+        .from('life_goals')
+        .select('*')
+        .eq('user_id', user.id)
+
+      if (savedLifeGoals && savedLifeGoals.length > 0) {
+        const loadedLifeGoals = savedLifeGoals.map((goal: any) => ({
+          id: goal.id,
+          category: goal.category,
+          title: goal.title,
+          targetAmount: goal.target_amount,
+          targetYear: goal.target_year,
+          description: goal.description,
+          completed: goal.completed
+        }))
+        setLifeGoals(loadedLifeGoals)
+      }
       
-      if (sprints) {
-        setNinetyDayItems(sprints.map(sprint => ({
-          id: sprint.id,
-          title: sprint.title,
-          owner: sprint.owner || '',
-          dueDate: sprint.due_date,
-          status: sprint.status as any,
-          milestones: (sprint.sprint_milestones || []).map(m => ({
-            id: m.id,
-            description: m.description,
-            completed: m.completed,
-            dueDate: m.due_date
-          }))
-        })))
-      }
-
-      // Setup realtime subscriptions
-      setupRealtimeSubscriptions(profileData)
-
     } catch (err) {
       console.error('Error initializing data:', err)
       setError('Failed to load data. Please refresh the page.')
@@ -481,224 +999,179 @@ export default function GoalsPage() {
     }
   }
 
-  function setupRealtimeSubscriptions(profileId: string) {
-    const channel = supabase.channel(`business-${profileId}`)
-      .on(
-        'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'strategic_goals',
-          filter: `business_profile_id=eq.${profileId}`
-        },
-        (payload) => {
-          // Handle real-time updates for strategic goals
-          if (payload.eventType === 'UPDATE') {
-            const updatedGoals = payload.new as DbStrategicGoal
-            setBhag({
-              statement: updatedGoals.bhag_statement || '',
-              metrics: updatedGoals.bhag_metrics || '',
-              deadline: updatedGoals.bhag_deadline || '10 years'
-            })
-            if (updatedGoals.three_year_goals) {
-              setThreeYearGoals(updatedGoals.three_year_goals as ThreeYearGoal[])
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'strategic_initiatives',
-          filter: `business_profile_id=eq.${profileId}`
-        },
-        async () => {
-          // Reload strategic initiatives on changes
-          const { data: initiatives } = await supabase
-            .from('strategic_initiatives')
-            .select('*')
-            .eq('business_profile_id', profileId)
-            .order('order_index', { ascending: true })
-          
-          if (initiatives) {
-            setStrategicItems(initiatives.map(item => ({
-              id: item.id,
-              title: item.title,
-              category: item.category as any,
-              isFromRoadmap: item.is_from_roadmap,
-              customSource: item.custom_source || undefined,
-              selected: item.selected,
-              quarterAssignment: item.quarter_assignment as any
-            })))
-          }
-        }
-      )
-      .subscribe()
+  const updateFinancialValue = (
+    metric: keyof FinancialData,
+    period: 'current' | 'year1' | 'year2' | 'year3',
+    value: number,
+    isPercentage: boolean = false
+  ) => {
+    const newData = { ...financialData }
     
-    setRealtimeChannel(channel)
+    if (isPercentage) {
+      // Update margin and calculate dollar amount
+      if (metric === 'grossMargin') {
+        newData.grossMargin[period] = value
+        newData.grossProfit[period] = Math.round(newData.revenue[period] * (value / 100))
+      } else if (metric === 'netMargin') {
+        newData.netMargin[period] = value
+        newData.netProfit[period] = Math.round(newData.revenue[period] * (value / 100))
+      }
+    } else {
+      // Update dollar amount and calculate percentage
+      if (metric === 'revenue') {
+        newData.revenue[period] = value
+        // Recalculate profits based on existing margins
+        newData.grossProfit[period] = Math.round(value * (newData.grossMargin[period] / 100))
+        newData.netProfit[period] = Math.round(value * (newData.netMargin[period] / 100))
+        
+        // Update revenue per employee KPI
+        updateRevenuePerEmployee()
+      } else if (metric === 'grossProfit') {
+        newData.grossProfit[period] = value
+        if (newData.revenue[period] > 0) {
+          newData.grossMargin[period] = Math.round((value / newData.revenue[period]) * 100)
+        }
+      } else if (metric === 'netProfit') {
+        newData.netProfit[period] = value
+        if (newData.revenue[period] > 0) {
+          newData.netMargin[period] = Math.round((value / newData.revenue[period]) * 100)
+        }
+      } else if (metric === 'customers' || metric === 'employees') {
+        newData[metric][period] = value
+        if (metric === 'employees') {
+          updateRevenuePerEmployee()
+        }
+      }
+    }
+    
+    setFinancialData(newData)
   }
 
-  // Utility function for debouncing
-  function debounce<T extends (...args: any[]) => any>(
-    func: T,
-    delay: number
-  ): (...args: Parameters<T>) => void {
-    let timeoutId: NodeJS.Timeout
-    return (...args: Parameters<T>) => {
-      clearTimeout(timeoutId)
-      timeoutId = setTimeout(() => func(...args), delay)
+  const updateRevenuePerEmployee = () => {
+    const teamSizeKPI = kpis.find(k => k.id === 'team-size')
+    const revenuePerEmpIndex = kpis.findIndex(k => k.id === 'revenue-per-employee')
+    
+    if (teamSizeKPI && revenuePerEmpIndex !== -1) {
+      const updatedKPIs = [...kpis]
+      updatedKPIs[revenuePerEmpIndex] = {
+        ...updatedKPIs[revenuePerEmpIndex],
+        currentValue: financialData.employees.current > 0 
+          ? Math.round(financialData.revenue.current / financialData.employees.current) 
+          : 0,
+        year1Target: financialData.employees.year1 > 0 
+          ? Math.round(financialData.revenue.year1 / financialData.employees.year1) 
+          : 0,
+        year2Target: financialData.employees.year2 > 0 
+          ? Math.round(financialData.revenue.year2 / financialData.employees.year2) 
+          : 0,
+        year3Target: financialData.employees.year3 > 0 
+          ? Math.round(financialData.revenue.year3 / financialData.employees.year3) 
+          : 0,
+      }
+      setKpis(updatedKPIs)
+      
+      // Also update team size KPI to match employees data
+      const teamSizeIndex = kpis.findIndex(k => k.id === 'team-size')
+      if (teamSizeIndex !== -1) {
+        updatedKPIs[teamSizeIndex] = {
+          ...updatedKPIs[teamSizeIndex],
+          currentValue: financialData.employees.current,
+          year1Target: financialData.employees.year1,
+          year2Target: financialData.employees.year2,
+          year3Target: financialData.employees.year3
+        }
+        setKpis(updatedKPIs)
+      }
     }
   }
 
-  const initializeStrategicItems = () => {
-    // Don't reinitialize if items already exist
-    if (strategicItems.length > 0) return
+  const updateKPIValue = (
+    kpiId: string,
+    field: 'currentValue' | 'year1Target' | 'year2Target' | 'year3Target',
+    value: number
+  ) => {
+    const updatedKPIs = kpis.map(kpi =>
+      kpi.id === kpiId ? { ...kpi, [field]: value } : kpi
+    )
     
-    const revenueStage = currentRevenue < 250000 ? 'foundation' :
-                        currentRevenue < 1000000 ? 'growth' :
-                        currentRevenue < 5000000 ? 'scale' : 'optimize'
+    setKpis(updatedKPIs)
     
-    const roadmapItems = REVENUE_ROADMAP[revenueStage].items.map((item, index) => ({
-      id: `roadmap-${revenueStage}-${index}`,
-      title: item.title,
-      category: item.category as any,
-      isFromRoadmap: true,
-      selected: false,
-      quarterAssignment: null
+    // If team size was updated, update employees data and recalculate revenue per employee
+    if (kpiId === 'team-size') {
+      const newFinancialData = { ...financialData }
+      const teamSizeKPI = updatedKPIs.find(k => k.id === 'team-size')
+      if (teamSizeKPI) {
+        if (field === 'currentValue') newFinancialData.employees.current = value
+        if (field === 'year1Target') newFinancialData.employees.year1 = value
+        if (field === 'year2Target') newFinancialData.employees.year2 = value
+        if (field === 'year3Target') newFinancialData.employees.year3 = value
+        setFinancialData(newFinancialData)
+      }
+      updateRevenuePerEmployee()
+    }
+  }
+
+  const handleKPISave = (selectedKPIs: any[]) => {
+    // Add new KPIs to the existing list
+    const newKPIs = selectedKPIs.map(kpi => ({
+      ...kpi,
+      id: kpi.id || `custom-${Date.now()}-${Math.random()}`,
+      currentValue: kpi.currentValue || 0,
+      year1Target: kpi.year1Target || 0,
+      year2Target: kpi.year2Target || 0,
+      year3Target: kpi.year3Target || 0,
+      isCustom: true
     }))
     
-    setStrategicItems(roadmapItems)
+    setKpis([...kpis, ...newKPIs])
+  }
+
+  const handleCustomKPISave = (customKPI: KPIData) => {
+    setKpis([...kpis, customKPI])
+  }
+
+  const deleteKPI = (kpiId: string) => {
+    setKpis(kpis.filter(k => k.id !== kpiId))
   }
 
   const handleProfitCalculatorComplete = (data: any) => {
-    setThreeYearGoals(prev => {
-      const updated = [...prev]
-      const revenueGoal = updated.find(g => g.id === 'revenue')
-      const profitGoal = updated.find(g => g.id === 'profit')
-      
-      if (revenueGoal) {
-        revenueGoal.currentValue = data.currentRevenue || currentRevenue
-        revenueGoal.year1Target = data.year1Revenue || 750000
-        revenueGoal.year2Target = data.year2Revenue || 1500000
-        revenueGoal.year3Target = data.year3Revenue || 3000000
-      }
-      
-      if (profitGoal) {
-        profitGoal.currentValue = data.currentProfit || Math.round(currentRevenue * 0.1)
-        profitGoal.year1Target = data.year1Profit || 112500
-        profitGoal.year2Target = data.year2Profit || 300000
-        profitGoal.year3Target = data.year3Profit || 750000
-      }
-      
-      if (data.currentRevenue) {
-        setCurrentRevenue(data.currentRevenue)
-      }
-      
-      return updated
+    setFinancialData({
+      revenue: {
+        current: data.currentRevenue || 500000,
+        year1: data.year1Revenue || 750000,
+        year2: data.year2Revenue || 1500000,
+        year3: data.year3Revenue || 3000000
+      },
+      grossProfit: {
+        current: data.currentGrossProfit || 200000,
+        year1: data.year1GrossProfit || 337500,
+        year2: data.year2GrossProfit || 675000,
+        year3: data.year3GrossProfit || 1350000
+      },
+      grossMargin: {
+        current: data.currentGrossMargin || 40,
+        year1: data.year1GrossMargin || 45,
+        year2: data.year2GrossMargin || 45,
+        year3: data.year3GrossMargin || 45
+      },
+      netProfit: {
+        current: data.currentProfit || 50000,
+        year1: data.year1Profit || 112500,
+        year2: data.year2Profit || 300000,
+        year3: data.year3Profit || 600000
+      },
+      netMargin: {
+        current: data.currentNetMargin || 10,
+        year1: data.year1NetMargin || 15,
+        year2: data.year2NetMargin || 20,
+        year3: data.year3NetMargin || 20
+      },
+      customers: financialData.customers, // Keep existing customer data
+      employees: financialData.employees   // Keep existing employee data
     })
     
     setShowProfitCalculator(false)
-  }
-
-  const toggleStrategicItem = (itemId: string) => {
-    setStrategicItems(prev => {
-      const selectedCount = prev.filter(item => item.selected).length
-      const item = prev.find(i => i.id === itemId)
-      
-      if (!item?.selected && selectedCount >= 12) {
-        alert('Maximum 12 items can be selected for the annual plan')
-        return prev
-      }
-      
-      return prev.map(i => 
-        i.id === itemId ? { ...i, selected: !i.selected } : i
-      )
-    })
-  }
-
-  const assignToQuarter = (itemId: string, quarter: 'q1' | 'q2' | 'q3' | 'q4' | null) => {
-    setStrategicItems(prev => {
-      const quarterCount = prev.filter(i => i.quarterAssignment === quarter).length
-      
-      if (quarter && quarterCount >= 5) {
-        alert(`Maximum 5 initiatives per quarter. Q${quarter.slice(1)} is at capacity.`)
-        return prev
-      }
-      
-      return prev.map(i => 
-        i.id === itemId ? { ...i, quarterAssignment: quarter } : i
-      )
-    })
-  }
-
-  const addCustomStrategicItem = (title: string, category: string) => {
-    const newItem: StrategicItem = {
-      id: `custom-${Date.now()}`,
-      title,
-      category: category as any,
-      isFromRoadmap: false,
-      customSource: 'User Added',
-      selected: false,
-      quarterAssignment: null
-    }
-    setStrategicItems(prev => [...prev, newItem])
-  }
-
-  const renderStepContent = () => {
-    switch(currentStep) {
-      case 1:
-        return <BHAGStep bhag={bhag} setBhag={setBhag} />
-      
-      case 2:
-        return (
-          <GoalsKPIsStep 
-            goals={threeYearGoals}
-            setGoals={setThreeYearGoals}
-            kpis={selectedKPIs}
-            setKpis={setSelectedKPIs}
-            onOpenKPIModal={() => setIsKPIModalOpen(true)}
-            onOpenProfitCalculator={() => setShowProfitCalculator(true)}
-          />
-        )
-      
-      case 3:
-        return (
-          <StrategicToDoStep
-            items={strategicItems}
-            onToggleItem={toggleStrategicItem}
-            onAddCustom={addCustomStrategicItem}
-            expandedCategories={expandedCategories}
-            setExpandedCategories={setExpandedCategories}
-            currentRevenue={currentRevenue}
-          />
-        )
-      
-      case 4:
-        return (
-          <AnnualPlanStep
-            goals={threeYearGoals}
-            kpis={selectedKPIs}
-            strategicItems={strategicItems.filter(i => i.selected)}
-            onAssignQuarter={assignToQuarter}
-          />
-        )
-      
-      case 5:
-        return (
-          <NinetyDayStep
-            goals={threeYearGoals}
-            kpis={selectedKPIs}
-            quarterItems={strategicItems.filter(i => i.quarterAssignment === 'q1')}
-            ninetyDayItems={ninetyDayItems}
-            setNinetyDayItems={setNinetyDayItems}
-          />
-        )
-      
-      default:
-        return null
-    }
+    updateRevenuePerEmployee()
   }
 
   // Loading state
@@ -734,22 +1207,45 @@ export default function GoalsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <style jsx>{`
+        input[type="text"] {
+          -moz-appearance: textfield;
+          -webkit-appearance: textfield;
+          appearance: textfield;
+        }
+        input[type="text"]::-webkit-outer-spin-button,
+        input[type="text"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+          display: none;
+        }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+          display: none;
+        }
+      `}</style>
       {/* Header */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Strategic Planning Wizard</h1>
-            <div className="flex items-center space-x-4">
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Strategic Planning Wizard</h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Build your roadmap to success
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
               {isSaving && (
                 <div className="flex items-center text-gray-600">
                   <Loader2 className="animate-spin h-4 w-4 mr-2" />
                   Saving...
                 </div>
               )}
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
-                <Save className="h-4 w-4 mr-2" />
-                {isSaving ? 'Saving...' : 'Saved'}
-              </button>
+              <div className="text-sm text-green-600 font-medium">
+                Auto-saved to database
+              </div>
             </div>
           </div>
         </div>
@@ -757,31 +1253,30 @@ export default function GoalsPage() {
 
       {/* Progress Steps */}
       <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-3">
             {[
-              { num: 1, label: '10yr BHAG', icon: Rocket },
-              { num: 2, label: '3yr Goals & KPIs', icon: Target },
-              { num: 3, label: 'Strategic To-Do', icon: ListChecks },
-              { num: 4, label: 'Annual Plan', icon: Calendar },
-              { num: 5, label: '90-Day Sprint', icon: Timer }
+              { num: 1, label: '3yr Goals & KPIs', icon: Target },
+              { num: 2, label: 'Strategic Initiatives', icon: ListChecks },
+              { num: 3, label: 'Annual Plan', icon: Calendar },
+              { num: 4, label: '90-Day Sprint', icon: Timer }
             ].map((step, index) => (
               <div key={step.num} className="flex items-center">
                 <button
                   onClick={() => setCurrentStep(step.num)}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
                     currentStep === step.num 
-                      ? 'bg-blue-100 text-blue-700' 
+                      ? 'bg-blue-100 text-blue-800' 
                       : currentStep > step.num 
                       ? 'text-green-600 hover:bg-gray-50' 
                       : 'text-gray-400'
                   }`}
                 >
                   <step.icon className="h-5 w-5" />
-                  <span className="font-medium">{step.label}</span>
+                  <span className="font-medium hidden sm:inline">{step.label}</span>
                   {currentStep > step.num && <CheckCircle className="h-4 w-4" />}
                 </button>
-                {index < 4 && <ChevronRight className="h-5 w-5 text-gray-300 ml-2" />}
+                {index < 3 && <ChevronRight className="h-5 w-5 text-gray-300 mx-2" />}
               </div>
             ))}
           </div>
@@ -789,24 +1284,60 @@ export default function GoalsPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {renderStepContent()}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {currentStep === 1 && (
+          <GoalsKPIsStep 
+            financialData={financialData}
+            updateFinancialValue={updateFinancialValue}
+            kpis={kpis}
+            updateKPIValue={updateKPIValue}
+            deleteKPI={deleteKPI}
+            lifeGoals={lifeGoals}
+            setLifeGoals={setLifeGoals}
+            onOpenProfitCalculator={() => setShowProfitCalculator(true)}
+            businessProfile={businessProfile}
+            yearType={yearType}
+            setYearType={setYearType}
+            setShowKPIModal={setShowKPIModal}
+            setShowCustomKPIModal={setShowCustomKPIModal}
+            setShowLifeGoalModal={setShowLifeGoalModal}
+            editingLifeGoal={editingLifeGoal}
+            setEditingLifeGoal={setEditingLifeGoal}
+            industry={industry}
+            hoveredKPI={hoveredKPI}
+            setHoveredKPI={setHoveredKPI}
+            collapsedSections={collapsedSections}
+            toggleSection={toggleSection}
+          />
+        )}
+
+        {currentStep === 2 && <StrategicInitiatives />}
+
+        {currentStep === 3 && <AnnualPlan />}
+
+        {currentStep === 4 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+            <Timer className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">90-Day Sprint Planning</h3>
+            <p className="text-gray-600">Coming soon - this section is under development</p>
+          </div>
+        )}
 
         {/* Navigation */}
         <div className="flex justify-between mt-8">
           <button
             onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
             disabled={currentStep === 1}
-            className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center"
+            className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             <ChevronLeft className="h-5 w-5 mr-2" />
             Previous
           </button>
           
           <button
-            onClick={() => setCurrentStep(Math.min(5, currentStep + 1))}
-            disabled={currentStep === 5}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center"
+            onClick={() => setCurrentStep(Math.min(4, currentStep + 1))}
+            disabled={currentStep === 4}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             Next
             <ChevronRight className="h-5 w-5 ml-2" />
@@ -814,7 +1345,40 @@ export default function GoalsPage() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Enhanced KPI Modal */}
+      <EnhancedKPIModal 
+        isOpen={showKPIModal} 
+        onClose={() => setShowKPIModal(false)} 
+        onSave={handleKPISave} 
+        businessProfile={businessProfile}
+        onOpenCustom={() => {
+          setShowKPIModal(false)
+          setShowCustomKPIModal(true)
+        }}
+      />
+
+      {/* Custom KPI Modal */}
+      <CustomKPIModal
+        isOpen={showCustomKPIModal}
+        onClose={() => setShowCustomKPIModal(false)}
+        onSave={handleCustomKPISave}
+      />
+
+      {/* Life Goal Modal */}
+      {showLifeGoalModal && (
+        <LifeGoalModal
+          editingGoal={editingLifeGoal}
+          setEditingGoal={setEditingLifeGoal}
+          lifeGoals={lifeGoals}
+          setLifeGoals={setLifeGoals}
+          onClose={() => {
+            setShowLifeGoalModal(false)
+            setEditingLifeGoal(null)
+          }}
+        />
+      )}
+
+      {/* Profit Calculator Modal */}
       {showProfitCalculator && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
@@ -836,466 +1400,594 @@ export default function GoalsPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
 
-      {/* KPI Selection Modal */}
-      {isKPIModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-bold">Select Key Performance Indicators</h3>
+// Goals & KPIs Step Component - WITH COLLAPSIBLE SECTIONS AND CUSTOMERS/EMPLOYEES
+function GoalsKPIsStep({ 
+  financialData,
+  updateFinancialValue,
+  kpis,
+  updateKPIValue,
+  deleteKPI,
+  lifeGoals,
+  setLifeGoals,
+  onOpenProfitCalculator,
+  businessProfile,
+  yearType,
+  setYearType,
+  setShowKPIModal,
+  setShowCustomKPIModal,
+  setShowLifeGoalModal,
+  editingLifeGoal,
+  setEditingLifeGoal,
+  industry,
+  hoveredKPI,
+  setHoveredKPI,
+  collapsedSections,
+  toggleSection
+}: any) {
+  const currentYear = new Date().getFullYear()
+  
+  const getYearEndDate = (yearNum: number) => {
+    if (yearType === 'FY') {
+      if (yearNum === 0) return 'Last Year'
+      return `FY${(currentYear + yearNum).toString().slice(-2)}`
+    } else {
+      if (yearNum === 0) return 'Last Year'
+      return `CY${(currentYear + yearNum - 1).toString().slice(-2)}`
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Controls Bar */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-6">
+            <div>
+              <span className="text-sm font-medium text-gray-700 mr-3">Period Type:</span>
+              <div className="inline-flex bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => setIsKPIModalOpen(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  onClick={() => setYearType('FY')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    yearType === 'FY' 
+                      ? 'bg-white text-blue-600 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
-                  <X className="h-6 w-6" />
+                  Financial Year
+                </button>
+                <button
+                  onClick={() => setYearType('CY')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    yearType === 'CY' 
+                      ? 'bg-white text-blue-600 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Calendar Year
                 </button>
               </div>
-              
-              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  Select the KPIs you want to track. You can set targets for each KPI after selection.
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                {Object.entries(KPI_OPTIONS).map(([category, kpis]) => (
-                  <div key={category}>
-                    <h4 className="font-semibold text-gray-900 mb-3 capitalize">
-                      {category} KPIs
-                    </h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {kpis.map((kpi) => (
-                        <label key={kpi.id} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedKPIs.some(k => k.id === kpi.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedKPIs([...selectedKPIs, {
-                                  ...kpi,
-                                  category,
-                                  currentValue: 0,
-                                  year1Target: 0,
-                                  year2Target: 0,
-                                  year3Target: 0
-                                }])
-                              } else {
-                                setSelectedKPIs(selectedKPIs.filter(k => k.id !== kpi.id))
-                              }
-                            }}
-                            className="h-4 w-4 text-blue-600 mr-3"
-                          />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{kpi.name}</p>
-                            <p className="text-xs text-gray-500">{kpi.frequency} • {kpi.unit}</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 flex justify-between items-center">
-                <p className="text-sm text-gray-600">
-                  {selectedKPIs.length} KPIs selected
-                </p>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => setIsKPIModalOpen(false)}
-                    className="px-4 py-2 text-gray-700 hover:text-gray-900"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setIsKPIModalOpen(false)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
             </div>
+            
+            {businessProfile && (
+              <div className="text-sm text-gray-600">
+                <span>Industry: </span>
+                <span className="font-semibold text-gray-900">
+                  {industry.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                </span>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Step Components (same as before, no changes needed)
-function BHAGStep({ bhag, setBhag }: { bhag: BHAG; setBhag: (bhag: BHAG) => void }) {
-  return (
-    <div className="bg-white rounded-xl shadow-lg p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-8">
-          <Rocket className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Define Your 10-Year BHAG</h2>
-          <p className="text-gray-600">Big Hairy Audacious Goal - Your Moonshot Vision</p>
-        </div>
-
-        <div className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              What's your audacious 10-year vision?
-            </label>
-            <textarea
-              value={bhag.statement}
-              onChange={(e) => setBhag({ ...bhag, statement: e.target.value })}
-              placeholder="e.g., Become the #1 sustainable construction company in Australia with $50M revenue and 200 happy team members"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-              rows={3}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              How will you measure success?
-            </label>
-            <input
-              type="text"
-              value={bhag.metrics}
-              onChange={(e) => setBhag({ ...bhag, metrics: e.target.value })}
-              placeholder="e.g., $50M revenue, 200 employees, 30% market share, 1000 5-star reviews"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="font-semibold text-blue-900 mb-3">BHAG Criteria Checklist:</h3>
-            <div className="space-y-2">
-              {[
-                'Clear and compelling vision',
-                'Requires significant effort and growth',
-                'Has specific measurable outcomes',
-                'Aligns with your core purpose',
-                'Excites and energizes your team'
-              ].map((criterion, index) => (
-                <label key={index} className="flex items-center text-blue-800">
-                  <input type="checkbox" className="mr-2 text-blue-600" />
-                  <span className="text-sm">{criterion}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Add remaining step components (GoalsKPIsStep, StrategicToDoStep, AnnualPlanStep, NinetyDayStep)
-// These components remain the same as in your original code
-// I'm including them here for completeness
-
-function GoalsKPIsStep({ 
-  goals, 
-  setGoals, 
-  kpis, 
-  setKpis, 
-  onOpenKPIModal, 
-  onOpenProfitCalculator 
-}: any) {
-  const [editingGoalId, setEditingGoalId] = useState<string | null>(null)
-
-  const addGoal = () => {
-    const newGoal: ThreeYearGoal = {
-      id: `goal-${Date.now()}`,
-      category: 'operations',
-      metric: '',
-      currentValue: 0,
-      year1Target: 0,
-      year2Target: 0,
-      year3Target: 0,
-      unit: '#'
-    }
-    setGoals([...goals, newGoal])
-    setEditingGoalId(newGoal.id)
-  }
-
-  const updateGoal = (id: string, updates: Partial<ThreeYearGoal>) => {
-    setGoals(goals.map((g: ThreeYearGoal) => 
-      g.id === id ? { ...g, ...updates } : g
-    ))
-  }
-
-  const deleteGoal = (id: string) => {
-    if (id === 'revenue' || id === 'profit') {
-      alert('Revenue and Profit goals cannot be deleted')
-      return
-    }
-    setGoals(goals.filter((g: ThreeYearGoal) => g.id !== id))
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900">3-Year Financial Goals</h3>
+          
           <button
             onClick={onOpenProfitCalculator}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center transition-colors"
           >
-            <Calculator className="h-5 w-5 mr-2" />
-            Open Profit Calculator
+            <Calculator className="h-4 w-4 mr-2" />
+            Profit Calculator
           </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-3 px-2">Metric</th>
-                <th className="text-center py-3 px-2">Current</th>
-                <th className="text-center py-3 px-2">Year 1</th>
-                <th className="text-center py-3 px-2">Year 2</th>
-                <th className="text-center py-3 px-2">Year 3</th>
-                <th className="text-center py-3 px-2">3yr Growth</th>
-              </tr>
-            </thead>
-            <tbody>
-              {goals.filter((g: ThreeYearGoal) => g.category === 'revenue' || g.category === 'profit').map((goal: ThreeYearGoal) => (
-                <tr key={goal.id} className="border-b">
-                  <td className="py-3 px-2 font-medium">{goal.metric}</td>
-                  <td className="py-3 px-2 text-center">
-                    ${goal.currentValue.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-2 text-center">
-                    ${goal.year1Target.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-2 text-center">
-                    ${goal.year2Target.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-2 text-center">
-                    ${goal.year3Target.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-2 text-center font-semibold text-green-600">
-                    {Math.round(((goal.year3Target - goal.currentValue) / goal.currentValue) * 100)}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-4 p-3 bg-green-50 rounded-lg">
-          <p className="text-sm text-green-800">
-            <Info className="h-4 w-4 inline mr-2" />
-            Use the Profit Calculator to model different scenarios and set realistic financial targets
-          </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900">Additional 3-Year Goals</h3>
-          <button
-            onClick={addGoal}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Add Goal
-          </button>
-        </div>
-
-        {goals.filter((g: ThreeYearGoal) => g.category !== 'revenue' && g.category !== 'profit').length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Target className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-            <p>No additional goals yet</p>
-            <p className="text-sm mt-1">Add goals for customers, operations, team growth, etc.</p>
+      {/* Financial Goals Table - COLLAPSIBLE */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div 
+          className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 border-b border-gray-200 cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all"
+          onClick={() => toggleSection('financial')}
+        >
+          <div className="flex items-center">
+            <DollarSign className="h-5 w-5 text-white mr-2" />
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Financial Goals</h3>
+            {collapsedSections.has('financial') ? (
+              <ChevronDown className="h-5 w-5 text-white ml-2" />
+            ) : (
+              <ChevronUp className="h-5 w-5 text-white ml-2" />
+            )}
           </div>
-        ) : (
-          <div className="space-y-4">
-            {goals.filter((g: ThreeYearGoal) => g.category !== 'revenue' && g.category !== 'profit').map((goal: ThreeYearGoal) => (
-              <div key={goal.id} className="border rounded-lg p-4">
-                {editingGoalId === goal.id ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+        </div>
+        
+        {!collapsedSections.has('financial') && (
+          <table className="w-full" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '240px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '48px' }} />
+            </colgroup>
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Metric
+                </th>
+                {['current', 'year1', 'year2', 'year3'].map((period, idx) => (
+                  <th key={period} className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                    {getYearEndDate(idx)}
+                  </th>
+                ))}
+                <th className="w-12"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {/* Revenue */}
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Revenue ($)</td>
+                {['current', 'year1', 'year2', 'year3'].map(period => (
+                  <td key={period} className="px-4 py-4">
+                    <div className="flex justify-center">
                       <input
                         type="text"
-                        value={goal.metric}
-                        onChange={(e) => updateGoal(goal.id, { metric: e.target.value })}
-                        placeholder="Goal metric (e.g., Customer Count)"
-                        className="px-3 py-2 border rounded-lg"
+                        value={formatDollar(financialData.revenue[period as keyof typeof financialData.revenue])}
+                        onChange={(e) => updateFinancialValue('revenue', period as any, parseDollarInput(e.target.value))}
+                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                       />
-                      <select
-                        value={goal.unit}
-                        onChange={(e) => updateGoal(goal.id, { unit: e.target.value as any })}
-                        className="px-3 py-2 border rounded-lg"
-                      >
-                        <option value="#">Number (#)</option>
-                        <option value="%">Percentage (%)</option>
-                        <option value="$">Dollar ($)</option>
-                      </select>
                     </div>
-                    <div className="grid grid-cols-4 gap-3">
+                  </td>
+                ))}
+                <td className="px-2 py-4"></td>
+              </tr>
+              
+              {/* Gross Profit */}
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Gross Profit ($)</td>
+                {['current', 'year1', 'year2', 'year3'].map(period => (
+                  <td key={period} className="px-4 py-4">
+                    <div className="flex justify-center">
+                      <input
+                        type="text"
+                        value={formatDollar(financialData.grossProfit[period as keyof typeof financialData.grossProfit])}
+                        onChange={(e) => updateFinancialValue('grossProfit', period as any, parseDollarInput(e.target.value))}
+                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      />
+                    </div>
+                  </td>
+                ))}
+                <td className="px-2 py-4"></td>
+              </tr>
+              
+              {/* Gross Margin */}
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Gross Margin (%)</td>
+                {['current', 'year1', 'year2', 'year3'].map(period => (
+                  <td key={period} className="px-4 py-4">
+                    <div className="flex justify-center">
                       <input
                         type="number"
-                        value={goal.currentValue}
-                        onChange={(e) => updateGoal(goal.id, { currentValue: Number(e.target.value) })}
-                        placeholder="Current"
-                        className="px-3 py-2 border rounded-lg"
+                        value={financialData.grossMargin[period as keyof typeof financialData.grossMargin]}
+                        onChange={(e) => updateFinancialValue('grossMargin', period as any, Number(e.target.value), true)}
+                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        min="0"
+                        max="100"
                       />
+                    </div>
+                  </td>
+                ))}
+                <td className="px-2 py-4"></td>
+              </tr>
+              
+              {/* Net Profit */}
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Net Profit ($)</td>
+                {['current', 'year1', 'year2', 'year3'].map(period => (
+                  <td key={period} className="px-4 py-4">
+                    <div className="flex justify-center">
+                      <input
+                        type="text"
+                        value={formatDollar(financialData.netProfit[period as keyof typeof financialData.netProfit])}
+                        onChange={(e) => updateFinancialValue('netProfit', period as any, parseDollarInput(e.target.value))}
+                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      />
+                    </div>
+                  </td>
+                ))}
+                <td className="px-2 py-4"></td>
+              </tr>
+              
+              {/* Net Margin */}
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Net Margin (%)</td>
+                {['current', 'year1', 'year2', 'year3'].map(period => (
+                  <td key={period} className="px-4 py-4">
+                    <div className="flex justify-center">
+                      <input
+                        type="text"
+                        value={financialData.netMargin[period as keyof typeof financialData.netMargin]}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '')
+                          if (value === '' || (Number(value) >= 0 && Number(value) <= 100)) {
+                            updateFinancialValue('netMargin', period as any, Number(value), true)
+                          }
+                        }}
+                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      />
+                    </div>
+                  </td>
+                ))}
+                <td className="px-2 py-4"></td>
+              </tr>
+
+              {/* Customers */}
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Customers (#)</td>
+                {['current', 'year1', 'year2', 'year3'].map(period => (
+                  <td key={period} className="px-4 py-4">
+                    <div className="flex justify-center">
                       <input
                         type="number"
-                        value={goal.year1Target}
-                        onChange={(e) => updateGoal(goal.id, { year1Target: Number(e.target.value) })}
-                        placeholder="Year 1"
-                        className="px-3 py-2 border rounded-lg"
+                        value={financialData.customers[period as keyof typeof financialData.customers]}
+                        onChange={(e) => updateFinancialValue('customers', period as any, Number(e.target.value))}
+                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        min="0"
                       />
+                    </div>
+                  </td>
+                ))}
+                <td className="px-2 py-4"></td>
+              </tr>
+
+              {/* Employees */}
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Employees (#)</td>
+                {['current', 'year1', 'year2', 'year3'].map(period => (
+                  <td key={period} className="px-4 py-4">
+                    <div className="flex justify-center">
                       <input
                         type="number"
-                        value={goal.year2Target}
-                        onChange={(e) => updateGoal(goal.id, { year2Target: Number(e.target.value) })}
-                        placeholder="Year 2"
-                        className="px-3 py-2 border rounded-lg"
-                      />
-                      <input
-                        type="number"
-                        value={goal.year3Target}
-                        onChange={(e) => updateGoal(goal.id, { year3Target: Number(e.target.value) })}
-                        placeholder="Year 3"
-                        className="px-3 py-2 border rounded-lg"
+                        value={financialData.employees[period as keyof typeof financialData.employees]}
+                        onChange={(e) => updateFinancialValue('employees', period as any, Number(e.target.value))}
+                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        min="0"
                       />
                     </div>
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => setEditingGoalId(null)}
-                        className="px-3 py-1 text-gray-600 hover:text-gray-800"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">{goal.metric || 'Unnamed Goal'}</h4>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Current: {goal.unit === '$' ? '$' : ''}{goal.currentValue}{goal.unit === '%' ? '%' : goal.unit === '#' ? '' : ''} → 
-                        Year 3: {goal.unit === '$' ? '$' : ''}{goal.year3Target}{goal.unit === '%' ? '%' : goal.unit === '#' ? '' : ''}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setEditingGoalId(goal.id)}
-                        className="p-1 text-gray-600 hover:text-blue-600"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => deleteGoal(goal.id)}
-                        className="p-1 text-gray-600 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  </td>
+                ))}
+                <td className="px-2 py-4"></td>
+              </tr>
+            </tbody>
+          </table>
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900">Key Performance Indicators (KPIs)</h3>
-          <button
-            onClick={onOpenKPIModal}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Select KPIs
-          </button>
-        </div>
-
-        {kpis.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <BarChart className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-            <p>No KPIs selected yet</p>
-            <p className="text-sm mt-1">Choose metrics to track your progress</p>
+      {/* KPI Section - COLLAPSIBLE */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div 
+          className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 border-b border-gray-200 cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all"
+          onClick={() => toggleSection('kpi')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Activity className="h-5 w-5 text-white mr-2" />
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Key Performance Indicators</h3>
+              {collapsedSections.has('kpi') ? (
+                <ChevronDown className="h-5 w-5 text-white ml-2" />
+              ) : (
+                <ChevronUp className="h-5 w-5 text-white ml-2" />
+              )}
+            </div>
+            {!collapsedSections.has('kpi') && (
+              <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => setShowCustomKPIModal(true)}
+                  className="px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 flex items-center text-sm transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Custom KPI
+                </button>
+                <button
+                  onClick={() => setShowKPIModal(true)}
+                  className="px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 flex items-center text-sm transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Choose KPIs
+                </button>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2">KPI</th>
-                  <th className="text-center py-2 px-2">Frequency</th>
-                  <th className="text-center py-2 px-2">Current</th>
-                  <th className="text-center py-2 px-2">Year 1</th>
-                  <th className="text-center py-2 px-2">Year 2</th>
-                  <th className="text-center py-2 px-2">Year 3</th>
-                  <th className="py-2 px-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {kpis.map((kpi: SelectedKPI, index: number) => (
-                  <tr key={kpi.id} className="border-b">
-                    <td className="py-2 px-2 font-medium">{kpi.name}</td>
-                    <td className="py-2 px-2 text-center capitalize">{kpi.frequency}</td>
-                    <td className="py-2 px-2">
-                      <input
-                        type="number"
-                        value={kpi.currentValue}
-                        onChange={(e) => {
-                          const updated = [...kpis]
-                          updated[index].currentValue = Number(e.target.value)
-                          setKpis(updated)
-                        }}
-                        className="w-20 px-2 py-1 border rounded"
-                      />
-                    </td>
-                    <td className="py-2 px-2">
-                      <input
-                        type="number"
-                        value={kpi.year1Target}
-                        onChange={(e) => {
-                          const updated = [...kpis]
-                          updated[index].year1Target = Number(e.target.value)
-                          setKpis(updated)
-                        }}
-                        className="w-20 px-2 py-1 border rounded"
-                      />
-                    </td>
-                    <td className="py-2 px-2">
-                      <input
-                        type="number"
-                        value={kpi.year2Target}
-                        onChange={(e) => {
-                          const updated = [...kpis]
-                          updated[index].year2Target = Number(e.target.value)
-                          setKpis(updated)
-                        }}
-                        className="w-20 px-2 py-1 border rounded"
-                      />
-                    </td>
-                    <td className="py-2 px-2">
-                      <input
-                        type="number"
-                        value={kpi.year3Target}
-                        onChange={(e) => {
-                          const updated = [...kpis]
-                          updated[index].year3Target = Number(e.target.value)
-                          setKpis(updated)
-                        }}
-                        className="w-20 px-2 py-1 border rounded"
-                      />
-                    </td>
-                    <td className="py-2 px-2">
-                      <button
-                        onClick={() => setKpis(kpis.filter((_: any, i: number) => i !== index))}
-                        className="text-gray-400 hover:text-red-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+        </div>
+        
+        {!collapsedSections.has('kpi') && (
+          <table className="w-full" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '240px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '48px' }} />
+            </colgroup>
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  KPI
+                </th>
+                {['current', 'year1', 'year2', 'year3'].map((period, idx) => (
+                  <th key={period} className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                    {getYearEndDate(idx)}
+                  </th>
+                ))}
+                <th className="w-12">
+                  <Trash2 className="h-4 w-4 mx-auto text-gray-400" />
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {/* Standard KPIs */}
+              {kpis.filter((k: KPIData) => k.isStandard).length > 0 && (
+                <>
+                  <tr className="bg-blue-50">
+                    <td colSpan={6} className="px-6 py-2 text-xs font-semibold text-blue-900 uppercase tracking-wider">
+                      Standard KPIs
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  {kpis.filter((k: KPIData) => k.isStandard).map((kpi: KPIData) => (
+                    <tr key={kpi.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 relative">
+                        <div className="flex items-center">
+                          <span>{kpi.name} {getUnitLabel(kpi.unit)}</span>
+                          <button
+                            onMouseEnter={() => setHoveredKPI(kpi.id)}
+                            onMouseLeave={() => setHoveredKPI(null)}
+                            className="ml-2 text-gray-400 hover:text-gray-600 relative"
+                          >
+                            <HelpCircle className="h-4 w-4" />
+                          </button>
+                          <KPIInfoCard kpi={kpi} isVisible={hoveredKPI === kpi.id} />
+                        </div>
+                      </td>
+                      {['currentValue', 'year1Target', 'year2Target', 'year3Target'].map(field => (
+                        <td key={field} className="px-4 py-4">
+                          <div className="flex justify-center">
+                            <input
+                              type="text"
+                              value={kpi.unit === 'currency' ? formatDollar(kpi[field as keyof KPIData] as number) : kpi[field as keyof KPIData]}
+                              onChange={(e) => updateKPIValue(
+                                kpi.id,
+                                field as any,
+                                kpi.unit === 'currency' ? parseDollarInput(e.target.value) : Number(e.target.value)
+                              )}
+                              className={`w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm ${
+                                kpi.id === 'revenue-per-employee' ? 'bg-gray-100 cursor-not-allowed' : ''
+                              }`}
+                              disabled={kpi.id === 'revenue-per-employee'}
+                            />
+                          </div>
+                        </td>
+                      ))}
+                      <td className="px-2 py-4 text-center">
+                        {/* Standard KPIs cannot be deleted - show lock icon */}
+                        <div className="text-gray-300" title="Standard KPIs cannot be deleted">
+                          🔒
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
+
+              {/* Industry Specific KPIs */}
+              {kpis.filter((k: KPIData) => k.isIndustry).length > 0 && (
+                <>
+                  <tr className="bg-green-50">
+                    <td colSpan={6} className="px-6 py-2 text-xs font-semibold text-green-900 uppercase tracking-wider">
+                      Industry Specific ({industry.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())})
+                    </td>
+                  </tr>
+                  {kpis.filter((k: KPIData) => k.isIndustry).map((kpi: KPIData) => (
+                    <tr key={kpi.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 relative">
+                        <div className="flex items-center">
+                          <span>{kpi.name} {getUnitLabel(kpi.unit)}</span>
+                          <button
+                            onMouseEnter={() => setHoveredKPI(kpi.id)}
+                            onMouseLeave={() => setHoveredKPI(null)}
+                            className="ml-2 text-gray-400 hover:text-gray-600 relative"
+                          >
+                            <HelpCircle className="h-4 w-4" />
+                          </button>
+                          <KPIInfoCard kpi={kpi} isVisible={hoveredKPI === kpi.id} />
+                        </div>
+                      </td>
+                      {['currentValue', 'year1Target', 'year2Target', 'year3Target'].map(field => (
+                        <td key={field} className="px-4 py-4">
+                          <div className="flex justify-center">
+                            <input
+                              type="text"
+                              value={kpi.unit === 'currency' ? formatDollar(kpi[field as keyof KPIData] as number) : kpi[field as keyof KPIData]}
+                              onChange={(e) => updateKPIValue(
+                                kpi.id,
+                                field as any,
+                                kpi.unit === 'currency' ? parseDollarInput(e.target.value) : Number(e.target.value)
+                              )}
+                              className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            />
+                          </div>
+                        </td>
+                      ))}
+                      <td className="px-2 py-4 text-center">
+                        <button
+                          onClick={() => deleteKPI(kpi.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1"
+                          title="Delete KPI"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
+
+              {/* Custom KPIs */}
+              {kpis.filter((k: KPIData) => k.isCustom).length > 0 && (
+                <>
+                  <tr className="bg-orange-50">
+                    <td colSpan={6} className="px-6 py-2 text-xs font-semibold text-orange-900 uppercase tracking-wider">
+                      Custom KPIs
+                    </td>
+                  </tr>
+                  {kpis.filter((k: KPIData) => k.isCustom).map((kpi: KPIData) => (
+                    <tr key={kpi.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 relative">
+                        <div className="flex items-center">
+                          <span>{kpi.name} {getUnitLabel(kpi.unit)}</span>
+                          <button
+                            onMouseEnter={() => setHoveredKPI(kpi.id)}
+                            onMouseLeave={() => setHoveredKPI(null)}
+                            className="ml-2 text-gray-400 hover:text-gray-600 relative"
+                          >
+                            <HelpCircle className="h-4 w-4" />
+                          </button>
+                          <KPIInfoCard kpi={kpi} isVisible={hoveredKPI === kpi.id} />
+                        </div>
+                      </td>
+                      {['currentValue', 'year1Target', 'year2Target', 'year3Target'].map(field => (
+                        <td key={field} className="px-4 py-4">
+                          <div className="flex justify-center">
+                            <input
+                              type="text"
+                              value={kpi.unit === 'currency' ? formatDollar(kpi[field as keyof KPIData] as number) : kpi[field as keyof KPIData]}
+                              onChange={(e) => updateKPIValue(
+                                kpi.id,
+                                field as any,
+                                kpi.unit === 'currency' ? parseDollarInput(e.target.value) : Number(e.target.value)
+                              )}
+                              className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            />
+                          </div>
+                        </td>
+                      ))}
+                      <td className="px-2 py-4 text-center">
+                        <button
+                          onClick={() => deleteKPI(kpi.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1"
+                          title="Delete KPI"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Life & Freedom Goals Section - COLLAPSIBLE */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div 
+          className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 border-b border-gray-200 cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all"
+          onClick={() => toggleSection('life')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Star className="h-5 w-5 text-white mr-2" />
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Life & Freedom Goals</h3>
+              {collapsedSections.has('life') ? (
+                <ChevronDown className="h-5 w-5 text-white ml-2" />
+              ) : (
+                <ChevronUp className="h-5 w-5 text-white ml-2" />
+              )}
+            </div>
+            {!collapsedSections.has('life') && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditingLifeGoal(null)
+                  setShowLifeGoalModal(true)
+                }}
+                className="px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 flex items-center text-sm font-semibold transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Life Goal
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {!collapsedSections.has('life') && (
+          <div className="p-6">
+            <div className="grid grid-cols-3 gap-6">
+              {['year1', 'year2', 'year3'].map((year, idx) => (
+                <div key={year} className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700 text-center mb-3">
+                    Year {idx + 1}
+                  </h4>
+                  <div className="space-y-2 min-h-[150px]">
+                    {lifeGoals.filter((goal: LifeGoal) => goal.targetYear === year).map((goal: LifeGoal) => {
+                      const categoryConfig = LIFE_GOAL_CATEGORIES[goal.category]
+                      const Icon = categoryConfig.icon
+                      
+                      return (
+                        <div
+                          key={goal.id}
+                          className={`p-3 rounded-lg border ${categoryConfig.color} cursor-pointer hover:shadow-md transition-all`}
+                          onClick={() => {
+                            setEditingLifeGoal(goal)
+                            setShowLifeGoalModal(true)
+                          }}
+                        >
+                          <div className="flex items-center">
+                            <Icon className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium block truncate">{goal.title}</span>
+                              {goal.targetAmount && (
+                                <span className="text-xs opacity-80">
+                                  ${formatDollar(goal.targetAmount)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {lifeGoals.filter((g: LifeGoal) => g.targetYear === year).length === 0 && (
+                      <button
+                        onClick={() => {
+                          setEditingLifeGoal({
+                            id: `new-${Date.now()}`,
+                            category: 'lifestyle',
+                            title: '',
+                            targetYear: year as any,
+                            completed: false
+                          })
+                          setShowLifeGoalModal(true)
+                        }}
+                        className="w-full py-6 px-3 border-2 border-dashed border-blue-200 rounded-lg text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-all text-sm"
+                      >
+                        <Plus className="h-4 w-4 mx-auto mb-1" />
+                        Add Goal
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1303,139 +1995,115 @@ function GoalsKPIsStep({
   )
 }
 
-function StrategicToDoStep({ items, onToggleItem, onAddCustom, expandedCategories, setExpandedCategories, currentRevenue }: any) {
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [newItem, setNewItem] = useState({ title: '', category: 'strategy' })
-
-  const selectedCount = items.filter((i: StrategicItem) => i.selected).length
-  const revenueStage = currentRevenue < 250000 ? 'foundation' :
-                      currentRevenue < 1000000 ? 'growth' :
-                      currentRevenue < 5000000 ? 'scale' : 'optimize'
-
-  const groupedItems = items.reduce((acc: any, item: StrategicItem) => {
-    if (!acc[item.category]) acc[item.category] = []
-    acc[item.category].push(item)
-    return acc
-  }, {})
-
-  const toggleCategory = (category: string) => {
-    const newExpanded = new Set(expandedCategories)
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category)
-    } else {
-      newExpanded.add(category)
+// Life Goal Modal Component - FIXED to allow year selection
+function LifeGoalModal({ editingGoal, setEditingGoal, lifeGoals, setLifeGoals, onClose }: any) {
+  const [showCustomForm, setShowCustomForm] = useState(false)
+  const [selectedTargetYear, setSelectedTargetYear] = useState<'year1' | 'year2' | 'year3'>(
+    editingGoal?.targetYear || 'year1'
+  )
+  const [customGoal, setCustomGoal] = useState({
+    title: editingGoal?.title || '',
+    category: editingGoal?.category || 'lifestyle',
+    targetYear: editingGoal?.targetYear || 'year1',
+    targetAmount: editingGoal?.targetAmount ? formatDollar(editingGoal.targetAmount) : '',
+    description: editingGoal?.description || ''
+  })
+  
+  const saveCustomGoal = () => {
+    if (customGoal.title) {
+      const newGoal: LifeGoal = {
+        id: editingGoal?.id || `life-goal-${Date.now()}`,
+        title: customGoal.title,
+        category: customGoal.category as any,
+        targetYear: customGoal.targetYear as any,
+        targetAmount: customGoal.targetAmount ? parseDollarInput(customGoal.targetAmount) : undefined,
+        description: customGoal.description,
+        completed: false
+      }
+      
+      if (editingGoal && lifeGoals.find((g: LifeGoal) => g.id === editingGoal.id)) {
+        setLifeGoals(lifeGoals.map((g: LifeGoal) => g.id === editingGoal.id ? newGoal : g))
+      } else {
+        setLifeGoals([...lifeGoals, newGoal])
+      }
+      
+      onClose()
     }
-    setExpandedCategories(newExpanded)
   }
-
+  
+  const selectSuggestion = (suggestion: string, category: keyof typeof LIFE_GOAL_CATEGORIES) => {
+    const newGoal: LifeGoal = {
+      id: `life-goal-${Date.now()}`,
+      title: suggestion,
+      category,
+      targetYear: selectedTargetYear,
+      completed: false
+    }
+    setLifeGoals([...lifeGoals, newGoal])
+    onClose()
+  }
+  
+  const deleteGoal = () => {
+    if (editingGoal && lifeGoals.find((g: LifeGoal) => g.id === editingGoal.id)) {
+      setLifeGoals(lifeGoals.filter((g: LifeGoal) => g.id !== editingGoal.id))
+      onClose()
+    }
+  }
+  
+  // If editing existing goal, show custom form immediately
+  useEffect(() => {
+    if (editingGoal?.title) {
+      setShowCustomForm(true)
+      setCustomGoal({
+        title: editingGoal.title,
+        category: editingGoal.category,
+        targetYear: editingGoal.targetYear,
+        targetAmount: editingGoal.targetAmount ? formatDollar(editingGoal.targetAmount) : '',
+        description: editingGoal.description || ''
+      })
+    } else if (editingGoal?.targetYear) {
+      // If we have a target year from clicking "Add Goal" in a specific year column
+      setSelectedTargetYear(editingGoal.targetYear)
+    }
+  }, [editingGoal])
+  
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900">Strategic To-Do List</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Revenue Stage: <span className="font-semibold">{REVENUE_ROADMAP[revenueStage].range}</span>
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className={`px-4 py-2 rounded-lg ${selectedCount > 12 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-              <span className="font-semibold">{selectedCount}/12</span> selected for annual plan
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+        <div className="p-6 border-b bg-gradient-to-r from-blue-500 to-blue-600">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-bold text-white flex items-center">
+                <Star className="h-7 w-7 mr-2" />
+                Life Goals & Personal Rewards
+              </h3>
+              <p className="text-blue-100 mt-1">
+                Define what success means to you personally
+              </p>
             </div>
             <button
-              onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
             >
-              <Plus className="h-5 w-5 mr-2" />
-              Add Custom
+              <X className="h-6 w-6 text-white" />
             </button>
           </div>
         </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
-            <Info className="h-4 w-4 inline mr-2" />
-            Select up to 12 strategic initiatives to focus on over the next 12 months. 
-            Items with <MapPin className="h-4 w-4 inline mx-1 text-blue-600" /> are revenue roadmap recommendations for your stage.
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        {Object.entries(groupedItems).map(([category, categoryItems]: [string, any]) => {
-          const config = CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG]
-          const Icon = config.icon
-          const isExpanded = expandedCategories.has(category)
-          
-          return (
-            <div key={category} className="border-b last:border-b-0">
-              <button
-                onClick={() => toggleCategory(category)}
-                className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium ${config.color}`}>
-                    <Icon className="h-4 w-4 mr-2" />
-                    {config.label}
-                  </span>
-                  <span className="text-sm text-gray-600">
-                    {categoryItems.filter((i: StrategicItem) => i.selected).length}/{categoryItems.length} selected
-                  </span>
-                </div>
-                {isExpanded ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-              </button>
-
-              {isExpanded && (
-                <div className="px-6 pb-4">
-                  <div className="space-y-2">
-                    {categoryItems.map((item: StrategicItem) => (
-                      <label
-                        key={item.id}
-                        className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
-                          item.selected 
-                            ? 'bg-blue-50 border-blue-300' 
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={item.selected}
-                          onChange={() => onToggleItem(item.id)}
-                          className="h-5 w-5 text-blue-600 mr-3"
-                        />
-                        <span className="flex-1 text-sm">{item.title}</span>
-                        {item.isFromRoadmap && (
-                          <MapPin className="h-4 w-4 text-blue-600 ml-2" title="Revenue Roadmap Recommendation" />
-                        )}
-                        {item.customSource && (
-                          <span className="text-xs text-gray-500 ml-2">{item.customSource}</span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold mb-4">Add Custom Strategic Item</h3>
-            
-            <div className="space-y-4">
+        
+        {/* Custom Goal Form or Suggestions */}
+        {showCustomForm ? (
+          <div className="p-6 bg-gray-50">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Initiative Title
+                  Goal Title
                 </label>
                 <input
                   type="text"
-                  value={newItem.title}
-                  onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Implement new CRM system"
+                  value={customGoal.title}
+                  onChange={(e) => setCustomGoal({ ...customGoal, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Take a sabbatical"
                 />
               </div>
               
@@ -1444,448 +2112,148 @@ function StrategicToDoStep({ items, onToggleItem, onAddCustom, expandedCategorie
                   Category
                 </label>
                 <select
-                  value={newItem.category}
-                  onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  value={customGoal.category}
+                  onChange={(e) => setCustomGoal({ ...customGoal, category: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
+                  {Object.entries(LIFE_GOAL_CATEGORIES).map(([key, config]) => (
                     <option key={key} value={key}>{config.label}</option>
                   ))}
                 </select>
               </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (newItem.title) {
-                    onAddCustom(newItem.title, newItem.category)
-                    setNewItem({ title: '', category: 'strategy' })
-                    setShowAddModal(false)
-                  }
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Add Item
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AnnualPlanStep({ goals, kpis, strategicItems, onAssignQuarter }: any) {
-  const quarters = ['q1', 'q2', 'q3', 'q4']
-  
-  const getQuarterItems = (quarter: string) => 
-    strategicItems.filter((item: StrategicItem) => item.quarterAssignment === quarter)
-  
-  const getUnassignedItems = () => 
-    strategicItems.filter((item: StrategicItem) => !item.quarterAssignment)
-
-  const revenueGoal = goals.find((g: ThreeYearGoal) => g.id === 'revenue')
-  const profitGoal = goals.find((g: ThreeYearGoal) => g.id === 'profit')
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg p-6 text-white">
-        <h3 className="text-xl font-bold mb-4">Year 1 Goals Overview</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <p className="text-blue-100 text-sm">Revenue Target</p>
-            <p className="text-2xl font-bold">${(revenueGoal?.year1Target || 0).toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-blue-100 text-sm">Profit Target</p>
-            <p className="text-2xl font-bold">${(profitGoal?.year1Target || 0).toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-blue-100 text-sm">Key Initiatives</p>
-            <p className="text-2xl font-bold">{strategicItems.length}</p>
-          </div>
-          <div>
-            <p className="text-blue-100 text-sm">KPIs Tracked</p>
-            <p className="text-2xl font-bold">{kpis.length}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <h3 className="text-xl font-bold mb-6">Quarterly Initiative Distribution</h3>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {quarters.map((quarter) => {
-            const quarterNum = quarter.slice(1)
-            const quarterItems = getQuarterItems(quarter)
-            const isFull = quarterItems.length >= 5
-            
-            return (
-              <div key={quarter} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold">Q{quarterNum}</h4>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    isFull ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-                  }`}>
-                    {quarterItems.length}/5
-                  </span>
-                </div>
-                
-                <div className="mb-4 p-3 bg-gray-50 rounded text-xs">
-                  <p className="text-gray-600">Revenue: ${Math.round((revenueGoal?.year1Target || 0) * (parseInt(quarterNum) / 4)).toLocaleString()}</p>
-                  <p className="text-gray-600">Profit: ${Math.round((profitGoal?.year1Target || 0) * (parseInt(quarterNum) / 4)).toLocaleString()}</p>
-                </div>
-                
-                <div className="space-y-2 min-h-[200px]">
-                  {quarterItems.map((item: StrategicItem) => (
-                    <div key={item.id} className="p-2 bg-blue-50 rounded text-sm flex items-center justify-between">
-                      <span className="flex-1 truncate">{item.title}</span>
-                      <button
-                        onClick={() => onAssignQuarter(item.id, null)}
-                        className="ml-2 text-gray-400 hover:text-red-600"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                  
-                  {quarterItems.length === 0 && (
-                    <p className="text-gray-400 text-sm text-center py-8">
-                      Drag initiatives here or click below
-                    </p>
-                  )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Target Amount (optional)
+                </label>
+                <div className="flex items-center">
+                  <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
+                  <input
+                    type="text"
+                    value={customGoal.targetAmount}
+                    onChange={(e) => setCustomGoal({ ...customGoal, targetAmount: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="50,000"
+                  />
                 </div>
               </div>
-            )
-          })}
-        </div>
-
-        {getUnassignedItems().length > 0 && (
-          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h4 className="font-semibold text-yellow-900 mb-3">Unassigned Initiatives</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {getUnassignedItems().map((item: StrategicItem) => (
-                <div key={item.id} className="flex items-center justify-between p-2 bg-white rounded border">
-                  <span className="text-sm flex-1">{item.title}</span>
-                  <div className="flex space-x-1">
-                    {quarters.map(q => (
-                      <button
-                        key={q}
-                        onClick={() => onAssignQuarter(item.id, q as any)}
-                        className="px-2 py-1 text-xs bg-gray-100 hover:bg-blue-100 rounded"
-                        disabled={getQuarterItems(q).length >= 5}
-                      >
-                        Q{q.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <h3 className="text-xl font-bold mb-6">Quarterly KPI Targets</h3>
-        
-        {kpis.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <BarChart className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-            <p>No KPIs to track quarterly</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2">KPI</th>
-                  <th className="text-center py-2">Q1</th>
-                  <th className="text-center py-2">Q2</th>
-                  <th className="text-center py-2">Q3</th>
-                  <th className="text-center py-2">Q4 (Year 1)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {kpis.map((kpi: SelectedKPI) => (
-                  <tr key={kpi.id} className="border-b">
-                    <td className="py-2 font-medium">{kpi.name}</td>
-                    <td className="py-2 text-center">
-                      {Math.round(kpi.year1Target * 0.25)}
-                    </td>
-                    <td className="py-2 text-center">
-                      {Math.round(kpi.year1Target * 0.5)}
-                    </td>
-                    <td className="py-2 text-center">
-                      {Math.round(kpi.year1Target * 0.75)}
-                    </td>
-                    <td className="py-2 text-center font-semibold">
-                      {kpi.year1Target}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function NinetyDayStep({ goals, kpis, quarterItems, ninetyDayItems, setNinetyDayItems }: any) {
-  const [editingId, setEditingId] = useState<string | null>(null)
-  
-  const revenueGoal = goals.find((g: ThreeYearGoal) => g.id === 'revenue')
-  const profitGoal = goals.find((g: ThreeYearGoal) => g.id === 'profit')
-  const q1Revenue = Math.round((revenueGoal?.year1Target || 0) * 0.25)
-  const q1Profit = Math.round((profitGoal?.year1Target || 0) * 0.25)
-
-  const addNinetyDayItem = (initiative: string) => {
-    const newItem: NinetyDayItem = {
-      id: `90day-${Date.now()}`,
-      title: initiative,
-      owner: '',
-      dueDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'not-started',
-      milestones: []
-    }
-    setNinetyDayItems([...ninetyDayItems, newItem])
-    setEditingId(newItem.id)
-  }
-
-  const updateItem = (id: string, updates: Partial<NinetyDayItem>) => {
-    setNinetyDayItems(ninetyDayItems.map((item: NinetyDayItem) =>
-      item.id === id ? { ...item, ...updates } : item
-    ))
-  }
-
-  const addMilestone = (itemId: string) => {
-    const item = ninetyDayItems.find((i: NinetyDayItem) => i.id === itemId)
-    if (item) {
-      const newMilestone = {
-        id: `milestone-${Date.now()}`,
-        description: '',
-        completed: false,
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      }
-      updateItem(itemId, {
-        milestones: [...item.milestones, newMilestone]
-      })
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl shadow-lg p-6 text-white">
-        <h3 className="text-xl font-bold mb-4">Q1 Sprint Goals</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <p className="text-green-100 text-sm">Q1 Revenue Target</p>
-            <p className="text-2xl font-bold">${q1Revenue.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-green-100 text-sm">Q1 Profit Target</p>
-            <p className="text-2xl font-bold">${q1Profit.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-green-100 text-sm">Q1 Initiatives</p>
-            <p className="text-2xl font-bold">{quarterItems.length}</p>
-          </div>
-          <div>
-            <p className="text-green-100 text-sm">Days Remaining</p>
-            <p className="text-2xl font-bold">90</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <h3 className="text-lg font-bold mb-4">Q1 KPI Targets</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {kpis.map((kpi: SelectedKPI) => (
-            <div key={kpi.id} className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600">{kpi.name}</p>
-              <p className="text-lg font-semibold">{Math.round(kpi.year1Target * 0.25)} {kpi.unit}</p>
-              <p className="text-xs text-gray-500">{kpi.frequency}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold">Q1 Sprint Initiatives</h3>
-          <button
-            onClick={() => addNinetyDayItem('New Initiative')}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Add Initiative
-          </button>
-        </div>
-
-        {quarterItems.length > 0 && ninetyDayItems.length === 0 && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800 mb-3">Import your Q1 initiatives:</p>
-            <div className="space-y-2">
-              {quarterItems.map((item: StrategicItem) => (
-                <button
-                  key={item.id}
-                  onClick={() => addNinetyDayItem(item.title)}
-                  className="block w-full text-left p-2 bg-white rounded hover:bg-blue-100 text-sm"
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Target Year
+                </label>
+                <select
+                  value={customGoal.targetYear}
+                  onChange={(e) => setCustomGoal({ ...customGoal, targetYear: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  + {item.title}
-                </button>
-              ))}
+                  <option value="year1">Year 1</option>
+                  <option value="year2">Year 2</option>
+                  <option value="year3">Year 3</option>
+                </select>
+              </div>
             </div>
-          </div>
-        )}
-
-        <div className="space-y-4">
-          {ninetyDayItems.map((item: NinetyDayItem) => (
-            <div key={item.id} className="border rounded-lg p-4">
-              {editingId === item.id ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      value={item.title}
-                      onChange={(e) => updateItem(item.id, { title: e.target.value })}
-                      className="px-3 py-2 border rounded-lg"
-                      placeholder="Initiative title"
-                    />
-                    <input
-                      type="text"
-                      value={item.owner}
-                      onChange={(e) => updateItem(item.id, { owner: e.target.value })}
-                      className="px-3 py-2 border rounded-lg"
-                      placeholder="Owner name"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="date"
-                      value={item.dueDate}
-                      onChange={(e) => updateItem(item.id, { dueDate: e.target.value })}
-                      className="px-3 py-2 border rounded-lg"
-                    />
-                    <select
-                      value={item.status}
-                      onChange={(e) => updateItem(item.id, { status: e.target.value as any })}
-                      className="px-3 py-2 border rounded-lg"
-                    >
-                      <option value="not-started">Not Started</option>
-                      <option value="in-progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                  </div>
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Save
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h4 className="font-semibold">{item.title}</h4>
-                      <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                        <span className="flex items-center">
-                          <User className="h-4 w-4 mr-1" />
-                          {item.owner || 'Unassigned'}
-                        </span>
-                        <span className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-1" />
-                          {new Date(item.dueDate).toLocaleDateString()}
-                        </span>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          item.status === 'completed' ? 'bg-green-100 text-green-700' :
-                          item.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {item.status.replace('-', ' ')}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setEditingId(item.id)}
-                      className="p-1 text-gray-600 hover:text-blue-600"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="mt-4 pl-4 border-l-2 border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <h5 className="text-sm font-medium text-gray-700">Milestones</h5>
-                      <button
-                        onClick={() => addMilestone(item.id)}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        + Add Milestone
-                      </button>
-                    </div>
-                    {item.milestones.length === 0 ? (
-                      <p className="text-sm text-gray-500">No milestones yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {item.milestones.map((milestone) => (
-                          <div key={milestone.id} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={milestone.completed}
-                              onChange={(e) => {
-                                const updatedMilestones = item.milestones.map(m =>
-                                  m.id === milestone.id ? { ...m, completed: e.target.checked } : m
-                                )
-                                updateItem(item.id, { milestones: updatedMilestones })
-                              }}
-                              className="h-4 w-4"
-                            />
-                            <input
-                              type="text"
-                              value={milestone.description}
-                              onChange={(e) => {
-                                const updatedMilestones = item.milestones.map(m =>
-                                  m.id === milestone.id ? { ...m, description: e.target.value } : m
-                                )
-                                updateItem(item.id, { milestones: updatedMilestones })
-                              }}
-                              className={`flex-1 text-sm px-2 py-1 border rounded ${
-                                milestone.completed ? 'line-through text-gray-400' : ''
-                              }`}
-                              placeholder="Milestone description"
-                            />
-                            <input
-                              type="date"
-                              value={milestone.dueDate}
-                              onChange={(e) => {
-                                const updatedMilestones = item.milestones.map(m =>
-                                  m.id === milestone.id ? { ...m, dueDate: e.target.value } : m
-                                )
-                                updateItem(item.id, { milestones: updatedMilestones })
-                              }}
-                              className="text-sm px-2 py-1 border rounded"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+            
+            <div className="flex items-center justify-between mt-6">
+              <button
+                onClick={saveCustomGoal}
+                className="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 font-semibold"
+              >
+                {editingGoal?.title ? 'Update Goal' : 'Add Custom Goal'}
+              </button>
+              {editingGoal?.title && (
+                <button
+                  onClick={deleteGoal}
+                  className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg flex items-center"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete Goal
+                </button>
               )}
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            {/* Year Selection */}
+            <div className="bg-blue-50 p-4 border-b border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Select Target Year:</span>
+                <div className="inline-flex bg-white rounded-lg shadow-sm border border-blue-200">
+                  {['year1', 'year2', 'year3'].map((year, idx) => (
+                    <button
+                      key={year}
+                      onClick={() => setSelectedTargetYear(year as any)}
+                      className={`px-4 py-2 text-sm font-medium transition-all ${
+                        selectedTargetYear === year 
+                          ? 'bg-blue-500 text-white' 
+                          : 'text-gray-700 hover:bg-gray-50'
+                      } ${
+                        idx === 0 ? 'rounded-l-lg' : ''
+                      } ${
+                        idx === 2 ? 'rounded-r-lg' : ''
+                      } ${
+                        idx !== 2 ? 'border-r border-blue-200' : ''
+                      }`}
+                    >
+                      Year {idx + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <button
+                  onClick={() => setShowCustomForm(true)}
+                  className="w-full px-6 py-4 bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg hover:border-blue-400 transition-all group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg mr-3">
+                        <Sparkles className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="text-left">
+                        <span className="font-bold text-gray-900">Create Custom Goal</span>
+                        <p className="text-sm text-gray-600">Design your own personal milestone</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </button>
+              </div>
+              
+              <div className="space-y-6">
+                {Object.entries(LIFE_GOAL_SUGGESTIONS).map(([category, suggestions]) => {
+                  const categoryConfig = LIFE_GOAL_CATEGORIES[category as keyof typeof LIFE_GOAL_CATEGORIES]
+                  const Icon = categoryConfig.icon
+                  
+                  return (
+                    <div key={category}>
+                      <div className={`inline-flex items-center px-3 py-1.5 rounded-lg ${categoryConfig.color} mb-3`}>
+                        <Icon className="h-4 w-4 mr-1.5" />
+                        <span className="font-medium text-sm">{categoryConfig.label}</span>
+                      </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                        {suggestions.map(suggestion => (
+                          <button
+                            key={suggestion}
+                            onClick={() => selectSuggestion(suggestion, category as any)}
+                            className="text-left p-3 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all"
+                          >
+                            <span className="text-gray-700 text-sm font-medium">
+                              {suggestion}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

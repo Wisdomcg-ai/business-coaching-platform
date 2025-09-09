@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 import type { Database } from '@/types/supabase'
 import { 
   ArrowLeft,

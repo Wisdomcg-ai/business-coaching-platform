@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import TodoManager from '@/components/TodoManager'
 
@@ -17,7 +17,7 @@ interface Business {
 
 export default function TodoCoachPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import dynamic from 'next/dynamic'
 
 // This fixes the 'use client' error by loading TodoManagerV2 dynamically
@@ -20,7 +20,7 @@ const TodoManagerV2 = dynamic(
 
 export default function TodosV2Page() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [ready, setReady] = useState(false)
   
   // Your IDs

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Target, TrendingUp, CheckCircle, AlertCircle, Sparkles, Brain, Users, Zap, DollarSign, Shield, Clock, BarChart3, Star, FileText } from 'lucide-react'
 
 // Define the 12 Success Disciplines with their details
@@ -175,7 +175,7 @@ export default function SuccessDisciplines() {
   const [hasAssessment, setHasAssessment] = useState(false)
   const [assessmentDate, setAssessmentDate] = useState<string>('')
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   useEffect(() => {
     loadDisciplineData()

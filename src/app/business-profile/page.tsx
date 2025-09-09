@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -80,7 +80,7 @@ const OFFERING_TYPES = [
 
 export default function EnhancedBusinessProfile() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   
   const [currentStep, setCurrentStep] = useState(1)
   const [business, setBusiness] = useState<any>({})

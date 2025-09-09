@@ -3,10 +3,10 @@
 
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 
 export async function runDiagnostics() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const results: any = {
     timestamp: new Date().toISOString(),
     checks: [],
