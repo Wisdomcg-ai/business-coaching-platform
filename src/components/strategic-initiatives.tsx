@@ -2,216 +2,77 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import {
-  StrategicInitiative,
-  InitiativeCategory,
-  categoryInfo
-} from '@/types/strategic-initiatives';
-import { 
-  Plus, X, ChevronDown, ChevronUp, Check, CheckCircle2,
-  Target, TrendingUp, Package, Heart, Settings, Users, 
-  DollarSign, Brain, AlertCircle, Lightbulb, User, Bot,
-  Building, CheckSquare, Square
-} from 'lucide-react';
+import { Target, Plus, User, AlertCircle, Lightbulb, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { TrendingUp, Package, Heart, Settings, Users, DollarSign, Brain } from 'lucide-react';
+import { Building, CheckSquare, Square, Check, Zap, TrendingDown } from 'lucide-react';
 
-// Revenue stage definitions with enhanced roadmap items
-const REVENUE_STAGES = [
-  {
-    id: 'foundation',
-    name: 'Foundation',
-    range: '$0-250K',
-    min: 0,
-    max: 250000,
-    priorities: {
-      attract: [
-        'Define ideal customer profile',
-        'Create basic brand identity',
-        'Build simple website with clear value proposition',
-        'Choose 1-2 primary marketing channels',
-        'Set up Google My Business profile'
-      ],
-      convert: [
-        'Create basic pricing strategy',
-        'Develop simple sales process',
-        'Design quote/proposal templates',
-        'Establish payment terms and methods',
-        'Create basic sales tracking system'
-      ],
-      deliver: [
-        'Define core service/product standards',
-        'Create basic delivery process',
-        'Develop quality control checklist',
-        'Set up customer communication system',
-        'Document service delivery workflow'
-      ],
-      delight: [
-        'Implement customer feedback system',
-        'Set response time goals',
-        'Create testimonial collection process',
-        'Develop customer complaint resolution process',
-        'Establish follow-up communication schedule'
-      ],
-      systems: [
-        'Document core business processes',
-        'Create basic file organization system',
-        'Implement simple project management workflow',
-        'Set up basic accounting system',
-        'Create backup and security procedures'
-      ],
-      people: [
-        'Define company core values',
-        'Create basic job descriptions',
-        'Establish hiring criteria',
-        'Develop basic training materials',
-        'Set up employee communication systems'
-      ],
-      profit: [
-        'Track basic cash flow',
-        'Implement expense tracking system',
-        'Calculate gross profit margins',
-        'Set up basic financial reporting',
-        'Create monthly budget process'
-      ],
-      strategy: [
-        'Write basic business plan',
-        'Define 3-year vision',
-        'Conduct basic market research',
-        'Set annual goals and targets',
-        'Create monthly review process'
-      ]
-    }
-  },
-  {
-    id: 'traction',
-    name: 'Traction',
-    range: '$250K-1M',
-    min: 250000,
-    max: 1000000,
-    priorities: {
-      attract: [
-        'Implement marketing ROI tracking',
-        'Develop content marketing strategy',
-        'Create referral program',
-        'Optimize website for search engines',
-        'Build email marketing system'
-      ],
-      convert: [
-        'Implement CRM system',
-        'Create sales scripts and templates',
-        'Develop pipeline management process',
-        'Set up sales performance tracking',
-        'Create territory/customer segmentation'
-      ],
-      deliver: [
-        'Create detailed service agreements',
-        'Develop customer onboarding process',
-        'Implement project management system',
-        'Create service level standards',
-        'Develop quality assurance process'
-      ],
-      delight: [
-        'Implement customer satisfaction surveys',
-        'Create customer success program',
-        'Develop retention strategies',
-        'Set up proactive communication system',
-        'Create loyalty/rewards program'
-      ],
-      systems: [
-        'Standardize all core processes',
-        'Implement basic automation tools',
-        'Create KPI tracking dashboards',
-        'Develop reporting systems',
-        'Create process improvement methodology'
-      ],
-      people: [
-        'Create organizational structure',
-        'Implement performance review system',
-        'Develop training programs',
-        'Create employee handbook',
-        'Set up team communication tools'
-      ],
-      profit: [
-        'Implement profit margin analysis',
-        'Create monthly financial reports',
-        'Develop budget planning process',
-        'Set up cost center tracking',
-        'Create cash flow forecasting'
-      ],
-      strategy: [
-        'Implement strategic planning process',
-        'Conduct competitive analysis',
-        'Develop growth strategy',
-        'Create market expansion plan',
-        'Set up strategic review meetings'
-      ]
-    }
-  },
-  {
-    id: 'scaling',
-    name: 'Scaling',
-    range: '$1M-3M',
-    min: 1000000,
-    max: 3000000,
-    priorities: {
-      attract: [
-        'Implement advanced marketing automation',
-        'Develop multi-channel marketing strategy',
-        'Create advanced SEO/content strategy',
-        'Build strategic partnerships',
-        'Implement advanced analytics tracking'
-      ],
-      convert: [
-        'Build dedicated sales team',
-        'Implement advanced CRM features',
-        'Create territory management system',
-        'Develop sales coaching program',
-        'Implement advanced sales analytics'
-      ],
-      deliver: [
-        'Scale operations infrastructure',
-        'Implement advanced technology solutions',
-        'Create quality management system',
-        'Develop capacity planning process',
-        'Implement customer success platform'
-      ],
-      delight: [
-        'Create comprehensive customer journey mapping',
-        'Implement advanced loyalty programs',
-        'Develop proactive customer success team',
-        'Create customer advocacy program',
-        'Implement advanced feedback systems'
-      ],
-      systems: [
-        'Implement enterprise-level automation',
-        'Create integrated technology platform',
-        'Develop real-time reporting systems',
-        'Implement advanced security measures',
-        'Create disaster recovery systems'
-      ],
-      people: [
-        'Create management development program',
-        'Implement advanced HR systems',
-        'Develop leadership pipeline',
-        'Create career advancement paths',
-        'Implement culture measurement tools'
-      ],
-      profit: [
-        'Implement advanced financial modeling',
-        'Create investment planning system',
-        'Develop scenario planning tools',
-        'Implement cost optimization programs',
-        'Create advanced profitability analysis'
-      ],
-      strategy: [
-        'Develop market expansion strategy',
-        'Create innovation pipeline',
-        'Build strategic partnership program',
-        'Implement advanced competitive intelligence',
-        'Create acquisition/merger planning'
-      ]
-    }
-  }
-];
+interface Initiative {
+  id: string;
+  title: string;
+  category: string;
+  selected_for_annual_plan: boolean;
+  source_type?: string;
+}
+
+interface RoadmapCompletion {
+  id: string;
+  user_id: string;
+  stage: string;
+  category: string;
+  item_text: string;
+  completed: boolean;
+  completed_at?: string;
+}
+
+interface AssessmentSuggestion {
+  id: string;
+  title: string;
+  category: InitiativeCategory;
+  reason: string;
+  priority: 'high' | 'medium' | 'low';
+  section: string;
+  score?: number;
+}
+
+interface Assessment {
+  id: string;
+  user_id: string;
+  created_at: string;
+  answers: Record<string, any>;
+  section_scores: Record<string, number>;
+  total_score: number;
+  max_score: number;
+  percentage: number;
+  health_status: string;
+  revenue_stage: string;
+  top_strengths: string[];
+  improvement_areas: string[];
+  recommendations: string[];
+}
+
+interface AssessmentResults {
+  sectionScores: Record<string, number>;
+  totalScore: number;
+  percentage: number;
+  healthStatus: string;
+  revenueStage: string;
+  improvementAreas: string[];
+  topStrengths: string[];
+  recommendations: string[];
+}
+
+type InitiativeCategory = 'attract' | 'convert' | 'deliver' | 'delight' | 'systems' | 'people' | 'profit' | 'strategy';
+
+const categoryInfo: Record<InitiativeCategory, { label: string }> = {
+  attract: { label: 'Attract' },
+  convert: { label: 'Convert' },
+  deliver: { label: 'Deliver' },
+  delight: { label: 'Delight' },
+  systems: { label: 'Systems' },
+  people: { label: 'People' },
+  profit: { label: 'Profit' },
+  strategy: { label: 'Strategy' }
+};
 
 const categoryIcons: Record<InitiativeCategory, React.ElementType> = {
   attract: Target,
@@ -224,92 +85,78 @@ const categoryIcons: Record<InitiativeCategory, React.ElementType> = {
   strategy: Brain
 };
 
-// Assessment-based suggestions mapping
-const ASSESSMENT_SUGGESTIONS = {
-  foundation_low: {
-    title: 'Foundation Building Priority',
-    description: 'Your Foundation score indicates these areas need immediate attention',
-    initiatives: [
-      { title: 'Document all core business processes', category: 'systems' as InitiativeCategory },
-      { title: 'Create standard operating procedures', category: 'systems' as InitiativeCategory },
-      { title: 'Implement quality control systems', category: 'deliver' as InitiativeCategory },
-      { title: 'Establish clear roles and responsibilities', category: 'people' as InitiativeCategory }
-    ]
+// Revenue stages with roadmap items
+const REVENUE_STAGES = [
+  {
+    id: 'foundation',
+    name: 'Foundation',
+    range: '$0-250K',
+    min: 0,
+    max: 250000,
+    priorities: {
+      attract: ['Define target market', 'Basic website', 'Choose 1-2 marketing channels'],
+      convert: ['Create pricing strategy', 'Basic sales process', 'Quote templates'],
+      deliver: ['Define service standards', 'Basic delivery process', 'Quality checklist'],
+      delight: ['Customer feedback system', 'Response time goals', 'Testimonial collection'],
+      systems: ['Document core processes', 'Basic workflows', 'File organization'],
+      people: ['First hires', 'Core values', 'Basic training'],
+      profit: ['Track cash flow', 'Basic bookkeeping', 'Expense tracking'],
+      strategy: ['Business plan', 'Goal setting', 'Market research']
+    }
   },
-  strategic_wheel_low: {
-    title: 'Strategic Planning Priority',
-    description: 'Your Strategic Wheel score suggests strengthening strategic foundation',
-    initiatives: [
-      { title: 'Define clear target market segments', category: 'attract' as InitiativeCategory },
-      { title: 'Develop competitive differentiation strategy', category: 'strategy' as InitiativeCategory },
-      { title: 'Create customer journey mapping', category: 'convert' as InitiativeCategory },
-      { title: 'Implement regular strategic planning sessions', category: 'strategy' as InitiativeCategory }
-    ]
+  {
+    id: 'traction',
+    name: 'Traction',
+    range: '$250K-1M',
+    min: 250000,
+    max: 1000000,
+    priorities: {
+      attract: ['Marketing ROI tracking', '2-3 marketing strategies', 'Referral system'],
+      convert: ['CRM implementation', 'Sales scripts', 'Pipeline management'],
+      deliver: ['Service agreements', 'Customer onboarding', 'Process documentation'],
+      delight: ['Satisfaction surveys', 'Customer success basics', 'Retention programs'],
+      systems: ['Process standardization', 'Basic automation', 'KPI dashboards'],
+      people: ['Team structure', 'Performance reviews', 'Training programs'],
+      profit: ['Profit margin analysis', 'Monthly reports', 'Budget planning'],
+      strategy: ['Strategic planning', 'Competitive analysis', 'Growth strategy']
+    }
   },
-  engines_low: {
-    title: 'Business Engines Priority',
-    description: 'Your Engines score indicates core business processes need improvement',
-    initiatives: [
-      { title: 'Implement CRM automation', category: 'convert' as InitiativeCategory },
-      { title: 'Create sales process documentation', category: 'convert' as InitiativeCategory },
-      { title: 'Develop customer onboarding systems', category: 'deliver' as InitiativeCategory },
-      { title: 'Build performance reporting dashboards', category: 'systems' as InitiativeCategory }
-    ]
-  },
-  disciplines_low: {
-    title: 'Success Disciplines Priority',
-    description: 'Your Disciplines score suggests focusing on execution consistency',
-    initiatives: [
-      { title: 'Implement daily planning routine', category: 'systems' as InitiativeCategory },
-      { title: 'Create accountability tracking system', category: 'people' as InitiativeCategory },
-      { title: 'Develop performance measurement tools', category: 'systems' as InitiativeCategory },
-      { title: 'Build team communication protocols', category: 'people' as InitiativeCategory }
-    ]
-  },
-  profitability_low: {
-    title: 'Profitability Priority',
-    description: 'Your Profitability score indicates financial management needs attention',
-    initiatives: [
-      { title: 'Implement comprehensive cost tracking', category: 'profit' as InitiativeCategory },
-      { title: 'Create profit margin analysis tools', category: 'profit' as InitiativeCategory },
-      { title: 'Develop pricing optimization strategy', category: 'profit' as InitiativeCategory },
-      { title: 'Build financial forecasting system', category: 'profit' as InitiativeCategory }
-    ]
+  {
+    id: 'scaling',
+    name: 'Scaling',
+    range: '$1M-3M',
+    min: 1000000,
+    max: 3000000,
+    priorities: {
+      attract: ['Marketing automation', 'Content strategy', 'SEO optimization'],
+      convert: ['Sales team hiring', 'Advanced CRM', 'Territory planning'],
+      deliver: ['Operations scaling', 'Technology integration', 'Quality management'],
+      delight: ['Customer journey mapping', 'Loyalty programs', 'Proactive support'],
+      systems: ['Process automation', 'Integration platforms', 'Real-time reporting'],
+      people: ['Management layer', 'Leadership development', 'Career paths'],
+      profit: ['Advanced reporting', 'Investment planning', 'Scenario planning'],
+      strategy: ['Market expansion', 'Innovation pipeline', 'Strategic partnerships']
+    }
   }
-};
-
-interface RoadmapCompletion {
-  id: string;
-  stage: string;
-  category: string;
-  item_text: string;
-  completed: boolean;
-  completed_at?: string;
-}
-
-interface AssessmentData {
-  foundation_score?: number;
-  strategic_wheel_score?: number;
-  engines_score?: number;
-  disciplines_score?: number;
-  profitability_score?: number;
-  health_score?: number;
-}
+];
 
 export default function StrategicInitiatives() {
-  const [initiatives, setInitiatives] = useState<StrategicInitiative[]>([]);
+  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [loading, setLoading] = useState(true);
   const [newInitiative, setNewInitiative] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<InitiativeCategory | null>(null);
-  const [filterCategory, setFilterCategory] = useState<InitiativeCategory | 'all'>('all');
-  const [showRoadmap, setShowRoadmap] = useState(false);
-  const [showAssessmentSuggestions, setShowAssessmentSuggestions] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<InitiativeCategory>('attract');
+  const [filterCategory, setFilterCategory] = useState<InitiativeCategory | 'all' | 'selected'>('all');
   const [showInitiatives, setShowInitiatives] = useState(true);
+  const [showRoadmap, setShowRoadmap] = useState(true);
+  const [showAssessmentSuggestions, setShowAssessmentSuggestions] = useState(true);
   const [currentStage, setCurrentStage] = useState(REVENUE_STAGES[1]);
   const [roadmapCompletions, setRoadmapCompletions] = useState<RoadmapCompletion[]>([]);
-  const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
+  const [assessmentSuggestions, setAssessmentSuggestions] = useState<AssessmentSuggestion[]>([]);
+  const [assessmentResults, setAssessmentResults] = useState<AssessmentResults | null>(null);
+  const [latestAssessment, setLatestAssessment] = useState<Assessment | null>(null);
+  const [twelveMonthTargets, setTwelveMonthTargets] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   const supabase = createClient();
 
   useEffect(() => {
@@ -319,49 +166,28 @@ export default function StrategicInitiatives() {
   const loadData = async () => {
     setLoading(true);
     setError(null);
+    
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
-        console.error('User error:', userError);
         setError('Authentication error. Please log in again.');
         setLoading(false);
         return;
       }
 
       if (!user) {
-        console.log('No user found');
         setLoading(false);
         return;
       }
 
       // Load business profile and determine revenue stage
-      const storedProfile = localStorage.getItem('businessProfile');
-      if (storedProfile) {
-        try {
-          const profile = JSON.parse(storedProfile);
-          const revenue = profile.annual_revenue || 500000;
-          const stage = REVENUE_STAGES.find(s => revenue >= s.min && revenue < s.max) || REVENUE_STAGES[1];
-          setCurrentStage(stage);
-        } catch (e) {
-          console.error('Error parsing business profile:', e);
-        }
-      }
+      await loadBusinessProfile();
 
-      // Load assessment data for suggestions
-      const { data: latestAssessment } = await supabase
-        .from('assessments')
-        .select('foundation_score, strategic_wheel_score, engines_score, disciplines_score, profitability_score, health_score')
-        .eq('completed_by', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      // Load latest assessment and generate suggestions
+      await loadLatestAssessment();
 
-      if (latestAssessment) {
-        setAssessmentData(latestAssessment);
-      }
-
-      // Load user's initiatives (including coach suggestions)
+      // Load initiatives
       const { data: initiativesData, error: dbError } = await supabase
         .from('strategic_initiatives')
         .select('*')
@@ -376,13 +202,17 @@ export default function StrategicInitiatives() {
       }
 
       // Load roadmap completions
-      const { data: completionsData } = await supabase
-        .from('roadmap_completions')
-        .select('*')
-        .eq('user_id', user.id);
+      try {
+        const { data: completionsData } = await supabase
+          .from('roadmap_completions')
+          .select('*')
+          .eq('user_id', user.id);
 
-      if (completionsData) {
-        setRoadmapCompletions(completionsData);
+        if (completionsData) {
+          setRoadmapCompletions(completionsData);
+        }
+      } catch (completionError) {
+        console.log('Roadmap completions not available yet (this is okay)');
       }
 
     } catch (error) {
@@ -393,15 +223,325 @@ export default function StrategicInitiatives() {
     }
   };
 
-  const addInitiative = async (sourceType: 'client' | 'coach' | 'ai' | 'roadmap' = 'client', suggestionType?: string) => {
-    if (!newInitiative.trim() || !selectedCategory) return;
+  const loadBusinessProfile = async () => {
+    try {
+      // Try Supabase first, then fallback to localStorage
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profileData } = await supabase
+        .from('business_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      let revenue = 500000; // default
+
+      if (profileData?.annual_revenue) {
+        revenue = profileData.annual_revenue;
+      } else {
+        // Fallback to localStorage
+        const storedProfile = localStorage.getItem('businessProfile');
+        if (storedProfile) {
+          const profile = JSON.parse(storedProfile);
+          revenue = profile.annual_revenue || profile.current_revenue || profile.currentRevenue || 500000;
+        }
+      }
+
+      const stage = REVENUE_STAGES.find(s => revenue >= s.min && revenue < s.max) || REVENUE_STAGES[1];
+      setCurrentStage(stage);
+    } catch (error) {
+      console.error('Error loading business profile:', error);
+    }
+  };
+
+  const loadLatestAssessment = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Load latest assessment from Supabase
+      const { data: assessmentData, error } = await supabase
+        .from('assessments')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (assessmentData && !error) {
+        setLatestAssessment(assessmentData);
+        
+        // Extract 12-month targets from assessment answers
+        if (assessmentData.answers) {
+          const targets = {
+            currentRevenue: assessmentData.answers.currentRevenue || assessmentData.answers.current_revenue,
+            targetRevenue: assessmentData.answers.targetRevenue || assessmentData.answers.target_revenue,
+            currentProfit: assessmentData.answers.currentProfit || assessmentData.answers.current_profit,
+            targetProfit: assessmentData.answers.targetProfit || assessmentData.answers.target_profit
+          };
+          
+          if (targets.currentRevenue || targets.targetRevenue) {
+            setTwelveMonthTargets(targets);
+          }
+        }
+        
+        // Convert to AssessmentResults format
+        const results: AssessmentResults = {
+          sectionScores: assessmentData.section_scores || {},
+          totalScore: assessmentData.total_score || 0,
+          percentage: assessmentData.percentage || 0,
+          healthStatus: assessmentData.health_status || 'BUILDING',
+          revenueStage: assessmentData.revenue_stage || 'Foundation',
+          improvementAreas: assessmentData.improvement_areas || [],
+          topStrengths: assessmentData.top_strengths || [],
+          recommendations: assessmentData.recommendations || []
+        };
+
+        setAssessmentResults(results);
+        const suggestions = generateAssessmentSuggestions(results);
+        setAssessmentSuggestions(suggestions);
+      } else {
+        // Fallback to localStorage if no Supabase data
+        await loadAssessmentFromLocalStorage();
+      }
+    } catch (error) {
+      console.error('Error loading assessment from Supabase:', error);
+      // Fallback to localStorage
+      await loadAssessmentFromLocalStorage();
+    }
+  };
+
+  const loadAssessmentFromLocalStorage = async () => {
+    try {
+      // Try to load from multiple possible localStorage keys
+      const assessmentResults = localStorage.getItem('assessmentResults');
+      const latestAssessment = localStorage.getItem('latestAssessment');
+      const assessmentAnswers = localStorage.getItem('assessmentAnswers');
+
+      let results: AssessmentResults | null = null;
+
+      if (assessmentResults) {
+        results = JSON.parse(assessmentResults);
+      } else if (latestAssessment) {
+        const assessment = JSON.parse(latestAssessment);
+        results = assessment.results || assessment;
+      } else if (assessmentAnswers) {
+        // If we only have answers, generate basic results
+        const answers = JSON.parse(assessmentAnswers);
+        results = generateBasicAssessmentResults(answers);
+      }
+
+      if (results) {
+        setAssessmentResults(results);
+        const suggestions = generateAssessmentSuggestions(results);
+        setAssessmentSuggestions(suggestions);
+      }
+    } catch (error) {
+      console.log('No assessment results found in localStorage');
+    }
+  };
+
+  const generateBasicAssessmentResults = (answers: Record<string, any>): AssessmentResults => {
+    // Basic assessment analysis when we only have raw answers
+    const foundationScore = calculateFoundationScore(answers);
+    const strategicScore = calculateStrategicScore(answers);
+    const enginesScore = calculateEnginesScore(answers);
+    
+    const totalScore = foundationScore + strategicScore + enginesScore;
+    const percentage = Math.round((totalScore / 200) * 100); // Simplified max score
+    
+    return {
+      sectionScores: {
+        foundation: foundationScore,
+        strategicWheel: strategicScore,
+        engines: enginesScore,
+      },
+      totalScore,
+      percentage,
+      healthStatus: getHealthStatus(percentage),
+      revenueStage: answers.revenue ? getRevenueStage(answers.revenue) : 'Foundation',
+      improvementAreas: [],
+      topStrengths: [],
+      recommendations: []
+    };
+  };
+
+  const calculateFoundationScore = (answers: Record<string, any>): number => {
+    let score = 0;
+    // Simplified foundation scoring
+    if (answers.profitMargin && answers.profitMargin.includes('profit')) score += 20;
+    if (answers.ownerSalary && answers.ownerSalary.includes('salary')) score += 15;
+    if (answers.businessDependency && answers.businessDependency.includes('runs well')) score += 15;
+    return Math.min(score, 50);
+  };
+
+  const calculateStrategicScore = (answers: Record<string, any>): number => {
+    let score = 0;
+    // Simplified strategic scoring based on common question patterns
+    if (answers.visionClarity && answers.visionClarity.includes('clear')) score += 15;
+    if (answers.teamCulture && answers.teamCulture.includes('good')) score += 15;
+    if (answers.marketPosition && answers.marketPosition.includes('strong')) score += 15;
+    return Math.min(score, 60);
+  };
+
+  const calculateEnginesScore = (answers: Record<string, any>): number => {
+    let score = 0;
+    // Simplified engines scoring
+    if (answers.marketingROI && !answers.marketingROI.includes("Don't")) score += 20;
+    if (answers.salesProcess && answers.salesProcess.includes('systematic')) score += 20;
+    if (answers.customerSatisfaction && answers.customerSatisfaction.includes('Over 80%')) score += 20;
+    return Math.min(score, 100);
+  };
+
+  const getHealthStatus = (percentage: number): string => {
+    if (percentage >= 90) return 'THRIVING';
+    if (percentage >= 80) return 'STRONG';
+    if (percentage >= 70) return 'STABLE';
+    if (percentage >= 60) return 'BUILDING';
+    if (percentage >= 50) return 'STRUGGLING';
+    return 'URGENT';
+  };
+
+  const getRevenueStage = (revenue: string): string => {
+    const stageMap: Record<string, string> = {
+      'Under $250K': 'Foundation',
+      '$250K - $1M': 'Traction',
+      '$1M - $3M': 'Scaling',
+      '$3M - $5M': 'Optimization',
+      '$5M - $10M': 'Leadership',
+      '$10M+': 'Mastery'
+    };
+    return stageMap[revenue] || 'Foundation';
+  };
+
+  const generateAssessmentSuggestions = (results: AssessmentResults): AssessmentSuggestion[] => {
+    const suggestions: AssessmentSuggestion[] = [];
+    let suggestionId = 1;
+
+    // Generate suggestions based on health status
+    if (results.healthStatus === 'URGENT' || results.healthStatus === 'STRUGGLING') {
+      suggestions.push({
+        id: `urgent-${suggestionId++}`,
+        title: 'Establish daily cash flow monitoring',
+        category: 'profit',
+        reason: `Your business health needs immediate attention`,
+        priority: 'high',
+        section: 'Foundation'
+      });
+
+      suggestions.push({
+        id: `urgent-${suggestionId++}`,
+        title: 'Create basic standard operating procedures',
+        category: 'systems',
+        reason: 'Standardizing core processes will reduce chaos',
+        priority: 'high',
+        section: 'Systems'
+      });
+    }
+
+    // Generate suggestions based on section scores
+    const sections = results.sectionScores;
+    
+    if (sections.foundation && sections.foundation < 30) {
+      suggestions.push({
+        id: `foundation-${suggestionId++}`,
+        title: 'Implement monthly financial reviews',
+        category: 'profit',
+        reason: 'Foundation needs strengthening',
+        priority: 'high',
+        section: 'Foundation'
+      });
+
+      suggestions.push({
+        id: `foundation-${suggestionId++}`,
+        title: 'Reduce business dependency on owner',
+        category: 'systems',
+        reason: 'Build systems that work without you',
+        priority: 'high',
+        section: 'Foundation'
+      });
+    }
+
+    if (sections.strategicWheel && sections.strategicWheel < 45) {
+      suggestions.push({
+        id: `strategic-${suggestionId++}`,
+        title: 'Define clear 3-year vision',
+        category: 'strategy',
+        reason: 'Strategic direction needs clarity',
+        priority: 'high',
+        section: 'Strategic Wheel'
+      });
+
+      suggestions.push({
+        id: `strategic-${suggestionId++}`,
+        title: 'Implement weekly team alignment meetings',
+        category: 'people',
+        reason: 'Improve team communication and alignment',
+        priority: 'medium',
+        section: 'Strategic Wheel'
+      });
+    }
+
+    if (sections.engines && sections.engines < 70) {
+      suggestions.push({
+        id: `engines-${suggestionId++}`,
+        title: 'Implement marketing ROI tracking',
+        category: 'attract',
+        reason: 'Track what marketing activities work',
+        priority: 'medium',
+        section: 'Business Engines'
+      });
+
+      suggestions.push({
+        id: `engines-${suggestionId++}`,
+        title: 'Create systematic sales follow-up process',
+        category: 'convert',
+        reason: 'Consistent follow-up improves conversion',
+        priority: 'medium',
+        section: 'Business Engines'
+      });
+    }
+
+    // Stage-specific suggestions
+    if (results.revenueStage === 'Foundation') {
+      suggestions.push({
+        id: `stage-${suggestionId++}`,
+        title: 'Validate product-market fit',
+        category: 'strategy',
+        reason: 'Foundation stage requires market validation',
+        priority: 'high',
+        section: 'Revenue Stage'
+      });
+    } else if (results.revenueStage === 'Traction') {
+      suggestions.push({
+        id: `stage-${suggestionId++}`,
+        title: 'Hire first key employee',
+        category: 'people',
+        reason: 'Time to build your initial team',
+        priority: 'medium',
+        section: 'Revenue Stage'
+      });
+    }
+
+    // Sort by priority and limit to top suggestions
+    return suggestions
+      .sort((a, b) => {
+        const priorityOrder = { high: 0, medium: 1, low: 2 };
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      })
+      .slice(0, 6); // Limit to 6 suggestions
+  };
+
+  const addInitiative = async () => {
+    if (!newInitiative.trim()) return;
     
     setError(null);
     
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (userError || !user) {
+      if (!user) {
         setError('Please log in to add initiatives');
         return;
       }
@@ -411,8 +551,7 @@ export default function StrategicInitiatives() {
         title: newInitiative.trim(),
         category: selectedCategory,
         priority: 'medium',
-        source_type: sourceType,
-        assessment_suggestion_type: suggestionType,
+        source_type: 'user',
         selected_for_action: false,
         selected_for_annual_plan: false
       };
@@ -429,7 +568,6 @@ export default function StrategicInitiatives() {
       } else if (data) {
         setInitiatives([data, ...initiatives]);
         setNewInitiative('');
-        setSelectedCategory(null); // Reset category selection
       }
     } catch (error) {
       console.error('Error adding initiative:', error);
@@ -437,18 +575,18 @@ export default function StrategicInitiatives() {
     }
   };
 
-  const addFromAssessment = async (suggestionItem: any, suggestionType: string) => {
+  const addFromAssessment = async (suggestion: AssessmentSuggestion) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const initiative = {
         user_id: user.id,
-        title: suggestionItem.title,
-        category: suggestionItem.category,
-        priority: 'high',
-        source_type: 'ai',
-        assessment_suggestion_type: suggestionType,
+        title: suggestion.title,
+        category: suggestion.category,
+        priority: suggestion.priority,
+        source_type: 'assessment',
+        assessment_suggestion_id: suggestion.id,
         selected_for_action: false,
         selected_for_annual_plan: false
       };
@@ -507,7 +645,6 @@ export default function StrategicInitiatives() {
       );
 
       if (existing) {
-        // Toggle completion status
         const { error } = await supabase
           .from('roadmap_completions')
           .update({ 
@@ -524,7 +661,6 @@ export default function StrategicInitiatives() {
           ));
         }
       } else {
-        // Create new completion record
         const { data, error } = await supabase
           .from('roadmap_completions')
           .insert({
@@ -552,7 +688,7 @@ export default function StrategicInitiatives() {
     if (!initiative) return;
 
     const selectedCount = initiatives.filter(i => i.selected_for_annual_plan).length;
-    if (!initiative.selected_for_annual_plan && selectedCount >= 12) return;
+    if (!initiative.selected_for_annual_plan && selectedCount >= 15) return;
 
     try {
       const { error } = await supabase
@@ -585,34 +721,7 @@ export default function StrategicInitiatives() {
     }
   };
 
-  // Helper functions
-  const getAssessmentSuggestions = () => {
-    if (!assessmentData) return [];
-
-    const suggestions = [];
-    const maxScores = { foundation: 40, strategic_wheel: 60, engines: 100, disciplines: 60, profitability: 30 };
-
-    Object.entries(assessmentData).forEach(([key, score]) => {
-      if (key.endsWith('_score') && score !== undefined) {
-        const sectionKey = key.replace('_score', '');
-        const maxScore = maxScores[sectionKey as keyof typeof maxScores];
-        if (maxScore && score < maxScore * 0.6) { // Less than 60% of max score
-          const suggestionKey = `${sectionKey}_low` as keyof typeof ASSESSMENT_SUGGESTIONS;
-          if (ASSESSMENT_SUGGESTIONS[suggestionKey]) {
-            suggestions.push({
-              key: suggestionKey,
-              ...ASSESSMENT_SUGGESTIONS[suggestionKey],
-              currentScore: score,
-              maxScore: maxScore
-            });
-          }
-        }
-      }
-    });
-
-    return suggestions;
-  };
-
+  // Helper functions for roadmap
   const getRoadmapItemsToShow = () => {
     const currentStageIndex = REVENUE_STAGES.findIndex(s => s.id === currentStage.id);
     const stagesToShow = REVENUE_STAGES.slice(0, currentStageIndex + 1);
@@ -647,13 +756,22 @@ export default function StrategicInitiatives() {
     return itemsToShow;
   };
 
-  const filteredInitiatives = initiatives.filter(i => 
-    filterCategory === 'all' || i.category === filterCategory
-  );
+  const getPriorityColor = (priority: 'high' | 'medium' | 'low') => {
+    switch (priority) {
+      case 'high': return 'text-red-700 bg-red-100';
+      case 'medium': return 'text-orange-700 bg-orange-100';
+      case 'low': return 'text-blue-700 bg-blue-100';
+    }
+  };
+
+  const filteredInitiatives = initiatives.filter(i => {
+    if (filterCategory === 'all') return true;
+    if (filterCategory === 'selected') return i.selected_for_annual_plan;
+    return i.category === filterCategory;
+  });
 
   const selectedCount = initiatives.filter(i => i.selected_for_annual_plan).length;
-  const maxReached = selectedCount >= 12;
-  const assessmentSuggestions = getAssessmentSuggestions();
+  const maxReached = selectedCount >= 15;
   const roadmapItems = getRoadmapItemsToShow();
   const incompleteRoadmapItems = roadmapItems.filter(item => !item.completed);
 
@@ -670,7 +788,6 @@ export default function StrategicInitiatives() {
 
   return (
     <div className="space-y-6">
-      {/* Error display */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
@@ -678,370 +795,96 @@ export default function StrategicInitiatives() {
         </div>
       )}
 
-      {/* COMPLETELY DROPDOWN-FREE INPUT SECTION */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-100 overflow-hidden">
-        {/* Header */}
-        <div className="bg-white/80 backdrop-blur-sm border-b border-blue-100 p-6">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-blue-100 rounded-xl">
-              <Target className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                What needs to get done to reach your 3-year targets?
-              </h2>
+      {/* Input Section - FIRST */}
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-100 p-6">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="p-3 bg-blue-100 rounded-xl">
+            <Target className="w-6 h-6 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              What do you need to implement/build/learn to achieve your 12-month targets?
+            </h2>
+            <div className="space-y-2">
               <p className="text-gray-600 leading-relaxed">
-                Brain dump everything - big projects, small improvements, new systems, key hires. 
-                <span className="font-medium text-blue-700"> Don't filter now, prioritise later.</span>
+                Brain dump everything - systems, people, skills, processes, technology.
               </p>
+              {twelveMonthTargets && (
+                <div className="text-sm text-blue-800 bg-blue-100 rounded-lg p-3">
+                  <strong>Your 12-month targets:</strong> 
+                  {twelveMonthTargets.currentRevenue && twelveMonthTargets.targetRevenue && (
+                    <span className="ml-2">
+                      ${twelveMonthTargets.currentRevenue?.toLocaleString()} → ${twelveMonthTargets.targetRevenue?.toLocaleString()} revenue
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
         
-        {/* Input Section */}
-        <div className="p-6">
-          <div className="space-y-6">
-            {/* Step 1: Initiative Input */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-semibold text-gray-900">Step 1: What needs to get done?</span>
-              </div>
-              
-              <div className="space-y-3">
-                <input
-                  id="initiative-input"
-                  type="text"
-                  value={newInitiative}
-                  onChange={(e) => setNewInitiative(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && newInitiative.trim() && selectedCategory && addInitiative()}
-                  placeholder="Type your initiative (e.g., 'Implement CRM system', 'Hire sales manager', 'Create customer onboarding process')"
-                  className="w-full px-4 py-4 border-2 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-gray-900 text-lg bg-white border-gray-300"
-                />
-                
-                {newInitiative.trim() && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    Initiative entered: "{newInitiative}"
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Step 2: Category Selection */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <span className={`text-lg font-semibold ${newInitiative.trim() ? 'text-gray-900' : 'text-gray-400'}`}>
-                  Step 2: Choose a category
-                </span>
-                <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">Required</span>
-                {selectedCategory && (
-                  <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    {categoryInfo[selectedCategory].label}
-                  </div>
-                )}
-              </div>
-              
-              {!newInitiative.trim() && (
-                <p className="text-sm text-gray-500 italic">Enter your initiative above first, then choose its category.</p>
-              )}
-              
-              <div className={`flex flex-wrap gap-2 ${!newInitiative.trim() ? 'opacity-50 pointer-events-none' : ''}`}>
-                {Object.entries(categoryInfo).map(([key, info]) => {
-                  const Icon = categoryIcons[key as InitiativeCategory];
-                  const isSelected = key === selectedCategory;
-                  
-                  return (
-                    <div key={key} className="relative group">
-                      <button
-                        onClick={() => setSelectedCategory(key as InitiativeCategory)}
-                        disabled={!newInitiative.trim()}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                          isSelected
-                            ? 'bg-blue-600 text-white shadow-md scale-105'
-                            : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 hover:shadow-sm'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                        {info.label}
-                      </button>
-                      
-                      {/* Hover Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                        {info.description}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Add Button */}
-            <div className="flex justify-end">
-              <button
-                onClick={() => addInitiative()}
-                disabled={!newInitiative.trim() || !selectedCategory}
-                className={`px-8 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 shadow-sm text-lg ${
-                  !newInitiative.trim()
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : !selectedCategory
-                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-lg hover:shadow-xl'
-                }`}
-              >
-                <Plus className="w-6 h-6" />
-                {!newInitiative.trim() ? 'Enter Initiative First' : !selectedCategory ? 'Choose Category' : 'Add Initiative'}
-              </button>
-            </div>
-          </div>
-          
-          {/* Help Text */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
-            <div className="flex items-start gap-3">
-              <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 flex-shrink-0"></div>
-              <p className="text-sm text-blue-800 leading-relaxed">
-                <span className="font-bold">Pro tip:</span> Start with what keeps you up at night, 
-                then add the exciting opportunities. You can organize and prioritize everything later.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Annual Focus Counter */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`text-lg font-semibold ${maxReached ? 'text-orange-600' : 'text-gray-900'}`}>
-              Annual Focus: {selectedCount}/12 selected
-            </div>
-            {maxReached && (
-              <div className="flex items-center gap-2 text-orange-600 text-sm">
-                <AlertCircle className="w-4 h-4" />
-                Maximum reached - deselect one to add another
-              </div>
-            )}
-          </div>
-          
-          {/* Filter Pills */}
-          <div className="flex gap-2">
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={newInitiative}
+              onChange={(e) => setNewInitiative(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addInitiative()}
+              placeholder="Type what you need to implement..."
+              className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value as InitiativeCategory)}
+              className="px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {Object.entries(categoryInfo).map(([key, info]) => (
+                <option key={key} value={key}>
+                  {info.label}
+                </option>
+              ))}
+            </select>
             <button
-              onClick={() => setFilterCategory('all')}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                filterCategory === 'all'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              onClick={addInitiative}
+              disabled={!newInitiative.trim()}
+              className={`px-6 py-3 rounded-lg font-semibold flex items-center gap-2 ${
+                !newInitiative.trim()
+                  ? 'bg-gray-300 text-gray-500'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
             >
-              All
+              <Plus className="w-5 h-5" />
+              Add
             </button>
-            {Object.entries(categoryInfo).map(([key, info]) => {
-              const Icon = categoryIcons[key as InitiativeCategory];
-              return (
-                <button
-                  key={key}
-                  onClick={() => setFilterCategory(key as InitiativeCategory)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
-                    filterCategory === key
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {info.label}
-                </button>
-              );
-            })}
           </div>
-        </div>
-      </div>
-
-      {/* Your Initiatives List */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <button
-          onClick={() => setShowInitiatives(!showInitiatives)}
-          className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
-        >
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <User className="w-5 h-5 text-blue-600 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-semibold text-gray-900">Your Initiatives</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                {filteredInitiatives.length} initiatives • {selectedCount} selected for annual plan
+          
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5" />
+              <p className="text-sm text-blue-800">
+                <span className="font-bold">Pro tip:</span> Think capabilities - what systems, people, skills do you need to hit your targets?
               </p>
             </div>
           </div>
-          {showInitiatives ? <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />}
-        </button>
-        
-        {showInitiatives && (
-          <div className="border-t border-gray-200 p-6">
-            {filteredInitiatives.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                {filterCategory === 'all' 
-                  ? "No initiatives yet. Start adding what needs to get done!"
-                  : `No initiatives in ${categoryInfo[filterCategory as InitiativeCategory]?.label}. Try another category or add one above.`
-                }
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredInitiatives.map((initiative) => {
-                  const Icon = categoryIcons[initiative.category];
-                  const info = categoryInfo[initiative.category];
-                  const isDisabled = !initiative.selected_for_annual_plan && maxReached;
-                  
-                  // Source icon
-                  const SourceIcon = initiative.source_type === 'coach' ? User :
-                                    initiative.source_type === 'ai' ? Bot :
-                                    initiative.source_type === 'roadmap' ? Building :
-                                    User;
-                  
-                  return (
-                    <div
-                      key={initiative.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors ${
-                        isDisabled ? 'opacity-50' : ''
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={initiative.selected_for_annual_plan || false}
-                        onChange={() => toggleAnnualPlan(initiative.id)}
-                        disabled={isDisabled}
-                        className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 disabled:cursor-not-allowed"
-                      />
-                      
-                      <div className="flex-1 text-gray-900">
-                        {initiative.title}
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700`}>
-                          <Icon className="w-3.5 h-3.5" />
-                          {info?.label}
-                        </div>
-                        
-                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          initiative.source_type === 'coach' ? 'bg-purple-100 text-purple-700' :
-                          initiative.source_type === 'ai' ? 'bg-yellow-100 text-yellow-700' :
-                          initiative.source_type === 'roadmap' ? 'bg-blue-100 text-blue-700' :
-                          'bg-green-100 text-green-700'
-                        }`}>
-                          <SourceIcon className="w-3 h-3" />
-                          {initiative.source_type === 'coach' ? 'Coach' :
-                           initiative.source_type === 'ai' ? 'AI' :
-                           initiative.source_type === 'roadmap' ? 'Roadmap' :
-                           'You'}
-                        </div>
-                      </div>
-                      
-                      <button
-                        onClick={() => deleteInitiative(initiative.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Assessment-Based Suggestions */}
-      {assessmentSuggestions.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <button
-            onClick={() => setShowAssessmentSuggestions(!showAssessmentSuggestions)}
-            className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <Lightbulb className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-              <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">Assessment-Based Suggestions</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Based on your assessment results, these areas need attention ({assessmentSuggestions.length} recommendations)
-                </p>
-              </div>
-            </div>
-            {showAssessmentSuggestions ? <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />}
-          </button>
-          
-          {showAssessmentSuggestions && (
-            <div className="border-t border-gray-200 p-6">
-              <div className="space-y-6">
-                {assessmentSuggestions.map((suggestion) => (
-                  <div key={suggestion.key} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium text-gray-900">{suggestion.title}</h4>
-                        <p className="text-sm text-gray-600">{suggestion.description}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Score: {suggestion.currentScore}/{suggestion.maxScore} ({Math.round((suggestion.currentScore / suggestion.maxScore) * 100)}%)
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid gap-2 pl-4">
-                      {suggestion.initiatives.map((item, idx) => {
-                        const exists = initiatives.some(i => 
-                          i.title.toLowerCase() === item.title.toLowerCase() && 
-                          i.category === item.category
-                        );
-                        
-                        return (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                            <div className="flex items-center gap-3">
-                              <Bot className="w-4 h-4 text-yellow-600" />
-                              <span className="text-sm text-gray-700">{item.title}</span>
-                              <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                                {React.createElement(categoryIcons[item.category], { className: "w-3 h-3" })}
-                                {categoryInfo[item.category]?.label}
-                              </div>
-                            </div>
-                            {exists ? (
-                              <span className="text-xs text-gray-400 flex items-center gap-1">
-                                <Check className="w-3.5 h-3.5" />
-                                Added
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => addFromAssessment(item, suggestion.key)}
-                                className="text-xs px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors"
-                              >
-                                Add to List
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Foundation-First Roadmap */}
+      {/* Foundation-First Roadmap - SECOND (Your Key IP) */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <button
           onClick={() => setShowRoadmap(!showRoadmap)}
           className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
         >
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <Building className="w-5 h-5 text-blue-600 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            <Building className="w-5 h-5 text-blue-600" />
+            <div>
               <h3 className="text-lg font-semibold text-gray-900">Foundation-First Roadmap</h3>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-gray-600">
                 {currentStage.name} ({currentStage.range}) • {incompleteRoadmapItems.length} items remaining across all levels
               </p>
             </div>
           </div>
-          {showRoadmap ? <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />}
+          {showRoadmap ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
         </button>
         
         {showRoadmap && (
@@ -1150,6 +993,264 @@ export default function StrategicInitiatives() {
                 );
               })}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Assessment Suggestions - THIRD (Simplified, Blue Branded) */}
+      {assessmentResults && assessmentSuggestions.length > 0 && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-100">
+          <button
+            onClick={() => setShowAssessmentSuggestions(!showAssessmentSuggestions)}
+            className="w-full p-4 flex items-center justify-between hover:bg-blue-50 transition-colors text-left rounded-t-xl"
+          >
+            <div className="flex items-center gap-3">
+              <Zap className="w-5 h-5 text-blue-600" />
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Diagnostic-Based Suggestions</h3>
+                <p className="text-sm text-gray-600">
+                  {assessmentSuggestions.length} recommendations based on your assessment
+                  {latestAssessment && (
+                    <span className="ml-1">
+                      • From {new Date(latestAssessment.created_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            {showAssessmentSuggestions ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+          </button>
+          
+          {showAssessmentSuggestions && (
+            <div className="border-t border-blue-200 p-6">
+              <div className="space-y-3">
+                {assessmentSuggestions.map((suggestion) => {
+                  const Icon = categoryIcons[suggestion.category];
+                  const info = categoryInfo[suggestion.category];
+                  const exists = initiatives.some(i => i.title.toLowerCase() === suggestion.title.toLowerCase());
+                  
+                  return (
+                    <div
+                      key={suggestion.id}
+                      className="flex items-start gap-4 p-4 bg-white rounded-lg border hover:border-blue-200 transition-colors"
+                    >
+                      <div className="flex-shrink-0 p-2 bg-blue-100 rounded-lg">
+                        <Icon className="w-4 h-4 text-blue-600" />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h4 className="font-medium text-gray-900 text-sm">{suggestion.title}</h4>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${getPriorityColor(suggestion.priority)}`}>
+                              {suggestion.priority.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <p className="text-xs text-gray-600 mb-2">{suggestion.reason}</p>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span className="inline-flex items-center gap-1">
+                              <Icon className="w-3 h-3" />
+                              {info?.label}
+                            </span>
+                            <span>•</span>
+                            <span>{suggestion.section}</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {exists && (
+                              <span className="text-xs text-blue-600 flex items-center gap-1">
+                                <Check className="w-3.5 h-3.5" />
+                                In List
+                              </span>
+                            )}
+                            {!exists && (
+                              <button
+                                onClick={() => addFromAssessment(suggestion)}
+                                className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                              >
+                                Add to List
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <Lightbulb className="w-4 h-4 text-blue-600 mt-0.5" />
+                  <p className="text-xs text-blue-800">
+                    <span className="font-bold">Assessment Insight:</span> These suggestions target your diagnostic weak spots for maximum impact.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 12-Month Focus Selection Interface */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {/* Section Header */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                Select Your 12-Month Focus ({selectedCount}/15)
+              </h3>
+              <p className="text-sm text-gray-600">
+                Choose up to 15 initiatives to prioritize over the next 12 months to achieve your targets
+              </p>
+              {maxReached && (
+                <div className="flex items-center gap-2 text-orange-600 text-sm mt-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Maximum reached - deselect one to add another
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Options */}
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setFilterCategory('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filterCategory === 'all' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              All ({initiatives.length})
+            </button>
+            <button
+              onClick={() => setFilterCategory('selected')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filterCategory === 'selected' ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Selected Only ({selectedCount})
+            </button>
+            {Object.entries(categoryInfo).map(([key, info]) => {
+              const Icon = categoryIcons[key as InitiativeCategory];
+              const categoryCount = initiatives.filter(i => i.category === key).length;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setFilterCategory(key as InitiativeCategory)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                    filterCategory === key ? 'bg-blue-100 text-blue-700' : 'bg-white text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {info.label} ({categoryCount})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Your Initiatives List - FOURTH */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <button
+          onClick={() => setShowInitiatives(!showInitiatives)}
+          className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
+        >
+          <div className="flex items-center gap-3">
+            <User className="w-5 h-5 text-blue-600" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Your Initiatives</h3>
+              <p className="text-sm text-gray-600">
+                {filteredInitiatives.length} initiatives
+                {filterCategory === 'all' && ` • ${selectedCount}/15 selected for 12-month focus`}
+                {filterCategory === 'selected' && ` selected for 12-month focus`}
+                {filterCategory !== 'all' && filterCategory !== 'selected' && 
+                  ` in ${categoryInfo[filterCategory as InitiativeCategory]?.label}`
+                }
+              </p>
+            </div>
+          </div>
+          {showInitiatives ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+        </button>
+        
+        {showInitiatives && (
+          <div className="border-t border-gray-200 p-6">
+            {filteredInitiatives.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {filterCategory === 'all' && "No initiatives yet. Start adding what you need to implement!"}
+                {filterCategory === 'selected' && "No initiatives selected yet. Start selecting your 12-month focus above."}
+                {filterCategory !== 'all' && filterCategory !== 'selected' && 
+                  `No initiatives in ${categoryInfo[filterCategory as InitiativeCategory]?.label}. Try another category or add one above.`
+                }
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredInitiatives.map((initiative) => {
+                  const Icon = categoryIcons[initiative.category as InitiativeCategory];
+                  const info = categoryInfo[initiative.category as InitiativeCategory];
+                  const isDisabled = !initiative.selected_for_annual_plan && maxReached;
+                  const isSelected = initiative.selected_for_annual_plan;
+                  
+                  return (
+                    <div
+                      key={initiative.id}
+                      className={`flex items-center gap-4 p-4 rounded-lg transition-colors border ${
+                        isSelected 
+                          ? 'bg-blue-50 border-blue-200' 
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      } ${isDisabled ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleAnnualPlan(initiative.id)}
+                          disabled={isDisabled}
+                          className="w-6 h-6 text-blue-600 rounded border-2 border-gray-300 focus:ring-blue-500 focus:ring-2 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                      
+                      <div className="flex-1 text-gray-900 font-medium">
+                        {initiative.title}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                          {Icon && <Icon className="w-3.5 h-3.5" />}
+                          {info?.label || initiative.category}
+                        </div>
+                        
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          initiative.source_type === 'user' ? 'bg-green-100 text-green-700' :
+                          initiative.source_type === 'assessment' ? 'bg-blue-100 text-blue-700' :
+                          initiative.source_type === 'roadmap' ? 'bg-indigo-100 text-indigo-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          <User className="w-3 h-3" />
+                          {initiative.source_type === 'user' ? 'You' : 
+                           initiative.source_type === 'assessment' ? 'Assessment' :
+                           initiative.source_type === 'roadmap' ? 'Roadmap' : 'You'}
+                        </div>
+                      </div>
+                      
+                      <button
+                        onClick={() => deleteInitiative(initiative.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

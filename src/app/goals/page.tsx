@@ -351,6 +351,13 @@ const getUnitLabel = (unit: string): string => {
   }
 }
 
+// FIXED: Safe accessor for business profile revenue - THIS IS THE KEY FIX
+const getCurrentRevenue = (profile: any): number => {
+  if (!profile) return 500000
+  // Try multiple property names for backwards compatibility
+  return profile.current_revenue || profile.annual_revenue || profile.currentRevenue || 500000
+}
+
 // KPI Info Card Component - Fixed positioning
 function KPIInfoCard({ kpi, isVisible }: { kpi: KPIData; isVisible: boolean }) {
   if (!isVisible) return null
@@ -575,7 +582,7 @@ export default function GoalsPage() {
   // Collapsed sections state
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
   
-  // Business data
+  // Business data - FIXED with safe defaults
   const [industry, setIndustry] = useState('building_construction')
   const [currentRevenue, setCurrentRevenue] = useState(500000)
   const [businessProfile, setBusinessProfile] = useState<any>(null)
@@ -797,16 +804,30 @@ export default function GoalsPage() {
         return
       }
       
-      // Load business profile from localStorage
+      // Load business profile from localStorage - FIXED safe access
       const storedProfile = localStorage.getItem('businessProfile')
       let profileIndustry = 'building_construction'
       
       if (storedProfile) {
-        const profile = JSON.parse(storedProfile)
-        profileIndustry = profile.industry || 'building_construction'
-        setIndustry(profileIndustry)
-        setCurrentRevenue(profile.annual_revenue || 500000)
-        setBusinessProfile(profile)
+        try {
+          const profile = JSON.parse(storedProfile)
+          profileIndustry = profile.industry || 'building_construction'
+          setIndustry(profileIndustry)
+          
+          // FIXED: Use safe getCurrentRevenue function
+          const revenue = getCurrentRevenue(profile)
+          setCurrentRevenue(revenue)
+          setBusinessProfile(profile)
+          
+          console.log('Loaded business profile:', { 
+            revenue, 
+            industry: profileIndustry,
+            profile 
+          })
+        } catch (e) {
+          console.error('Error parsing business profile:', e)
+          // Continue with defaults
+        }
       }
 
       // Load financial data from database
@@ -1350,7 +1371,12 @@ export default function GoalsPage() {
         isOpen={showKPIModal} 
         onClose={() => setShowKPIModal(false)} 
         onSave={handleKPISave} 
-        businessProfile={businessProfile}
+        businessProfile={{
+          // FIXED: Pass safe business profile with correct property names
+          ...businessProfile,
+          currentRevenue: getCurrentRevenue(businessProfile),
+          industry: industry
+        }}
         onOpenCustom={() => {
           setShowKPIModal(false)
           setShowCustomKPIModal(true)
@@ -1394,7 +1420,7 @@ export default function GoalsPage() {
               </div>
               <ProfitCalculator 
                 onComplete={handleProfitCalculatorComplete}
-                initialRevenue={currentRevenue}
+                initialRevenue={getCurrentRevenue(businessProfile)}
               />
             </div>
           </div>
