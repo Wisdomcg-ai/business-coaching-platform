@@ -5,12 +5,19 @@
 import { KPI, BusinessFunction, Industry, BusinessStage, KPITier } from '../types'
 import { ESSENTIAL_KPIS } from './essential'
 import { ATTRACT_KPIS } from './functions/attract'
+import { CONVERT_KPIS } from './functions/convert'
 
 // Combine all KPI sources
 export const ALL_KPIS: KPI[] = [
   ...ESSENTIAL_KPIS,
-  ...ATTRACT_KPIS
+  ...ATTRACT_KPIS,
+  ...CONVERT_KPIS
 ]
+
+// Main export function (required by hooks)
+export function getAllKPIs(): KPI[] {
+  return ALL_KPIS
+}
 
 // Stats and utility functions
 export function getKPIStats() {
