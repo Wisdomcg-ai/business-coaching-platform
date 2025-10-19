@@ -15,6 +15,7 @@ import EnhancedKPIModal from '@/components/EnhancedKPIModal'
 import StrategicInitiatives from '@/components/strategic-initiatives'
 import AnnualPlan from '@/components/AnnualPlan'
 import { createClient } from '@/lib/supabase/client'
+import { getBusinessProfile } from '@/lib/supabase/helpers' // ADDED: Import helper function
 import type { Database } from '@/lib/supabase/types'
 
 // Type definitions
@@ -351,11 +352,47 @@ const getUnitLabel = (unit: string): string => {
   }
 }
 
-// FIXED: Safe accessor for business profile revenue - THIS IS THE KEY FIX
+// FIXED: Safe accessor for business profile revenue
 const getCurrentRevenue = (profile: any): number => {
   if (!profile) return 500000
   // Try multiple property names for backwards compatibility
   return profile.current_revenue || profile.annual_revenue || profile.currentRevenue || 500000
+}
+
+// FIXED: Map industry from database to KPI categories
+const mapIndustryFromDatabase = (dbIndustry: string | null): string => {
+  if (!dbIndustry) return 'building_construction'
+  
+  const lower = dbIndustry.toLowerCase()
+  
+  // Map database industry values to our KPI categories
+  if (lower.includes('construction') || lower.includes('building')) return 'building_construction'
+  if (lower.includes('allied') || lower.includes('health') || lower.includes('physio') || lower.includes('psych')) return 'allied_health'
+  if (lower.includes('professional') || lower.includes('services') || lower.includes('consult')) return 'professional_services'
+  if (lower.includes('retail')) return 'retail'
+  
+  // Default to building_construction if no specific match
+  return 'building_construction'
+}
+
+// Financial Help Info Card Component
+function FinancialHelpCard({ isVisible }: { isVisible: boolean }) {
+  if (!isVisible) return null
+  
+  return (
+    <div className="absolute z-50 left-6 top-8 w-80 bg-white rounded-lg shadow-xl border border-gray-200 p-4">
+      <div className="absolute -top-2 left-4 w-4 h-4 bg-white border-l border-t border-gray-200 rotate-45"></div>
+      <div className="space-y-2 relative">
+        <h4 className="font-semibold text-gray-900">Financial Goals Help</h4>
+        <p className="text-sm text-gray-600">
+          You can enter either dollar amounts or percentages - the system automatically calculates the other.
+        </p>
+        <p className="text-sm text-gray-600">
+          When you change revenue, profits scale automatically to maintain your margin percentages.
+        </p>
+      </div>
+    </div>
+  )
 }
 
 // KPI Info Card Component - Fixed positioning
@@ -569,20 +606,21 @@ export default function GoalsPage() {
   const router = useRouter()
   const supabase = createClient()
   
-  // Core states
+  // Core states - FIXED: Remove isSaving, add lastSaved and showFinancialHelp
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [businessProfileId, setBusinessProfileId] = useState<string | null>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [showProfitCalculator, setShowProfitCalculator] = useState(false)
   const [yearType, setYearType] = useState<'FY' | 'CY'>('FY')
   const [hoveredKPI, setHoveredKPI] = useState<string | null>(null)
+  const [showFinancialHelp, setShowFinancialHelp] = useState(false)
   
   // Collapsed sections state
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
   
-  // Business data - FIXED with safe defaults
+  // Business data - FIXED with proper database loading
   const [industry, setIndustry] = useState('building_construction')
   const [currentRevenue, setCurrentRevenue] = useState(500000)
   const [businessProfile, setBusinessProfile] = useState<any>(null)
@@ -611,12 +649,9 @@ export default function GoalsPage() {
   // Strategic items
   const [ninetyDayItems, setNinetyDayItems] = useState<NinetyDayItem[]>([])
 
-  // Database operations
+  // Database operations - FIXED: Remove isSaving circular dependency
   const saveFinancialData = useCallback(async (data: FinancialData) => {
-    if (isSaving) return // Prevent concurrent saves
-    
     try {
-      setIsSaving(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -659,13 +694,13 @@ export default function GoalsPage() {
         .upsert(financialRecord, { onConflict: 'user_id' })
 
       if (error) throw error
+      
+      setLastSaved(new Date())
     } catch (err) {
       console.error('Error saving financial data:', err)
       setError('Failed to save financial data')
-    } finally {
-      setIsSaving(false)
     }
-  }, [supabase, yearType, industry, isSaving])
+  }, [supabase, yearType, industry])
 
   const saveKPIs = useCallback(async (kpiList: KPIData[]) => {
     try {
@@ -704,6 +739,8 @@ export default function GoalsPage() {
 
         if (error) throw error
       }
+      
+      setLastSaved(new Date())
     } catch (err) {
       console.error('Error saving KPIs:', err)
       setError('Failed to save KPIs')
@@ -739,6 +776,8 @@ export default function GoalsPage() {
 
         if (error) throw error
       }
+      
+      setLastSaved(new Date())
     } catch (err) {
       console.error('Error saving life goals:', err)
       setError('Failed to save life goals')
@@ -750,7 +789,7 @@ export default function GoalsPage() {
     if (!isLoading) {
       const timeoutId = setTimeout(() => {
         saveFinancialData(financialData)
-      }, 1000) // Save 1 second after user stops typing
+      }, 2000) // Save 2 seconds after user stops typing
       
       return () => clearTimeout(timeoutId)
     }
@@ -760,7 +799,7 @@ export default function GoalsPage() {
     if (!isLoading) {
       const timeoutId = setTimeout(() => {
         saveKPIs(kpis)
-      }, 1000)
+      }, 2000)
       
       return () => clearTimeout(timeoutId)
     }
@@ -770,7 +809,7 @@ export default function GoalsPage() {
     if (!isLoading) {
       const timeoutId = setTimeout(() => {
         saveLifeGoals(lifeGoals)
-      }, 1000)
+      }, 2000)
       
       return () => clearTimeout(timeoutId)
     }
@@ -804,30 +843,42 @@ export default function GoalsPage() {
         return
       }
       
-      // Load business profile from localStorage - FIXED safe access
-      const storedProfile = localStorage.getItem('businessProfile')
-      let profileIndustry = 'building_construction'
+      console.log('🔄 Loading business profile from database...')
       
-      if (storedProfile) {
-        try {
-          const profile = JSON.parse(storedProfile)
-          profileIndustry = profile.industry || 'building_construction'
-          setIndustry(profileIndustry)
+      // FIXED: Load business profile from Supabase database instead of localStorage
+      try {
+        const dbBusinessProfile = await getBusinessProfile()
+        console.log('📊 Database business profile:', dbBusinessProfile)
+        
+        if (dbBusinessProfile) {
+          // Map the database industry to our KPI categories
+          const mappedIndustry = mapIndustryFromDatabase(dbBusinessProfile.industry)
+          console.log(`🏭 Industry mapping: "${dbBusinessProfile.industry}" → "${mappedIndustry}"`)
           
-          // FIXED: Use safe getCurrentRevenue function
-          const revenue = getCurrentRevenue(profile)
-          setCurrentRevenue(revenue)
-          setBusinessProfile(profile)
-          
-          console.log('Loaded business profile:', { 
-            revenue, 
-            industry: profileIndustry,
-            profile 
+          setIndustry(mappedIndustry)
+          setCurrentRevenue(dbBusinessProfile.current_revenue || 500000)
+          setBusinessProfile({
+            id: dbBusinessProfile.id,
+            company_name: dbBusinessProfile.company_name,
+            industry: mappedIndustry,
+            current_revenue: dbBusinessProfile.current_revenue,
+            employee_count: dbBusinessProfile.employee_count
           })
-        } catch (e) {
-          console.error('Error parsing business profile:', e)
-          // Continue with defaults
+          
+          console.log('✅ Business profile loaded successfully:', {
+            industry: mappedIndustry,
+            revenue: dbBusinessProfile.current_revenue
+          })
+        } else {
+          console.log('⚠️ No business profile found, using defaults')
+          setIndustry('building_construction')
+          setCurrentRevenue(500000)
         }
+      } catch (profileError) {
+        console.error('❌ Error loading business profile:', profileError)
+        // Continue with defaults if profile loading fails
+        setIndustry('building_construction')
+        setCurrentRevenue(500000)
       }
 
       // Load financial data from database
@@ -883,9 +934,10 @@ export default function GoalsPage() {
           }
         })
         setYearType(strategicGoals.year_type as 'FY' | 'CY')
-        if (strategicGoals.industry) {
-          setIndustry(strategicGoals.industry)
-        }
+        
+        // FIXED: Don't override industry from strategic_goals
+        // Keep the industry from business_profiles as the source of truth
+        console.log('✅ Using industry from business profile, not overriding from strategic_goals')
       }
 
       // Load KPIs from database
@@ -911,9 +963,29 @@ export default function GoalsPage() {
           isIndustry: kpi.is_industry,
           isCustom: kpi.is_custom
         }))
-        setKpis(loadedKPIs)
+        
+        // FIXED: Check if industry-specific KPIs match current industry
+        const currentIndustryKPIs = INDUSTRY_KPIS[industry] || []
+        const loadedIndustryKPIs = loadedKPIs.filter(kpi => kpi.isIndustry)
+        const standardAndCustomKPIs = loadedKPIs.filter(kpi => !kpi.isIndustry)
+        
+        // If loaded industry KPIs don't match current industry, replace them
+        const industryKPIsMatch = currentIndustryKPIs.length > 0 && 
+          loadedIndustryKPIs.some(loaded => 
+            currentIndustryKPIs.some(current => current.id === loaded.id)
+          )
+        
+        if (!industryKPIsMatch && currentIndustryKPIs.length > 0) {
+          console.log(`🔄 Industry KPIs mismatch detected. Replacing with ${industry} KPIs`)
+          setKpis([...standardAndCustomKPIs, ...currentIndustryKPIs])
+        } else {
+          setKpis(loadedKPIs)
+          console.log('✅ Loaded existing KPIs:', loadedKPIs.length)
+        }
       } else {
-        // Initialize with standard KPIs if none exist
+        // Initialize with standard + industry-specific KPIs if none exist
+        console.log(`🎯 Initializing KPIs for industry: ${industry}`)
+        
         const standardKPIs: KPIData[] = [
           {
             id: 'leads',
@@ -987,8 +1059,9 @@ export default function GoalsPage() {
           }
         ]
         
-        // Add industry-specific KPIs
-        const industryKPIs = INDUSTRY_KPIS[profileIndustry] || []
+        // FIXED: Add industry-specific KPIs based on the loaded industry
+        const industryKPIs = INDUSTRY_KPIS[industry] || []
+        console.log(`📊 Adding ${industryKPIs.length} industry-specific KPIs for ${industry}`)
         
         setKpis([...standardKPIs, ...industryKPIs])
       }
@@ -1013,13 +1086,14 @@ export default function GoalsPage() {
       }
       
     } catch (err) {
-      console.error('Error initializing data:', err)
+      console.error('❌ Error initializing data:', err)
       setError('Failed to load data. Please refresh the page.')
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Rest of the component methods remain the same...
   const updateFinancialValue = (
     metric: keyof FinancialData,
     period: 'current' | 'year1' | 'year2' | 'year3',
@@ -1116,20 +1190,6 @@ export default function GoalsPage() {
     )
     
     setKpis(updatedKPIs)
-    
-    // If team size was updated, update employees data and recalculate revenue per employee
-    if (kpiId === 'team-size') {
-      const newFinancialData = { ...financialData }
-      const teamSizeKPI = updatedKPIs.find(k => k.id === 'team-size')
-      if (teamSizeKPI) {
-        if (field === 'currentValue') newFinancialData.employees.current = value
-        if (field === 'year1Target') newFinancialData.employees.year1 = value
-        if (field === 'year2Target') newFinancialData.employees.year2 = value
-        if (field === 'year3Target') newFinancialData.employees.year3 = value
-        setFinancialData(newFinancialData)
-      }
-      updateRevenuePerEmployee()
-    }
   }
 
   const handleKPISave = (selectedKPIs: any[]) => {
@@ -1202,6 +1262,7 @@ export default function GoalsPage() {
         <div className="text-center">
           <Loader2 className="animate-spin h-12 w-12 text-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Loading strategic planner...</p>
+          <p className="mt-2 text-sm text-gray-500">Fetching business profile from database...</p>
         </div>
       </div>
     )
@@ -1258,15 +1319,15 @@ export default function GoalsPage() {
               </p>
             </div>
             <div className="flex items-center space-x-3">
-              {isSaving && (
-                <div className="flex items-center text-gray-600">
-                  <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                  Saving...
+              {lastSaved && (
+                <div className="flex items-center text-green-600">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Auto-saved {Math.floor((new Date().getTime() - lastSaved.getTime()) / 1000) < 10 
+                    ? 'just now' 
+                    : `${Math.floor((new Date().getTime() - lastSaved.getTime()) / 1000)}s ago`
+                  }
                 </div>
               )}
-              <div className="text-sm text-green-600 font-medium">
-                Auto-saved to database
-              </div>
             </div>
           </div>
         </div>
@@ -1329,6 +1390,8 @@ export default function GoalsPage() {
             setHoveredKPI={setHoveredKPI}
             collapsedSections={collapsedSections}
             toggleSection={toggleSection}
+            showFinancialHelp={showFinancialHelp}
+            setShowFinancialHelp={setShowFinancialHelp}
           />
         )}
 
@@ -1430,7 +1493,7 @@ export default function GoalsPage() {
   )
 }
 
-// Goals & KPIs Step Component - WITH COLLAPSIBLE SECTIONS AND CUSTOMERS/EMPLOYEES
+// Goals & KPIs Step Component - WITH ALL REQUESTED CHANGES
 function GoalsKPIsStep({ 
   financialData,
   updateFinancialValue,
@@ -1452,7 +1515,9 @@ function GoalsKPIsStep({
   hoveredKPI,
   setHoveredKPI,
   collapsedSections,
-  toggleSection
+  toggleSection,
+  showFinancialHelp,
+  setShowFinancialHelp
 }: any) {
   const currentYear = new Date().getFullYear()
   
@@ -1468,7 +1533,7 @@ function GoalsKPIsStep({
 
   return (
     <div className="space-y-6">
-      {/* Controls Bar */}
+      {/* Controls Bar - SHOWING LOADED INDUSTRY */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
@@ -1498,14 +1563,13 @@ function GoalsKPIsStep({
               </div>
             </div>
             
-            {businessProfile && (
-              <div className="text-sm text-gray-600">
-                <span>Industry: </span>
-                <span className="font-semibold text-gray-900">
-                  {industry.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                </span>
-              </div>
-            )}
+            {/* FIXED: Show loaded industry from database */}
+            <div className="text-sm text-gray-600">
+              <span>Industry: </span>
+              <span className="font-semibold text-gray-900 bg-green-100 px-2 py-1 rounded">
+                {industry.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+              </span>
+            </div>
           </div>
           
           <button
@@ -1518,19 +1582,28 @@ function GoalsKPIsStep({
         </div>
       </div>
 
-      {/* Financial Goals Table - COLLAPSIBLE */}
+      {/* Financial Goals Table - WITH HELP TOOLTIP AND TEXT INPUT FOR GROSS MARGIN */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div 
           className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 border-b border-gray-200 cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all"
           onClick={() => toggleSection('financial')}
         >
-          <div className="flex items-center">
+          <div className="flex items-center relative">
             <DollarSign className="h-5 w-5 text-white mr-2" />
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Financial Goals</h3>
+            <button
+              onMouseEnter={() => setShowFinancialHelp(true)}
+              onMouseLeave={() => setShowFinancialHelp(false)}
+              onClick={(e) => e.stopPropagation()}
+              className="ml-2 text-white/80 hover:text-white relative"
+            >
+              <Info className="h-4 w-4" />
+            </button>
+            <FinancialHelpCard isVisible={showFinancialHelp} />
             {collapsedSections.has('financial') ? (
-              <ChevronDown className="h-5 w-5 text-white ml-2" />
+              <ChevronDown className="h-5 w-5 text-white ml-auto" />
             ) : (
-              <ChevronUp className="h-5 w-5 text-white ml-2" />
+              <ChevronUp className="h-5 w-5 text-white ml-auto" />
             )}
           </div>
         </div>
@@ -1595,19 +1668,22 @@ function GoalsKPIsStep({
                 <td className="px-2 py-4"></td>
               </tr>
               
-              {/* Gross Margin */}
+              {/* Gross Margin - FIXED: Changed to text input like net margin */}
               <tr className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 text-sm font-medium text-gray-900">Gross Margin (%)</td>
                 {['current', 'year1', 'year2', 'year3'].map(period => (
                   <td key={period} className="px-4 py-4">
                     <div className="flex justify-center">
                       <input
-                        type="number"
+                        type="text"
                         value={financialData.grossMargin[period as keyof typeof financialData.grossMargin]}
-                        onChange={(e) => updateFinancialValue('grossMargin', period as any, Number(e.target.value), true)}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '')
+                          if (value === '' || (Number(value) >= 0 && Number(value) <= 100)) {
+                            updateFinancialValue('grossMargin', period as any, Number(value), true)
+                          }
+                        }}
                         className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        min="0"
-                        max="100"
                       />
                     </div>
                   </td>
@@ -1656,49 +1732,13 @@ function GoalsKPIsStep({
                 <td className="px-2 py-4"></td>
               </tr>
 
-              {/* Customers */}
-              <tr className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">Customers (#)</td>
-                {['current', 'year1', 'year2', 'year3'].map(period => (
-                  <td key={period} className="px-4 py-4">
-                    <div className="flex justify-center">
-                      <input
-                        type="number"
-                        value={financialData.customers[period as keyof typeof financialData.customers]}
-                        onChange={(e) => updateFinancialValue('customers', period as any, Number(e.target.value))}
-                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        min="0"
-                      />
-                    </div>
-                  </td>
-                ))}
-                <td className="px-2 py-4"></td>
-              </tr>
-
-              {/* Employees */}
-              <tr className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">Employees (#)</td>
-                {['current', 'year1', 'year2', 'year3'].map(period => (
-                  <td key={period} className="px-4 py-4">
-                    <div className="flex justify-center">
-                      <input
-                        type="number"
-                        value={financialData.employees[period as keyof typeof financialData.employees]}
-                        onChange={(e) => updateFinancialValue('employees', period as any, Number(e.target.value))}
-                        className="w-28 px-3 py-1.5 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        min="0"
-                      />
-                    </div>
-                  </td>
-                ))}
-                <td className="px-2 py-4"></td>
-              </tr>
+              {/* REMOVED: Customers and Employees rows have been removed */}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* KPI Section - COLLAPSIBLE */}
+      {/* KPI Section - COLLAPSIBLE WITH INDUSTRY-SPECIFIC KPIs PROPERLY DISPLAYED */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div 
           className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 border-b border-gray-200 cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all"
@@ -1814,7 +1854,7 @@ function GoalsKPIsStep({
                 </>
               )}
 
-              {/* Industry Specific KPIs */}
+              {/* Industry Specific KPIs - FIXED TO SHOW CORRECT INDUSTRY */}
               {kpis.filter((k: KPIData) => k.isIndustry).length > 0 && (
                 <>
                   <tr className="bg-green-50">

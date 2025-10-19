@@ -1,85 +1,37 @@
 // src/lib/kpi/types.ts
+// STEP 2: Core KPI Types and Interfaces
+// This file defines all the types used throughout the KPI system
 
-import { LucideIcon } from 'lucide-react'
-
-/**
- * Core KPI Interface - Single Source of Truth
- * 
- * This interface defines the complete structure for all KPIs in the system.
- * It serves as the foundation for the unified KPI architecture.
- */
-export interface KPI {
-  // Identity
-  id: string                    // Unique identifier (e.g., 'monthly-revenue')
-  name: string                  // Display name (e.g., 'Monthly Revenue')
-  plainName: string             // User-friendly name (e.g., 'Money Coming In Each Month')
-  
-  // Classification
-  function: BusinessFunction    // ATTRACT, CONVERT, DELIVER, etc.
-  category: string              // Sub-category (e.g., 'Revenue', 'Marketing Efficiency')
-  tier: KPITier                // Essential, recommended, advanced
-  industries: Industry[]        // Applicable industries
-  stages: BusinessStage[]       // Applicable business stages
-  
-  // Measurement
-  unit: string                  // 'currency', 'percentage', 'number', 'days', etc.
-  frequency: Frequency          // How often to measure
-  formula?: string              // Optional calculation formula
-  
-  // Guidance
-  description: string           // What this measures
-  whyItMatters: string         // Business importance explanation
-  actionToTake: string         // What to do with results
-  
-  // Benchmarks
-  benchmarks: {
-    poor: number | string
-    average: number | string  
-    good: number | string
-    excellent: number | string
-  }
-  
-  // Metadata
-  icon: LucideIcon             // Icon for UI display
-  tags: string[]               // For searching/filtering
-  createdAt: string            // ISO timestamp
-  updatedAt: string            // ISO timestamp
-}
+import type { LucideIcon } from 'lucide-react'
 
 /**
- * Business Functions - The 6 Core Business Engines
- * 
- * Based on the Strategic Wheel methodology used in the platform.
- * Each function represents a key area of business performance.
+ * Business Functions - The 7 core areas of business
  */
 export enum BusinessFunction {
-  ATTRACT = 'ATTRACT',          // Marketing & Lead Generation
-  CONVERT = 'CONVERT',          // Sales & Conversion
-  DELIVER = 'DELIVER',          // Operations & Delivery
-  DELIGHT = 'DELIGHT',          // Customer Service & Retention
-  PEOPLE = 'PEOPLE',            // Team & Culture
-  PROFIT = 'PROFIT',            // Financial Management
-  SYSTEMS = 'SYSTEMS'           // Efficiency & Productivity
+  ESSENTIAL = 'ESSENTIAL',
+  ATTRACT = 'ATTRACT',     // Marketing & Lead Generation
+  CONVERT = 'CONVERT',     // Sales & Conversion
+  DELIVER = 'DELIVER',     // Operations & Service Delivery
+  DELIGHT = 'DELIGHT',     // Customer Success & Retention
+  PEOPLE = 'PEOPLE',       // Team & Human Resources
+  PROFIT = 'PROFIT',       // Financial Performance
+  SYSTEMS = 'SYSTEMS'      // Technology & Operations
 }
 
 /**
- * Industries - Supported Business Industries
- * 
- * Maps to the industry classification used throughout the platform.
+ * Industries supported by the platform
  */
 export enum Industry {
   CONSTRUCTION_TRADES = 'construction-trades',
-  HEALTH_WELLNESS = 'health-wellness', 
+  HEALTH_WELLNESS = 'health-wellness',
   PROFESSIONAL_SERVICES = 'professional-services',
   RETAIL_ECOMMERCE = 'retail-ecommerce',
   OPERATIONS_LOGISTICS = 'operations-logistics',
-  ALL = 'all'                   // Universal KPIs applicable to all industries
+  ALL = 'all'
 }
 
 /**
- * Business Stages - Revenue-Based Business Maturity Levels
- * 
- * Aligns with the platform's revenue stage framework.
+ * Business stages based on revenue
  */
 export enum BusinessStage {
   FOUNDATION = 'foundation',     // 0-250K
@@ -91,44 +43,84 @@ export enum BusinessStage {
 }
 
 /**
- * KPI Tiers - Importance Classification
- * 
- * Helps with progressive disclosure and prioritization.
+ * KPI importance tiers
  */
 export enum KPITier {
-  ESSENTIAL = 'essential',       // Every business must track
-  RECOMMENDED = 'recommended',   // Important for most businesses
-  ADVANCED = 'advanced'          // For sophisticated operations
+  ESSENTIAL = 'essential',       // Must-have KPIs for any business
+  RECOMMENDED = 'recommended',   // Important KPIs for most businesses
+  ADVANCED = 'advanced'          // Specialized KPIs for optimization
 }
 
 /**
- * Measurement Frequency Options
+ * Measurement frequency options
  */
 export enum Frequency {
   DAILY = 'daily',
   WEEKLY = 'weekly',
   MONTHLY = 'monthly',
   QUARTERLY = 'quarterly',
-  ANNUALLY = 'annually',
-  REAL_TIME = 'real-time'
+  ANNUALLY = 'annually'
 }
 
 /**
- * Context-Specific Interfaces
- * 
- * These interfaces adapt the base KPI for specific use cases.
+ * Core KPI interface - the main data structure
  */
+export interface KPI {
+  // Identity
+  id: string                    // Unique identifier
+  name: string                  // Display name (e.g., "Customer Acquisition Cost")
+  plainName: string             // Simple explanation (e.g., "Cost to get one new customer")
+  
+  // Classification
+  function: BusinessFunction    // Which business area this belongs to
+  category: string              // Subcategory (e.g., "Marketing Efficiency")
+  tier: KPITier                // Importance level
+  industries: Industry[]        // Which industries this applies to
+  stages: BusinessStage[]       // Which business stages this applies to
+  
+  // Measurement details
+  unit: string                 // What it measures (currency, percentage, number, etc.)
+  frequency: string            // How often to measure (daily, weekly, monthly, etc.)
+  formula?: string             // How to calculate it (optional)
+  
+  // Guidance and context
+  description: string          // What this KPI measures
+  whyItMatters: string        // Why this KPI is important for business
+  actionToTake: string        // What to do based on results
+  
+  // Performance benchmarks
+  benchmarks: {
+    poor: number | string      // Poor performance threshold
+    average: number | string   // Average performance threshold
+    good: number | string      // Good performance threshold
+    excellent: number | string // Excellent performance threshold
+  }
+  
+  // Metadata
+  icon: LucideIcon            // Icon for display
+  tags: string[]              // Tags for searching and filtering
+  createdAt: string           // When this KPI was created
+  updatedAt: string           // When this KPI was last updated
+}
 
 /**
- * WizardKPI - For Goals Wizard UI
- * 
- * Extends base KPI with wizard-specific fields for target setting.
+ * Business profile for KPI recommendations
+ */
+export interface BusinessProfile {
+  industry: Industry
+  stage: BusinessStage
+  weakFunctions?: BusinessFunction[]
+  preferredTiers?: KPITier[]
+  maxKPIs?: number
+}
+
+/**
+ * Legacy interfaces for backwards compatibility
  */
 export interface WizardKPI {
-  // Core identification
   id: string
   name: string
-  friendlyName: string          // Maps to plainName
+  friendlyName: string
   category: string
   unit: string
   frequency: string
@@ -138,161 +130,157 @@ export interface WizardKPI {
   benchmarks: KPI['benchmarks']
   
   // Wizard-specific fields
-  currentValue: number          // Current performance
-  year1Target: number           // Year 1 target
-  year2Target: number           // Year 2 target  
-  year3Target: number           // Year 3 target
-  
-  // Classification flags
-  isStandard: boolean           // Standard/universal KPI
-  isIndustry: boolean           // Industry-specific KPI
-  isCustom: boolean             // Custom user-created KPI
+  currentValue: number
+  year1Target: number
+  year2Target: number
+  year3Target: number
+  isStandard: boolean
+  isIndustry: boolean
+  isCustom: boolean
 }
 
-/**
- * RecommendationKPI - For Assessment Results
- * 
- * KPIs recommended based on assessment results with context.
- */
 export interface RecommendationKPI {
   id: string
   name: string
   plainName: string
   function: BusinessFunction
   tier: KPITier
-  priority: Priority
-  reason: string                // Why recommended based on assessment
+  priority: 'high' | 'medium' | 'low'
+  reason: string
   whyItMatters: string
   actionToTake: string
 }
 
 /**
- * Business Profile - Context for KPI Recommendations
- * 
- * Represents the business context used for filtering and recommendations.
+ * Search and filter interfaces
  */
-export interface BusinessProfile {
-  userId: string
-  industry: Industry
-  stage: BusinessStage
-  weakFunctions?: BusinessFunction[]  // From assessment results
-  revenue?: number
-  employees?: number
-  customNiche?: string
-}
-
-/**
- * KPI Search and Filter Types
- */
-export interface KPICriteria {
+export interface KPIFilters {
+  function?: BusinessFunction
   industry?: Industry
   stage?: BusinessStage
-  functions?: BusinessFunction[]
   tier?: KPITier
+  searchQuery?: string
   tags?: string[]
 }
 
-export interface SearchFilters {
-  query?: string
-  functions?: BusinessFunction[]
-  industries?: Industry[]
-  stages?: BusinessStage[]
-  tiers?: KPITier[]
-  tags?: string[]
+export interface KPISearchResult {
+  kpi: KPI
+  relevanceScore: number
+  matchedFields: string[]
 }
 
 /**
- * Priority Levels for Recommendations
+ * Service interfaces
  */
-export enum Priority {
-  HIGH = 'high',
-  MEDIUM = 'medium', 
-  LOW = 'low'
-}
-
-/**
- * Cache and Service Types
- */
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T> {
   data: T
   timestamp: number
   ttl: number
 }
 
-export interface KPIValue {
-  kpiId: string
-  userId: string
-  value: number
-  date: string
-  period: string               // e.g., '2024-01', '2024-Q1'
+export interface ValidationResult {
+  isValid: boolean
+  errors: string[]
+  warnings: string[]
 }
 
 /**
- * Error Types for Better Error Handling
+ * Form and UI interfaces
  */
-export class KPIError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public details?: any
-  ) {
-    super(message)
-    this.name = 'KPIError'
-  }
+export interface KPIFormData {
+  currentValue: number
+  year1Target: number
+  year2Target: number
+  year3Target: number
+  notes: string
 }
 
-export class ValidationError extends KPIError {
-  constructor(message: string, details?: any) {
-    super(message, 'VALIDATION_ERROR', details)
-    this.name = 'ValidationError'
-  }
-}
-
-export class CacheError extends KPIError {
-  constructor(message: string, details?: any) {
-    super(message, 'CACHE_ERROR', details) 
-    this.name = 'CacheError'
-  }
+export interface KPIFormErrors {
+  currentValue?: string
+  year1Target?: string
+  year2Target?: string
+  year3Target?: string
+  notes?: string
 }
 
 /**
- * Type Guards for Runtime Type Checking
+ * Statistics and analytics interfaces
  */
-export function isKPI(obj: any): obj is KPI {
-  return obj && 
+export interface KPIStats {
+  total: number
+  essential: number
+  recommended: number
+  advanced: number
+  byFunction: Record<BusinessFunction, number>
+  byIndustry: Record<Industry, number>
+  byStage: Record<BusinessStage, number>
+  byTier: Record<KPITier, number>
+}
+
+export interface SystemHealth {
+  status: 'healthy' | 'degraded' | 'error'
+  totalKPIs: number
+  expectedMinimum: number
+  functionsComplete: boolean
+  hasEssentialKPIs: boolean
+  hasRecommendedKPIs: boolean
+  hasAdvancedKPIs: boolean
+  error?: string
+}
+
+/**
+ * Type guards for runtime type checking
+ */
+export const isKPI = (obj: any): obj is KPI => {
+  return obj &&
     typeof obj.id === 'string' &&
     typeof obj.name === 'string' &&
     typeof obj.plainName === 'string' &&
     Object.values(BusinessFunction).includes(obj.function) &&
-    typeof obj.category === 'string' &&
-    Object.values(KPITier).includes(obj.tier)
+    Object.values(KPITier).includes(obj.tier) &&
+    Array.isArray(obj.industries) &&
+    Array.isArray(obj.stages) &&
+    Array.isArray(obj.tags) &&
+    obj.benchmarks &&
+    typeof obj.benchmarks === 'object'
 }
 
-export function isWizardKPI(obj: any): obj is WizardKPI {
-  return obj &&
-    typeof obj.id === 'string' &&
-    typeof obj.currentValue === 'number' &&
-    typeof obj.year1Target === 'number' &&
-    typeof obj.isStandard === 'boolean'
+export const isBusinessFunction = (value: string): value is BusinessFunction => {
+  return Object.values(BusinessFunction).includes(value as BusinessFunction)
 }
 
-export function isBusinessProfile(obj: any): obj is BusinessProfile {
-  return obj &&
-    typeof obj.userId === 'string' &&
-    Object.values(Industry).includes(obj.industry) &&
-    Object.values(BusinessStage).includes(obj.stage)
+export const isIndustry = (value: string): value is Industry => {
+  return Object.values(Industry).includes(value as Industry)
+}
+
+export const isBusinessStage = (value: string): value is BusinessStage => {
+  return Object.values(BusinessStage).includes(value as BusinessStage)
+}
+
+export const isKPITier = (value: string): value is KPITier => {
+  return Object.values(KPITier).includes(value as KPITier)
 }
 
 /**
- * Utility Types
+ * Utility type for making certain properties optional
  */
-export type KPIRegistry = Map<string, KPI>
-export type FunctionKPIs = Record<BusinessFunction, KPI[]>
-export type IndustryKPIs = Record<Industry, KPI[]>
+export type PartialKPI = Partial<KPI> & Pick<KPI, 'id' | 'name' | 'function'>
 
-// Export all enums as const for better tree-shaking
-export const BUSINESS_FUNCTIONS = Object.values(BusinessFunction) as const
-export const INDUSTRIES = Object.values(Industry) as const  
-export const BUSINESS_STAGES = Object.values(BusinessStage) as const
-export const KPI_TIERS = Object.values(KPITier) as const
-export const FREQUENCIES = Object.values(Frequency) as const
+/**
+ * Type for KPI creation (without computed fields)
+ */
+export type CreateKPIInput = Omit<KPI, 'createdAt' | 'updatedAt'>
+
+/**
+ * Type for KPI updates (all fields optional except id)
+ */
+export type UpdateKPIInput = Partial<KPI> & Pick<KPI, 'id'>
+
+/**
+ * Union types for easier usage
+ */
+export type KPIUnit = 'currency' | 'percentage' | 'number' | 'ratio' | 'score' | 'rating' | 'days' | 'hours' | 'minutes' | 'months' | 'contacts_per_month'
+
+export type Priority = 'high' | 'medium' | 'low'
+
+export type SystemStatus = 'healthy' | 'degraded' | 'error'

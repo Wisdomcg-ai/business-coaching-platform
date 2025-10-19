@@ -28,54 +28,17 @@ import {
 } from 'lucide-react'
 
 // =====================================================
-// TYPE DEFINITIONS - FIXED Property Names
+// TYPE DEFINITIONS - Production Ready
 // =====================================================
 
 interface BusinessProfile {
   id: string
   user_id: string
   company_name: string
-  current_revenue: number // Fixed: use database field name
+  current_revenue: number
   industry: string | null
   employee_count: number
   founded_date: string | null
-  created_at: string
-  updated_at: string
-}
-
-interface StrategicGoalsFlat {
-  id: string
-  business_profile_id: number | string
-  revenue_current: number
-  revenue_1_year: number
-  revenue_2_year: number
-  revenue_3_year: number
-  gross_profit_current: number
-  gross_profit_1_year: number
-  gross_profit_2_year: number
-  gross_profit_3_year: number
-  gross_margin_current: number
-  gross_margin_1_year: number
-  gross_margin_2_year: number
-  gross_margin_3_year: number
-  net_profit_current: number
-  net_profit_1_year: number
-  net_profit_2_year: number
-  net_profit_3_year: number
-  net_margin_current: number
-  net_margin_1_year: number
-  net_margin_2_year: number
-  net_margin_3_year: number
-  customers_current: number
-  customers_1_year: number
-  customers_2_year: number
-  customers_3_year: number
-  employees_current: number
-  employees_1_year: number
-  employees_2_year: number
-  employees_3_year: number
-  year_type: string
-  industry: string
   created_at: string
   updated_at: string
 }
@@ -107,29 +70,19 @@ interface KPI {
   updated_at: string
 }
 
+// Fixed: Match exact database schema
 interface Initiative {
   id: string
-  user_id: string
   business_profile_id: string
   title: string
   category: string
-  priority: string | null
-  source: string | null
-  source_reference: string | null
-  selected_for_action: boolean | null
-  selected_for_annual_plan: boolean | null
-  notes: string | null
-  revenue_impact_estimate: number | null
-  aligns_with_level: number | null
+  is_from_roadmap: boolean
+  custom_source: string | null
+  selected: boolean  // Database field name
   quarter_assignment: string | null
   order_index: number
   created_at: string
-  updated_at: string | null
-  completed_at: string | null
-  source_type: string | null
-  coach_id: string | null
-  roadmap_item_id: string | null
-  assessment_suggestion_type: string | null
+  updated_at: string
 }
 
 interface FinancialData {
@@ -179,154 +132,42 @@ interface ErrorState {
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 // =====================================================
-// DEMO DATA FUNCTIONS - Enhanced for Client Demo
+// FALLBACK DATA - Only when no real data exists
 // =====================================================
 
-function getDemoStrategicGoals() {
+function createFallbackFinancialData(businessProfile: BusinessProfile): FinancialData {
+  const currentRevenue = businessProfile.current_revenue || 500000
   return {
-    id: 'demo-goals',
-    business_profile_id: 'demo-profile',
-    bhag_statement: 'Build Australia\'s leading business coaching platform serving 1,000+ SMBs by 2027',
-    bhag_metrics: '1,000 active clients, $5M ARR, 95% satisfaction rate',
-    bhag_deadline: '2027-12-31',
-    three_year_goals: {
-      revenue_current: 500000,
-      revenue_1_year: 750000,
-      revenue_2_year: 1200000,
-      revenue_3_year: 2000000,
-      gross_profit_current: 200000,
-      gross_profit_1_year: 337500,
-      gross_profit_2_year: 600000,
-      gross_profit_3_year: 1000000,
-      net_profit_current: 50000,
-      net_profit_1_year: 112500,
-      net_profit_2_year: 240000,
-      net_profit_3_year: 500000,
-      gross_margin_current: 40,
-      gross_margin_1_year: 45,
-      gross_margin_2_year: 50,
-      gross_margin_3_year: 50,
-      net_margin_current: 10,
-      net_margin_1_year: 15,
-      net_margin_2_year: 20,
-      net_margin_3_year: 25,
-      customers_current: 50,
-      customers_1_year: 100,
-      customers_2_year: 200,
-      customers_3_year: 400,
-      employees_current: 2,
-      employees_1_year: 5,
-      employees_2_year: 12,
-      employees_3_year: 25,
-      year_type: 'FY' as const
-    },
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    revenue_current: currentRevenue,
+    revenue_1_year: Math.round(currentRevenue * 1.5),
+    revenue_2_year: Math.round(currentRevenue * 2.4),
+    revenue_3_year: Math.round(currentRevenue * 4),
+    gross_profit_current: Math.round(currentRevenue * 0.4),
+    gross_profit_1_year: Math.round(currentRevenue * 1.5 * 0.45),
+    gross_profit_2_year: Math.round(currentRevenue * 2.4 * 0.5),
+    gross_profit_3_year: Math.round(currentRevenue * 4 * 0.5),
+    net_profit_current: Math.round(currentRevenue * 0.1),
+    net_profit_1_year: Math.round(currentRevenue * 1.5 * 0.15),
+    net_profit_2_year: Math.round(currentRevenue * 2.4 * 0.2),
+    net_profit_3_year: Math.round(currentRevenue * 4 * 0.25),
+    gross_margin_current: 40,
+    gross_margin_1_year: 45,
+    gross_margin_2_year: 50,
+    gross_margin_3_year: 50,
+    net_margin_current: 10,
+    net_margin_1_year: 15,
+    net_margin_2_year: 20,
+    net_margin_3_year: 25,
+    customers_current: 50,
+    customers_1_year: 100,
+    customers_2_year: 200,
+    customers_3_year: 400,
+    employees_current: businessProfile.employee_count || 2,
+    employees_1_year: Math.max(businessProfile.employee_count + 3, 5),
+    employees_2_year: Math.max(businessProfile.employee_count + 10, 12),
+    employees_3_year: Math.max(businessProfile.employee_count + 23, 25),
+    year_type: 'FY' as const
   }
-}
-
-function getDemoKPIs() {
-  return [
-    { 
-      id: 'demo-kpi-1', 
-      name: 'Monthly Recurring Revenue', 
-      category: 'Financial', 
-      currentValue: 20833, 
-      year1Target: 62500,
-      unit: 'currency', 
-      frequency: 'monthly' 
-    },
-    { 
-      id: 'demo-kpi-2', 
-      name: 'Customer Acquisition Cost', 
-      category: 'Marketing', 
-      currentValue: 250, 
-      year1Target: 150,
-      unit: 'currency', 
-      frequency: 'monthly' 
-    },
-    { 
-      id: 'demo-kpi-3', 
-      name: 'Customer Lifetime Value', 
-      category: 'Financial', 
-      currentValue: 2400, 
-      year1Target: 4800,
-      unit: 'currency', 
-      frequency: 'quarterly' 
-    },
-    { 
-      id: 'demo-kpi-4', 
-      name: 'Net Promoter Score', 
-      category: 'Customer', 
-      currentValue: 45, 
-      year1Target: 70,
-      unit: 'score', 
-      frequency: 'quarterly' 
-    },
-    { 
-      id: 'demo-kpi-5', 
-      name: 'Team Satisfaction Score', 
-      category: 'People', 
-      currentValue: 7.2, 
-      year1Target: 8.5,
-      unit: 'rating', 
-      frequency: 'quarterly' 
-    }
-  ]
-}
-
-function getDemoInitiatives() {
-  return [
-    { 
-      id: 'demo-init-1', 
-      title: 'Launch AI-powered business assessment tool', 
-      category: 'Product Development', 
-      selected: true, 
-      quarterAssignment: 'q1' 
-    },
-    { 
-      id: 'demo-init-2', 
-      title: 'Implement comprehensive financial dashboard', 
-      category: 'Technology', 
-      selected: true, 
-      quarterAssignment: 'q1' 
-    },
-    { 
-      id: 'demo-init-3', 
-      title: 'Build multi-client coach management system', 
-      category: 'Product Development', 
-      selected: true, 
-      quarterAssignment: 'q2' 
-    },
-    { 
-      id: 'demo-init-4', 
-      title: 'Create strategic planning automation', 
-      category: 'Product Development', 
-      selected: true, 
-      quarterAssignment: 'q2' 
-    },
-    { 
-      id: 'demo-init-5', 
-      title: 'Develop mobile companion app', 
-      category: 'Technology', 
-      selected: true, 
-      quarterAssignment: 'q3' 
-    },
-    { 
-      id: 'demo-init-6', 
-      title: 'Integrate with accounting platforms', 
-      category: 'Technology', 
-      selected: true, 
-      quarterAssignment: 'q3' 
-    },
-    { 
-      id: 'demo-init-7', 
-      title: 'Launch partner program for business coaches', 
-      category: 'Business Development', 
-      selected: true, 
-      quarterAssignment: 'q4' 
-    }
-  ]
 }
 
 // =====================================================
@@ -343,7 +184,7 @@ export default function AnnualPlan() {
   
   const [error, setError] = useState<ErrorState | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [isDemoMode, setIsDemoMode] = useState(false)
+  const [hasData, setHasData] = useState(false)
   
   // Data state
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null)
@@ -379,7 +220,7 @@ export default function AnnualPlan() {
   const supabase = createClient()
 
   // =====================================================
-  // DATA LOADING - FIXED NULL HANDLING
+  // DATA LOADING - Production Ready with Error Handling
   // =====================================================
 
   const loadData = useCallback(async () => {
@@ -387,84 +228,151 @@ export default function AnnualPlan() {
       setLoading(prev => ({ ...prev, main: true }))
       setError(null)
       
-      console.log('Loading Annual Plan data...')
+      console.log('Loading Annual Plan data from database...')
       
-      // Always start with demo mode for client presentation
-      console.log('Using demo mode for client presentation')
-      setIsDemoMode(true)
+      // Get current user first
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
       
-      // Load demo data
-      const demoGoals = getDemoStrategicGoals()
-      const demoKpis = getDemoKPIs()
-      const demoInitiatives = getDemoInitiatives()
-      
-      // Create demo business profile
-      const demoProfile: BusinessProfile = {
-        id: 'demo-profile-id',
-        user_id: 'demo-user',
-        company_name: 'TechStart Solutions',
-        current_revenue: 500000, // Fixed: proper field name
-        industry: 'technology',
-        employee_count: 5,
-        founded_date: '2020-01-01',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+      if (userError) {
+        console.error('Authentication error:', userError)
+        setError({
+          message: 'Please log in to view your annual plan',
+          type: 'warning',
+          dismissible: false
+        })
+        return
       }
+
+      if (!user) {
+        console.log('No user found - need to log in')
+        setError({
+          message: 'Please log in to access your strategic plan',
+          type: 'info', 
+          dismissible: false
+        })
+        return
+      }
+
+      console.log('User authenticated:', user.email)
       
-      setBusinessProfile(demoProfile)
-      setStrategicGoals(demoGoals)
-      
-      // Convert demo KPIs to proper format
-      setKpis(demoKpis.map(kpi => ({
-        id: `demo-${kpi.id}`,
-        business_profile_id: 'demo-profile',
-        kpi_id: kpi.id,
-        name: kpi.name,
-        category: kpi.category,
-        current_value: kpi.currentValue,
-        year1_target: kpi.year1Target,
-        year2_target: kpi.year1Target * 1.2,
-        year3_target: kpi.year1Target * 1.5,
-        unit: kpi.unit,
-        frequency: kpi.frequency,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })))
-      
-      // Convert demo initiatives to proper format
-      setInitiatives(demoInitiatives.map(init => ({
-        id: `demo-${init.id}`,
-        user_id: 'demo-user',
-        business_profile_id: 'demo-profile',
-        title: init.title,
-        category: init.category,
-        priority: 'High',
-        source: null,
-        source_reference: null,
-        selected_for_action: true,
-        selected_for_annual_plan: init.selected,
-        notes: null,
-        revenue_impact_estimate: null,
-        aligns_with_level: null,
-        quarter_assignment: init.quarterAssignment,
-        order_index: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        completed_at: null,
-        source_type: 'roadmap',
-        coach_id: null,
-        roadmap_item_id: null,
-        assessment_suggestion_type: null
-      })))
-      
-      const demoFinancialData = demoGoals.three_year_goals as FinancialData
-      setFinancialData(demoFinancialData)
-      
+      // Load business profile using proper RLS query
+      console.log('Loading business profile...')
+      const { data: businessProfileData, error: profileError } = await supabase
+        .from('business_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()  // Use maybeSingle to handle no results gracefully
+
+      if (profileError) {
+        console.error('Business profile error:', profileError)
+        setError({
+          message: 'Database error loading business profile. Please contact support.',
+          type: 'error',
+          dismissible: true
+        })
+        return
+      }
+
+      if (!businessProfileData) {
+        console.log('No business profile found')
+        setError({
+          message: 'No business profile found. Please complete your business setup first.',
+          type: 'warning',
+          dismissible: true
+        })
+        return
+      }
+
+      console.log('Business profile loaded:', businessProfileData.company_name)
+      setBusinessProfile(businessProfileData)
+
+      // Load strategic goals with proper error handling
+      console.log('Loading strategic goals...')
+      const { data: strategicGoalsData, error: goalsError } = await supabase
+        .from('strategic_goals')
+        .select('*')
+        .eq('business_profile_id', businessProfileData.id)
+        .maybeSingle()
+
+      let finalStrategicGoals: StrategicGoals | null = null
+      let finalFinancialData: FinancialData
+
+      if (goalsError) {
+        console.log('Strategic goals error:', goalsError)
+        // Continue with fallback data
+      }
+
+      if (!strategicGoalsData) {
+        console.log('No strategic goals found, creating fallback financial data')
+        finalFinancialData = createFallbackFinancialData(businessProfileData)
+      } else {
+        console.log('Strategic goals loaded')
+        finalStrategicGoals = strategicGoalsData
+        finalFinancialData = strategicGoalsData.three_year_goals as FinancialData
+      }
+
+      setStrategicGoals(finalStrategicGoals)
+      setFinancialData(finalFinancialData)
+
+      // Load KPIs with proper error handling
+      console.log('Loading KPIs...')
+      const { data: kpisData, error: kpisError } = await supabase
+        .from('kpis')
+        .select('*')
+        .eq('business_profile_id', businessProfileData.id)
+
+      if (kpisError) {
+        console.log('KPIs error:', kpisError)
+        setKpis([])
+      } else {
+        console.log(`Loaded ${kpisData?.length || 0} KPIs`)
+        setKpis(kpisData || [])
+      }
+
+      // Load strategic initiatives with exact database field names
+      console.log('Loading strategic initiatives...')
+      const { data: initiativesData, error: initiativesError } = await supabase
+        .from('strategic_initiatives')
+        .select(`
+          id,
+          business_profile_id,
+          title,
+          category,
+          is_from_roadmap,
+          custom_source,
+          selected,
+          quarter_assignment,
+          order_index,
+          created_at,
+          updated_at
+        `)
+        .eq('business_profile_id', businessProfileData.id)
+        .eq('selected', true)  // Only get selected initiatives
+
+      if (initiativesError) {
+        console.error('Initiatives error:', initiativesError)
+        // Log the specific error details
+        console.error('Error details:', {
+          code: initiativesError.code,
+          message: initiativesError.message,
+          details: initiativesError.details,
+          hint: initiativesError.hint
+        })
+        setInitiatives([])
+      } else {
+        console.log(`Loaded ${initiativesData?.length || 0} selected initiatives`)
+        setInitiatives(initiativesData || [])
+      }
+
       // Initialize quarterly targets
-      initializeQuarterlyTargets([], demoFinancialData)
+      initializeQuarterlyTargets(kpisData || [], finalFinancialData)
       
+      // Success message
+      const initiativeCount = initiativesData?.length || 0
+      const kpiCount = kpisData?.length || 0
+      setHasData(true)
       setError({
-        message: `Demo mode: TechStart Solutions - $${formatNumber(500000)} current revenue → $${formatNumber(750000)} target`,
+        message: `Loaded ${businessProfileData.company_name}: ${initiativeCount} initiatives, ${kpiCount} KPIs`,
         type: 'info',
         dismissible: true
       })
@@ -472,7 +380,7 @@ export default function AnnualPlan() {
     } catch (err) {
       console.error('Error in loadData:', err)
       setError({
-        message: `Error loading demo data: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        message: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
         type: 'error',
         dismissible: true
       })
@@ -482,23 +390,64 @@ export default function AnnualPlan() {
   }, [])
 
   // =====================================================
-  // AUTO-SAVE FUNCTIONALITY
+  // AUTO-SAVE WITH DEBOUNCING - Fixed Loop Issue
   // =====================================================
 
   const saveQuarterlyTargets = useCallback(async (
     targets: QuarterlyTargets, 
     percentages: QuarterlyPercentages
   ) => {
-    if (loading.saving || isDemoMode || !businessProfile?.id) return
+    // Prevent save if still loading or no business profile
+    if (loading.saving || loading.main || !businessProfile?.id || !hasData) {
+      console.log('Skipping save: loading or no business profile')
+      return
+    }
+
+    // Prevent save if targets are empty (still initializing)
+    const hasTargets = Object.values(targets).some(quarter => Object.keys(quarter).length > 0)
+    if (!hasTargets) {
+      console.log('Skipping save: no targets set yet')
+      return
+    }
     
     try {
       setLoading(prev => ({ ...prev, saving: true }))
       setSaveStatus('saving')
       
-      console.log('Saving quarterly targets:', { targets, percentages, usePercentageMode })
+      console.log('Saving quarterly targets to database...')
       
-      // Simulate async save
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Save quarterly plans to database
+      const currentYear = new Date().getFullYear()
+      const quarters = ['q1', 'q2', 'q3', 'q4'] as const
+      
+      for (const quarter of quarters) {
+        const quarterTargets = targets[quarter]
+        
+        if (Object.keys(quarterTargets).length > 0) {
+          const { error: saveError } = await supabase
+            .from('quarterly_plans')
+            .upsert({
+              business_profile_id: businessProfile.id,
+              year: currentYear,
+              quarter: quarter,
+              revenue_target: quarterTargets.revenue_1_year || 0,
+              profit_target: quarterTargets.net_profit_1_year || 0,
+              other_goals: {
+                gross_profit: quarterTargets.gross_profit_1_year || 0,
+                customers: quarterTargets.customers_1_year || 0,
+                employees: quarterTargets.employees_1_year || 0
+              },
+              kpi_targets: quarterTargets
+            }, {
+              onConflict: 'business_profile_id,year,quarter'
+            })
+          
+          if (saveError) {
+            console.error(`Error saving ${quarter} targets:`, saveError)
+            throw saveError
+          }
+        }
+      }
       
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
@@ -510,18 +459,19 @@ export default function AnnualPlan() {
     } finally {
       setLoading(prev => ({ ...prev, saving: false }))
     }
-  }, [businessProfile?.id, usePercentageMode, loading.saving, isDemoMode])
+  }, [businessProfile?.id, loading.saving, loading.main, hasData])
 
-  // Debounced auto-save effect
+  // Fixed: Debounced auto-save that won't create loops
   useEffect(() => {
-    if (!loading.main && !isDemoMode && Object.keys(quarterlyTargets.q1).length > 0) {
+    // Only auto-save if we have data and not still loading
+    if (!loading.main && hasData && businessProfile?.id && Object.keys(quarterlyTargets.q1).length > 0) {
       const timeoutId = setTimeout(() => {
         saveQuarterlyTargets(quarterlyTargets, quarterlyPercentages)
-      }, 1500)
+      }, 2000)  // Increased debounce time
       
       return () => clearTimeout(timeoutId)
     }
-  }, [quarterlyTargets, quarterlyPercentages, saveQuarterlyTargets, loading.main, isDemoMode])
+  }, [quarterlyTargets, quarterlyPercentages, saveQuarterlyTargets, loading.main, hasData, businessProfile?.id])
 
   // =====================================================
   // QUARTERLY TARGET CALCULATIONS
@@ -608,7 +558,7 @@ export default function AnnualPlan() {
   }, [financialData, kpis])
 
   // =====================================================
-  // EVENT HANDLERS
+  // EVENT HANDLERS - Production Ready
   // =====================================================
 
   const updateQuarterlyPercentages = useCallback((quarter: keyof QuarterlyPercentages, percentage: number) => {
@@ -635,7 +585,7 @@ export default function AnnualPlan() {
   }, [usePercentageMode])
 
   const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination || isDemoMode) return
+    if (!result.destination || !businessProfile?.id) return
 
     const { source, destination, draggableId } = result
 
@@ -660,7 +610,26 @@ export default function AnnualPlan() {
         return
       }
 
-      // Optimistic update for demo
+      // Update database with exact field names
+      const { error: updateError } = await supabase
+        .from('strategic_initiatives')
+        .update({
+          quarter_assignment: destinationQuarter === 'unassigned' ? null : destinationQuarter,
+          order_index: destination.index
+        })
+        .eq('id', draggableId)
+
+      if (updateError) {
+        console.error('Error updating initiative:', updateError)
+        setError({
+          message: 'Failed to update initiative assignment',
+          type: 'error',
+          dismissible: true
+        })
+        return
+      }
+
+      // Optimistic update
       setInitiatives(prev => prev.map(i => 
         i.id === draggableId 
           ? { 
@@ -671,7 +640,7 @@ export default function AnnualPlan() {
           : i
       ))
 
-      setError(null)
+      console.log('Initiative assignment updated successfully')
 
     } catch (err) {
       console.error('Error updating initiative:', err)
@@ -834,19 +803,19 @@ export default function AnnualPlan() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-3 text-gray-600">Loading your annual strategic plan...</p>
-          <p className="mt-1 text-xs text-gray-500">Preparing demo data for client presentation</p>
+          <p className="mt-1 text-xs text-gray-500">Connecting to database...</p>
         </div>
       </div>
     )
   }
 
-  if (!financialData) {
+  if (!businessProfile) {
     return (
       <div className="text-center py-12">
         <Target className="h-12 w-12 text-gray-400 mx-auto" />
-        <p className="mt-4 text-gray-900 font-semibold">Unable to Load Strategic Plan</p>
+        <p className="mt-4 text-gray-900 font-semibold">Business Profile Required</p>
         <p className="mt-2 text-gray-600">
-          {error?.message || "Unable to load your strategic planning data"}
+          {error?.message || "Please complete your business profile to access strategic planning"}
         </p>
         <div className="mt-6 space-x-3">
           <button
@@ -871,6 +840,27 @@ export default function AnnualPlan() {
     )
   }
 
+  if (!financialData) {
+    return (
+      <div className="text-center py-12">
+        <BarChart3 className="h-12 w-12 text-gray-400 mx-auto" />
+        <p className="mt-4 text-gray-900 font-semibold">Strategic Goals Required</p>
+        <p className="mt-2 text-gray-600">
+          Complete your strategic planning setup to create your annual plan
+        </p>
+        <div className="mt-6 space-x-3">
+          <button
+            onClick={refreshData}
+            disabled={loading.refreshing}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            Setup Strategic Goals
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // =====================================================
   // MAIN RENDER
   // =====================================================
@@ -886,12 +876,8 @@ export default function AnnualPlan() {
           {businessProfile && (
             <div className="flex items-center gap-2 mt-2">
               <p className="text-sm text-gray-700 font-medium">{businessProfile.company_name}</p>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                isDemoMode 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-blue-100 text-blue-800'
-              }`}>
-                {isDemoMode ? 'Client Demo Ready' : 'Live Data'}
+              <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">
+                Production Ready
               </span>
             </div>
           )}
@@ -929,6 +915,21 @@ export default function AnnualPlan() {
               ×
             </button>
           )}
+        </div>
+      )}
+
+      {/* Empty State for No Initiatives */}
+      {initiatives.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-6">
+          <div className="flex items-center gap-3">
+            <Calendar className="h-6 w-6 text-yellow-600" />
+            <div>
+              <h3 className="font-semibold text-yellow-800">No Strategic Initiatives Selected</h3>
+              <p className="text-yellow-700 text-sm mt-1">
+                Visit the Strategic Initiatives page to select initiatives for your annual plan.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1274,206 +1275,204 @@ export default function AnnualPlan() {
       )}
 
       {/* Strategic Initiatives Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <button
-          onClick={() => toggleSection('initiatives')}
-          className="w-full bg-slate-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between hover:bg-slate-100 transition-colors"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Calendar className="h-5 w-5 mr-2 text-slate-600" />
-            Strategic Initiatives
-            <span className="ml-2 text-sm bg-slate-100 text-slate-800 px-2 py-1 rounded-full">
-              {initiatives.length} selected
-            </span>
-          </h3>
-          {sectionsCollapsed.initiatives ? (
-            <ChevronDown className="h-5 w-5 text-gray-600" />
-          ) : (
-            <ChevronUp className="h-5 w-5 text-gray-600" />
-          )}
-        </button>
-        
-        {!sectionsCollapsed.initiatives && (
-          <>
-            <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
-              <p className="text-sm text-gray-600 flex items-center gap-2">
-                <Grip className="h-4 w-4" />
-                Drag initiatives to quarters • Maximum 5 per quarter • {initiatives.length} total selected
-                {isDemoMode && (
-                  <span className="text-green-600 font-medium">(Demo mode for client presentation)</span>
-                )}
-              </p>
-            </div>
+      {initiatives.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <button
+            onClick={() => toggleSection('initiatives')}
+            className="w-full bg-slate-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between hover:bg-slate-100 transition-colors"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <Calendar className="h-5 w-5 mr-2 text-slate-600" />
+              Strategic Initiatives
+              <span className="ml-2 text-sm bg-slate-100 text-slate-800 px-2 py-1 rounded-full">
+                {initiatives.length} selected
+              </span>
+            </h3>
+            {sectionsCollapsed.initiatives ? (
+              <ChevronDown className="h-5 w-5 text-gray-600" />
+            ) : (
+              <ChevronUp className="h-5 w-5 text-gray-600" />
+            )}
+          </button>
+          
+          {!sectionsCollapsed.initiatives && (
+            <>
+              <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                <p className="text-sm text-gray-600 flex items-center gap-2">
+                  <Grip className="h-4 w-4" />
+                  Drag initiatives to quarters • Maximum 5 per quarter • {initiatives.length} total selected
+                  <span className="text-green-600 font-medium">(Auto-saves to database)</span>
+                </p>
+              </div>
 
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <div className="p-6">
-                
-                {/* Unassigned Initiatives */}
-                <div className="mb-8">
-                  <h4 className="text-base font-medium text-gray-900 mb-4 flex items-center">
-                    <div className="w-3 h-3 bg-gray-400 rounded-full mr-3"></div>
-                    Unassigned Initiatives
-                    <span className="ml-2 text-sm text-gray-500">({unassignedInitiatives.length})</span>
-                  </h4>
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <div className="p-6">
                   
-                  <Droppable droppableId="unassigned">
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`min-h-[100px] rounded-lg border-2 border-dashed p-4 transition-colors ${
-                          snapshot.isDraggingOver 
-                            ? 'border-gray-400 bg-gray-50' 
-                            : 'border-gray-200 bg-gray-50'
-                        }`}
-                      >
-                        {unassignedInitiatives.length === 0 ? (
-                          <div className="text-center py-6 text-gray-500">
-                            <CheckCircle2 className="h-6 w-6 mx-auto mb-2 text-green-500" />
-                            <p className="font-medium">All initiatives assigned to quarters</p>
-                            <p className="text-sm">Perfect strategic distribution!</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {unassignedInitiatives.map((initiative, index) => (
-                              <Draggable
-                                key={`unassigned-${initiative.id}-${index}`}
-                                draggableId={initiative.id}
-                                index={index}
-                              >
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className={`bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex items-center transition-all ${
-                                      snapshot.isDragging 
-                                        ? 'shadow-lg rotate-1 scale-105' 
-                                        : 'hover:shadow-md'
-                                    }`}
-                                  >
-                                    <Grip className="h-4 w-4 text-gray-400 mr-3 flex-shrink-0" />
-                                    <span className="font-medium text-gray-900 flex-1">
-                                      {initiative.title}
-                                    </span>
-                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                      {initiative.category}
-                                    </span>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
-                          </div>
-                        )}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </div>
-
-                {/* Quarterly Columns */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  {['q1', 'q2', 'q3', 'q4'].map((quarter, quarterIndex) => {
-                    const quarterInitiatives = getInitiativesByQuarter(quarter)
-                    const quarterColors = [
-                      { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', dot: 'bg-blue-500' },
-                      { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', dot: 'bg-green-500' },
-                      { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', dot: 'bg-indigo-500' },
-                      { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', dot: 'bg-slate-500' }
-                    ][quarterIndex]
-
-                    return (
-                      <div key={`quarter-${quarter}`} className={`rounded-lg ${quarterColors.bg} ${quarterColors.border} border`}>
-                        <div className="p-4 border-b border-gray-200">
-                          <h4 className={`font-semibold ${quarterColors.text} flex items-center`}>
-                            <div className={`w-3 h-3 ${quarterColors.dot} rounded-full mr-3`}></div>
-                            {getQuarterEndDate(quarter, financialData.year_type)}
-                            <span className={`ml-auto text-sm font-normal ${
-                              quarterInitiatives.length >= 5 ? 'text-red-600' : 'text-current'
-                            }`}>
-                              {quarterInitiatives.length}/5
-                            </span>
-                          </h4>
-                        </div>
-
-                        <Droppable droppableId={quarter}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.droppableProps}
-                              className={`min-h-[200px] p-4 transition-colors ${
-                                snapshot.isDraggingOver 
-                                  ? quarterColors.bg 
-                                  : ''
-                              }`}
-                            >
-                              {quarterInitiatives.length === 0 ? (
-                                <div className="text-center py-6 text-gray-500">
-                                  <Plus className="h-6 w-6 mx-auto mb-2 text-gray-400" />
-                                  <p className="text-sm font-medium">Drop initiatives here</p>
-                                  <p className="text-xs text-gray-400">Maximum 5 per quarter</p>
-                                </div>
-                              ) : (
-                                <div className="space-y-3">
-                                  {quarterInitiatives.map((initiative, index) => (
-                                    <Draggable
-                                      key={`${quarter}-${initiative.id}-${index}`}
-                                      draggableId={initiative.id}
-                                      index={index}
+                  {/* Unassigned Initiatives */}
+                  <div className="mb-8">
+                    <h4 className="text-base font-medium text-gray-900 mb-4 flex items-center">
+                      <div className="w-3 h-3 bg-gray-400 rounded-full mr-3"></div>
+                      Unassigned Initiatives
+                      <span className="ml-2 text-sm text-gray-500">({unassignedInitiatives.length})</span>
+                    </h4>
+                    
+                    <Droppable droppableId="unassigned">
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`min-h-[100px] rounded-lg border-2 border-dashed p-4 transition-colors ${
+                            snapshot.isDraggingOver 
+                              ? 'border-gray-400 bg-gray-50' 
+                              : 'border-gray-200 bg-gray-50'
+                          }`}
+                        >
+                          {unassignedInitiatives.length === 0 ? (
+                            <div className="text-center py-6 text-gray-500">
+                              <CheckCircle2 className="h-6 w-6 mx-auto mb-2 text-green-500" />
+                              <p className="font-medium">All initiatives assigned to quarters</p>
+                              <p className="text-sm">Perfect strategic distribution!</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {unassignedInitiatives.map((initiative, index) => (
+                                <Draggable
+                                  key={`unassigned-${initiative.id}-${index}`}
+                                  draggableId={initiative.id}
+                                  index={index}
+                                >
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      className={`bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex items-center transition-all ${
+                                        snapshot.isDragging 
+                                          ? 'shadow-lg rotate-1 scale-105' 
+                                          : 'hover:shadow-md'
+                                      }`}
                                     >
-                                      {(provided, snapshot) => (
-                                        <div
-                                          ref={provided.innerRef}
-                                          {...provided.draggableProps}
-                                          {...provided.dragHandleProps}
-                                          className={`bg-white p-3 rounded-lg border border-gray-200 shadow-sm transition-all ${
-                                            snapshot.isDragging 
-                                              ? 'shadow-lg rotate-1 scale-105' 
-                                              : 'hover:shadow-md'
-                                          }`}
-                                        >
-                                          <div className="flex items-start">
-                                            <Grip className="h-4 w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
-                                            <div className="flex-1">
-                                              <p className="font-medium text-gray-900 text-sm leading-tight">
-                                                {initiative.title}
-                                              </p>
-                                              <p className="text-xs text-gray-500 mt-1">
-                                                {initiative.category}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </Draggable>
-                                  ))}
-                                </div>
-                              )}
-                              {provided.placeholder}
+                                      <Grip className="h-4 w-4 text-gray-400 mr-3 flex-shrink-0" />
+                                      <span className="font-medium text-gray-900 flex-1">
+                                        {initiative.title}
+                                      </span>
+                                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                        {initiative.category}
+                                      </span>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
                             </div>
                           )}
-                        </Droppable>
-                      </div>
-                    )
-                  })}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
+
+                  {/* Quarterly Columns */}
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {['q1', 'q2', 'q3', 'q4'].map((quarter, quarterIndex) => {
+                      const quarterInitiatives = getInitiativesByQuarter(quarter)
+                      const quarterColors = [
+                        { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', dot: 'bg-blue-500' },
+                        { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', dot: 'bg-green-500' },
+                        { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+                        { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', dot: 'bg-slate-500' }
+                      ][quarterIndex]
+
+                      return (
+                        <div key={`quarter-${quarter}`} className={`rounded-lg ${quarterColors.bg} ${quarterColors.border} border`}>
+                          <div className="p-4 border-b border-gray-200">
+                            <h4 className={`font-semibold ${quarterColors.text} flex items-center`}>
+                              <div className={`w-3 h-3 ${quarterColors.dot} rounded-full mr-3`}></div>
+                              {getQuarterEndDate(quarter, financialData.year_type)}
+                              <span className={`ml-auto text-sm font-normal ${
+                                quarterInitiatives.length >= 5 ? 'text-red-600' : 'text-current'
+                              }`}>
+                                {quarterInitiatives.length}/5
+                              </span>
+                            </h4>
+                          </div>
+
+                          <Droppable droppableId={quarter}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                className={`min-h-[200px] p-4 transition-colors ${
+                                  snapshot.isDraggingOver 
+                                    ? quarterColors.bg 
+                                    : ''
+                                }`}
+                              >
+                                {quarterInitiatives.length === 0 ? (
+                                  <div className="text-center py-6 text-gray-500">
+                                    <Plus className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                                    <p className="text-sm font-medium">Drop initiatives here</p>
+                                    <p className="text-xs text-gray-400">Maximum 5 per quarter</p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {quarterInitiatives.map((initiative, index) => (
+                                      <Draggable
+                                        key={`${quarter}-${initiative.id}-${index}`}
+                                        draggableId={initiative.id}
+                                        index={index}
+                                      >
+                                        {(provided, snapshot) => (
+                                          <div
+                                            ref={provided.innerRef}
+                                            {...provided.draggableProps}
+                                            {...provided.dragHandleProps}
+                                            className={`bg-white p-3 rounded-lg border border-gray-200 shadow-sm transition-all ${
+                                              snapshot.isDragging 
+                                                ? 'shadow-lg rotate-1 scale-105' 
+                                                : 'hover:shadow-md'
+                                            }`}
+                                          >
+                                            <div className="flex items-start">
+                                              <Grip className="h-4 w-4 text-gray-400 mr-2 mt-0.5 flex-shrink-0" />
+                                              <div className="flex-1">
+                                                <p className="font-medium text-gray-900 text-sm leading-tight">
+                                                  {initiative.title}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                  {initiative.category}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </Draggable>
+                                    ))}
+                                  </div>
+                                )}
+                                {provided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            </DragDropContext>
-          </>
-        )}
-      </div>
+              </DragDropContext>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Footer Section */}
       <div className="bg-gray-50 rounded-lg p-4 text-center">
         <p className="text-sm text-gray-600">
           Your annual strategic plan transforms vision into executable quarterly milestones.
-          {!isDemoMode && ' Changes auto-save every 1.5 seconds.'}
+          Changes auto-save every 2 seconds to your database.
         </p>
-        {isDemoMode && (
-          <p className="mt-2 text-sm text-green-600 font-medium">
-            Demo mode: Perfect for client presentations and planning sessions
-          </p>
-        )}
+        <p className="mt-2 text-sm text-green-600 font-medium">
+          Production ready • All data persisted to Supabase
+        </p>
       </div>
 
     </div>

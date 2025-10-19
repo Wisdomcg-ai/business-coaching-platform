@@ -106,43 +106,43 @@ export default function AssessmentResultsPage() {
       'over_10m': 'Mastery Stage ($10M+)'
     };
     return stages[stage] || 'Unknown Stage';
-  };
+  }; // FIXED: Added missing closing brace
 
   // Calculate section percentages
   const sections = [
-    { 
-      name: 'Business Foundation', 
-      score: assessment.foundation_score || 0, 
+    {
+      name: 'Foundation',
+      score: assessment.foundation_score || 0,
       max: 40,
-      icon: <Target className="w-5 h-5" />,
+      icon: Target,
       color: 'blue'
     },
-    { 
-      name: 'Strategic Wheel', 
-      score: assessment.strategic_wheel_score || 0, 
+    {
+      name: 'Strategic Wheel',
+      score: assessment.strategic_wheel_score || 0,
       max: 60,
-      icon: <Brain className="w-5 h-5" />,
+      icon: Brain,
       color: 'purple'
     },
-    { 
-      name: 'Profitability Health', 
-      score: assessment.profitability_score || 0, 
+    {
+      name: 'Profitability',
+      score: assessment.profitability_score || 0,
       max: 30,
-      icon: <DollarSign className="w-5 h-5" />,
+      icon: DollarSign,
       color: 'green'
     },
-    { 
-      name: 'Business Engines', 
-      score: assessment.engines_score || 0, 
+    {
+      name: 'Business Engines',
+      score: assessment.engines_score || 0,
       max: 100,
-      icon: <BarChart3 className="w-5 h-5" />,
+      icon: BarChart3,
       color: 'indigo'
     },
-    { 
-      name: 'Success Disciplines', 
-      score: assessment.disciplines_score || 0, 
+    {
+      name: 'Success Disciplines',
+      score: assessment.disciplines_score || 0,
       max: 60,
-      icon: <Award className="w-5 h-5" />,
+      icon: Award,
       color: 'yellow'
     }
   ];
@@ -207,4 +207,161 @@ export default function AssessmentResultsPage() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <div className="text-4xl font-bold text-gray-900">
-                    {health
+                    {healthPercentage}%
+                  </div>
+                  <div className={`text-sm font-semibold px-3 py-1 rounded-full ${healthStatus.bg} ${healthStatus.color}`}>
+                    {healthStatus.label}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 text-center">
+                <p className="text-lg font-semibold text-gray-900">
+                  Overall Business Health
+                </p>
+                <p className="text-sm text-gray-600">
+                  {assessment.health_score} out of 290 points
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {getRevenueStageLabel(assessment.revenue_stage)}
+                </p>
+              </div>
+            </div>
+
+            {/* Detailed Breakdown */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Score Breakdown</h3>
+              {sections.map((section) => {
+                const percentage = Math.round((section.score / section.max) * 100);
+                const Icon = section.icon;
+                
+                return (
+                  <div key={section.name} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <Icon className={`w-5 h-5 mr-2 text-${section.color}-600`} />
+                        <span className="font-medium text-gray-900">{section.name}</span>
+                      </div>
+                      <span className={`text-sm font-semibold ${
+                        percentage >= 80 ? 'text-green-600' :
+                        percentage >= 60 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {percentage}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          percentage >= 80 ? 'bg-green-500' :
+                          percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {section.score}/{section.max} points
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Recommendations Section */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+          <div className="flex items-center mb-6">
+            <Target className="w-6 h-6 text-blue-600 mr-3" />
+            <h2 className="text-2xl font-bold text-gray-900">Key Recommendations</h2>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Priority Areas */}
+            <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
+              <div className="flex items-center mb-3">
+                <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+                <h3 className="font-semibold text-red-900">Priority Areas</h3>
+              </div>
+              <ul className="text-sm text-red-800 space-y-2">
+                {sections
+                  .filter(section => (section.score / section.max) < 0.6)
+                  .map(section => (
+                    <li key={section.name} className="flex items-center">
+                      <div className="w-2 h-2 bg-red-500 rounded-full mr-2" />
+                      Focus on {section.name}
+                    </li>
+                  ))
+                }
+              </ul>
+            </div>
+
+            {/* Strengths */}
+            <div className="bg-green-50 border-l-4 border-green-500 p-6 rounded-lg">
+              <div className="flex items-center mb-3">
+                <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                <h3 className="font-semibold text-green-900">Your Strengths</h3>
+              </div>
+              <ul className="text-sm text-green-800 space-y-2">
+                {sections
+                  .filter(section => (section.score / section.max) >= 0.8)
+                  .map(section => (
+                    <li key={section.name} className="flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                      Strong {section.name}
+                    </li>
+                  ))
+                }
+              </ul>
+            </div>
+
+            {/* Next Steps */}
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg">
+              <div className="flex items-center mb-3">
+                <TrendingUp className="w-5 h-5 text-blue-600 mr-2" />
+                <h3 className="font-semibold text-blue-900">Next Steps</h3>
+              </div>
+              <ul className="text-sm text-blue-800 space-y-2">
+                <li className="flex items-center">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2" />
+                  Set specific improvement goals
+                </li>
+                <li className="flex items-center">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2" />
+                  Focus on priority areas first
+                </li>
+                <li className="flex items-center">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2" />
+                  Schedule regular progress reviews
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold mb-2">Ready to Take Action?</h2>
+            <p className="text-blue-100">
+              Transform your assessment insights into actionable business improvements
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <button
+              onClick={() => router.push('/strategic-goals')}
+              className="bg-white text-blue-600 font-semibold py-3 px-6 rounded-lg hover:bg-blue-50 transition-colors"
+            >
+              Set Strategic Goals
+            </button>
+            <button
+              onClick={() => router.push('/assessment')}
+              className="bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-800 transition-colors"
+            >
+              Retake Assessment
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
