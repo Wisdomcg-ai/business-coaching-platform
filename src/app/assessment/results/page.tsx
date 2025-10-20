@@ -1,519 +1,398 @@
-// src/app/assessment/results/page.tsx
-// Database-integrated results page with live KPI recommendations
-
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { ChevronLeft, Target, TrendingUp, AlertTriangle, CheckCircle, ArrowRight, Loader2 } from 'lucide-react'
-import { getRecommendedKPIs, mapAssessmentToWeakEngines, getRevenueStageFromAmount, type KPI, type BusinessFunction, type Industry } from '@/lib/kpi-definitions-legacy'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { 
+  TrendingUp, 
+  CheckCircle, 
+  Target,
+  ArrowRight,
+  Download,
+  AlertCircle
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
-// Types for assessment data
-interface AssessmentResults {
-  totalScore: number
-  totalPossible: number
+interface AssessmentData {
+  id: string
+  revenue_stage: string
+  total_score: number
   percentage: number
-  healthStatus: string
-  revenueStage: string
-  scores: {
-    foundation: number
-    strategicWheel: number
-    profitability: number
-    engines: number
-    disciplines: number
-    attract: number
-    convert: number
-    deliver: number
-    people: number
-    systems: number
-    finance: number
-  }
-  strengths: string[]
-  improvements: string[]
-  recommendations: string[]
-  weakEngines: string[]
-  industry?: string
-  revenue?: number
+  health_status: string
+  foundation_score: number
+  strategic_wheel_score: number
+  profitability_score: number
+  engines_score: number
+  disciplines_score: number
+  foundation_max: number
+  strategic_wheel_max: number
+  profitability_max: number
+  engines_max: number
+  disciplines_max: number
+  total_max: number
+  answers: any
+  completed_at: string
 }
 
-interface RecommendedKPIs {
-  universal: KPI[]
-  engine: KPI[]
-  industry: KPI[]
-  total: number
+interface ScoreCategory {
+  name: string
+  score: number
+  max: number
+  percentage: number
+  status: 'excellent' | 'good' | 'needs-improvement' | 'critical'
+  color: string
+  bgColor: string
 }
 
-export default function AssessmentResultsPage() {
+function ResultsContent() {
   const router = useRouter()
-  const [results, setResults] = useState<AssessmentResults | null>(null)
-  const [recommendedKPIs, setRecommendedKPIs] = useState<RecommendedKPIs | null>(null)
+  const searchParams = useSearchParams()
+  const assessmentId = searchParams.get('id')
+  
+  const [assessment, setAssessment] = useState<AssessmentData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [kpiLoading, setKpiLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadAssessmentResults()
-  }, [])
-
-  const loadAssessmentResults = async () => {
-    try {
-      // Load assessment results from localStorage
-      const storedResults = localStorage.getItem('assessmentResults')
-      const storedAnswers = localStorage.getItem('assessmentAnswers')
-      
-      if (storedResults && storedAnswers) {
-        const parsedResults = JSON.parse(storedResults)
-        const answers = JSON.parse(storedAnswers)
-        
-        setResults(parsedResults)
-        
-        // Generate KPI recommendations from database
-        await generateKPIRecommendations(parsedResults, answers)
-      } else {
-        // No results found, redirect to assessment
+    async function loadAssessment() {
+      if (!assessmentId) {
         router.push('/assessment')
         return
       }
-    } catch (error) {
-      console.error('Error loading assessment results:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const generateKPIRecommendations = async (results: AssessmentResults, answers: any) => {
-    setKpiLoading(true)
-    try {
-      // Map assessment scores to weak business functions
-      const weakEngines = mapAssessmentToWeakEngines({
-        attract: results.scores.attract,
-        convert: results.scores.convert,
-        deliver: results.scores.deliver,
-        delight: results.scores.deliver, // You might want to separate this
-        people: results.scores.people,
-        profit: results.scores.finance,
-        systems: results.scores.systems
-      })
-
-      // Determine industry from answers (you'll need to map your assessment industry question)
-      let industry: Industry = 'professional-services' // Default
-      if (answers.industry) {
-        // Map your assessment industry options to database industries
-        const industryMap: Record<string, Industry> = {
-          'Construction': 'construction-trades',
-          'Healthcare': 'health-wellness',
-          'Professional Services': 'professional-services',
-          'Retail': 'retail-ecommerce',
-          'Logistics': 'operations-logistics'
+      try {
+        const supabase = createClient()
+        
+        // Get current user
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !user) {
+          setError('Please log in to view results')
+          setLoading(false)
+          return
         }
-        industry = industryMap[answers.industry] || 'professional-services'
+
+        // Load assessment from database
+        const { data: assessmentData, error: dbError } = await supabase
+          .from('assessments')
+          .select('*')
+          .eq('id', assessmentId)
+          .eq('user_id', user.id)
+          .single()
+
+        if (dbError) {
+          console.error('Database error:', dbError)
+          setError('Assessment not found')
+          setLoading(false)
+          return
+        }
+
+        if (!assessmentData) {
+          setError('Assessment not found')
+          setLoading(false)
+          return
+        }
+
+        console.log('✅ Loaded assessment from database:', assessmentData.id)
+        setAssessment(assessmentData)
+        setLoading(false)
+        
+      } catch (error) {
+        console.error('Error loading assessment:', error)
+        setError('Failed to load assessment')
+        setLoading(false)
       }
+    }
 
-      // Get revenue stage
-      let revenueStage
-      if (results.revenue) {
-        revenueStage = getRevenueStageFromAmount(results.revenue)
+    loadAssessment()
+  }, [assessmentId, router])
+
+  const getScoreStatus = (percentage: number) => {
+    if (percentage >= 80) return { status: 'excellent' as const, color: 'text-green-600', bgColor: 'bg-green-100', label: 'Excellent' }
+    if (percentage >= 60) return { status: 'good' as const, color: 'text-blue-600', bgColor: 'bg-blue-100', label: 'Good' }
+    if (percentage >= 40) return { status: 'needs-improvement' as const, color: 'text-yellow-600', bgColor: 'bg-yellow-100', label: 'Needs Improvement' }
+    return { status: 'critical' as const, color: 'text-red-600', bgColor: 'bg-red-100', label: 'Critical' }
+  }
+
+  const getSectionCategories = (): ScoreCategory[] => {
+    if (!assessment) return []
+
+    const sections = [
+      {
+        name: 'Business Foundation',
+        score: assessment.foundation_score,
+        max: assessment.foundation_max
+      },
+      {
+        name: 'Strategic Wheel',
+        score: assessment.strategic_wheel_score,
+        max: assessment.strategic_wheel_max
+      },
+      {
+        name: 'Profitability Health',
+        score: assessment.profitability_score,
+        max: assessment.profitability_max
+      },
+      {
+        name: 'Business Engines',
+        score: assessment.engines_score,
+        max: assessment.engines_max
+      },
+      {
+        name: 'Success Disciplines',
+        score: assessment.disciplines_score,
+        max: assessment.disciplines_max
       }
+    ]
 
-      // Get recommendations from database
-      const kpiRecommendations = await getRecommendedKPIs(
-        weakEngines,
-        industry,
-        revenueStage
-      )
-
-      setRecommendedKPIs(kpiRecommendations)
-    } catch (error) {
-      console.error('Error generating KPI recommendations:', error)
-      // Set fallback recommendations
-      setRecommendedKPIs({
-        universal: [],
-        engine: [],
-        industry: [],
-        total: 0
-      })
-    } finally {
-      setKpiLoading(false)
-    }
+    return sections.map(section => {
+      const percentage = section.max > 0 ? (section.score / section.max) * 100 : 0
+      const statusInfo = getScoreStatus(percentage)
+      
+      return {
+        name: section.name,
+        score: section.score,
+        max: section.max,
+        percentage,
+        ...statusInfo
+      }
+    })
   }
 
-  const getHealthStatusColor = (status: string) => {
-    const colors = {
-      'THRIVING': 'text-green-600 bg-green-50 border-green-200',
-      'STRONG': 'text-blue-600 bg-blue-50 border-blue-200',
-      'STABLE': 'text-yellow-600 bg-yellow-50 border-yellow-200',
-      'BUILDING': 'text-orange-600 bg-orange-50 border-orange-200',
-      'STRUGGLING': 'text-red-600 bg-red-50 border-red-200',
-      'URGENT': 'text-red-800 bg-red-100 border-red-300'
-    }
-    return colors[status as keyof typeof colors] || colors.STABLE
+  const getRecommendations = () => {
+    if (!assessment) return []
+
+    const categories = getSectionCategories()
+    const weakAreas = categories.filter(c => c.percentage < 60).sort((a, b) => a.percentage - b.percentage)
+
+    return weakAreas.slice(0, 3).map(area => ({
+      area: area.name,
+      priority: area.percentage < 40 ? 'High' : 'Medium',
+      action: getActionForArea(area.name),
+      impact: 'Addressing this will improve overall business performance by 15-25%'
+    }))
   }
 
-  const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return 'text-green-600'
-    if (percentage >= 60) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const getTierLabel = (tier: number) => {
-    switch (tier) {
-      case 1: return 'Universal'
-      case 2: return 'Engine Focus'
-      case 3: return 'Industry'
-      default: return 'Standard'
+  const getActionForArea = (areaName: string) => {
+    const actions: Record<string, string> = {
+      'Business Foundation': 'Focus on strengthening revenue predictability and reducing owner dependency',
+      'Strategic Wheel': 'Develop clear vision and improve strategic planning processes',
+      'Profitability Health': 'Review pricing strategy and optimize expense management',
+      'Business Engines': 'Systematize lead generation and improve conversion processes',
+      'Success Disciplines': 'Implement accountability systems and develop leadership capabilities'
     }
-  }
-
-  const getTierColor = (tier: number) => {
-    switch (tier) {
-      case 1: return 'bg-blue-100 text-blue-700'
-      case 2: return 'bg-purple-100 text-purple-700'
-      case 3: return 'bg-green-100 text-green-700'
-      default: return 'bg-gray-100 text-gray-700'
-    }
+    return actions[areaName] || 'Schedule strategy session to develop improvement plan'
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-gray-600">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          Loading your results...
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your results...</p>
         </div>
       </div>
     )
   }
 
-  if (!results) {
+  if (error || !assessment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No Assessment Results Found</h2>
-          <p className="text-gray-600 mb-4">Please complete the assessment first.</p>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+          <div className="flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+            {error || 'Assessment Not Found'}
+          </h2>
+          <p className="text-gray-600 text-center mb-6">
+            Unable to load your assessment results. Please try taking the assessment again.
+          </p>
           <button
             onClick={() => router.push('/assessment')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
           >
-            Take Assessment
+            Take New Assessment
           </button>
         </div>
       </div>
     )
   }
 
+  const categories = getSectionCategories()
+  const recommendations = getRecommendations()
+  const scoreInfo = getScoreStatus(assessment.percentage)
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Assessment Results</h1>
-                <p className="text-gray-600">Your business health snapshot and personalized KPI recommendations</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Your Business Assessment Results
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Based on your responses, here's a comprehensive analysis of your business performance.
+          </p>
+        </div>
+
+        {/* Overall Score */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 border-2 border-blue-100">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 mb-6">
+              <div className="text-white">
+                <div className="text-5xl font-bold">{assessment.percentage}</div>
+                <div className="text-sm opacity-90">/ 100</div>
               </div>
             </div>
+            
+            <div className={`inline-block px-6 py-3 rounded-full ${scoreInfo.bgColor} ${scoreInfo.color} font-semibold text-lg mb-4`}>
+              {scoreInfo.label} Performance
+            </div>
+            
+            <p className="text-gray-600 max-w-xl mx-auto">
+              {assessment.percentage >= 80 && "Outstanding! Your business shows strong performance across most areas."}
+              {assessment.percentage >= 60 && assessment.percentage < 80 && "Good foundation with clear opportunities for improvement."}
+              {assessment.percentage >= 40 && assessment.percentage < 60 && "Solid start with several areas requiring focused attention."}
+              {assessment.percentage < 40 && "Significant opportunity for growth. Let's build your roadmap to success."}
+            </p>
+          </div>
+        </div>
+
+        {/* Section Performance */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Target className="text-blue-600" />
+            Performance By Area
+          </h2>
+          
+          <div className="space-y-4">
+            {categories.map((category, index) => (
+              <div key={index} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      category.percentage >= 80 ? 'bg-green-500' :
+                      category.percentage >= 60 ? 'bg-blue-500' :
+                      category.percentage >= 40 ? 'bg-yellow-500' :
+                      'bg-red-500'
+                    }`}></div>
+                    <h3 className="font-semibold text-gray-900">{category.name}</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-sm font-medium ${category.color}`}>
+                      {category.percentage.toFixed(0)}%
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {category.score.toFixed(1)}/{category.max}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className={`h-3 rounded-full transition-all duration-500 ${
+                      category.percentage >= 80 ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                      category.percentage >= 60 ? 'bg-gradient-to-r from-blue-500 to-blue-600' :
+                      category.percentage >= 40 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
+                      'bg-gradient-to-r from-red-500 to-red-600'
+                    }`}
+                    style={{ width: `${category.percentage}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recommendations */}
+        {recommendations.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <TrendingUp className="text-purple-600" />
+              Top Priority Actions
+            </h2>
+            
+            <div className="space-y-6">
+              {recommendations.map((rec, index) => (
+                <div key={index} className="border-l-4 border-purple-500 pl-6 py-4 bg-purple-50 rounded-r-lg">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-bold text-gray-900 text-lg">{index + 1}. {rec.area}</h3>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      rec.priority === 'High' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {rec.priority} Priority
+                    </span>
+                  </div>
+                  <p className="text-gray-700 mb-2 font-medium">{rec.action}</p>
+                  <p className="text-sm text-gray-600 italic">{rec.impact}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Next Steps */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white">
+          <h2 className="text-3xl font-bold mb-4">What's Next?</h2>
+          <p className="text-blue-100 mb-6 text-lg">
+            Your assessment is complete. Now it's time to turn insights into action.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
-              onClick={() => router.push('/assessment')}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={() => router.push('/goals')}
+              className="bg-white text-blue-600 px-6 py-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
             >
-              Retake Assessment
+              Set Your Goals <ArrowRight className="h-5 w-5" />
+            </button>
+            
+            <button
+              onClick={() => window.print()}
+              className="bg-white/10 backdrop-blur text-white px-6 py-4 rounded-lg font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2 border-2 border-white/30"
+            >
+              <Download className="h-5 w-5" /> Download Report
+            </button>
+            
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="bg-white/10 backdrop-blur text-white px-6 py-4 rounded-lg font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2 border-2 border-white/30"
+            >
+              View Dashboard <ArrowRight className="h-5 w-5" />
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-        {/* Overall Score Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <div className="text-center mb-8">
-            <div className={`inline-flex items-center px-4 py-2 rounded-full border font-semibold text-sm mb-4 ${getHealthStatusColor(results.healthStatus)}`}>
-              {results.healthStatus}
-            </div>
-            <div className="text-6xl font-bold text-gray-900 mb-2">
-              {results.percentage}%
-            </div>
-            <p className="text-gray-600 text-lg">
-              Overall Business Health Score
-            </p>
-            <p className="text-gray-500 text-sm mt-2">
-              {results.totalScore} out of {results.totalPossible} points • {results.revenueStage} Stage
-            </p>
-          </div>
-
-          {/* Score Breakdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Object.entries(results.scores).map(([key, score]) => {
-              let maxScore, label
-              switch (key) {
-                case 'foundation':
-                  maxScore = 40
-                  label = 'Foundation'
-                  break
-                case 'strategicWheel':
-                  maxScore = 60
-                  label = 'Strategic Wheel'
-                  break
-                case 'profitability':
-                  maxScore = 30
-                  label = 'Profitability'
-                  break
-                case 'engines':
-                  maxScore = 100
-                  label = 'Business Engines'
-                  break
-                case 'disciplines':
-                  maxScore = 60
-                  label = 'Success Disciplines'
-                  break
-                default:
-                  // Individual engine scores (these are percentages)
-                  maxScore = 100
-                  label = key.charAt(0).toUpperCase() + key.slice(1)
-                  break
-              }
-
-              const percentage = key === 'attract' || key === 'convert' || key === 'deliver' || key === 'people' || key === 'systems' || key === 'finance'
-                ? score // These are already percentages
-                : Math.round((score / maxScore) * 100)
-
-              return (
-                <div key={key} className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">{label}</span>
-                    <span className={`text-sm font-semibold ${getScoreColor(percentage)}`}>
-                      {percentage}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-500 ${
-                        percentage >= 80 ? 'bg-green-500' :
-                        percentage >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {key === 'attract' || key === 'convert' || key === 'deliver' || key === 'people' || key === 'systems' || key === 'finance'
-                      ? `${score}%` // These are already percentages
-                      : `${score}/${maxScore} points`
-                    }
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+        {/* Footer */}
+        <div className="mt-8 text-center text-sm text-gray-500">
+          <p>Assessment completed on {new Date(assessment.completed_at).toLocaleDateString()}</p>
+          <p className="mt-2">
+            Want to retake the assessment? 
+            <button 
+              onClick={() => router.push('/assessment')}
+              className="text-blue-600 hover:underline ml-1 font-medium"
+            >
+              Start New Assessment
+            </button>
+          </p>
         </div>
 
-        {/* Three Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Strengths */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <h3 className="text-lg font-semibold text-gray-900">Your Strengths</h3>
-            </div>
-            <ul className="space-y-3">
-              {results.strengths?.map((strength, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
-                  <span className="text-gray-700">{strength}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Areas for Improvement */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="w-5 h-5 text-orange-500" />
-              <h3 className="text-lg font-semibold text-gray-900">Areas for Improvement</h3>
-            </div>
-            <ul className="space-y-3">
-              {results.improvements?.map((improvement, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0" />
-                  <span className="text-gray-700">{improvement}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Key Recommendations */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Target className="w-5 h-5 text-blue-500" />
-              <h3 className="text-lg font-semibold text-gray-900">Key Recommendations</h3>
-            </div>
-            <ul className="space-y-3">
-              {results.recommendations?.map((recommendation, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
-                  <span className="text-gray-700">{recommendation}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        {/* Database-Driven KPI Recommendations */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Your Personalized KPI Recommendations</h2>
-              <p className="text-gray-600">Based on your assessment, here are the metrics that will help you improve fastest</p>
-            </div>
-            <TrendingUp className="w-6 h-6 text-blue-500" />
-          </div>
-
-          {kpiLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="flex items-center gap-3 text-gray-600">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Loading personalized recommendations...
-              </div>
-            </div>
-          ) : recommendedKPIs && recommendedKPIs.total > 0 ? (
-            <>
-              {/* Universal KPIs */}
-              {recommendedKPIs.universal.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm">Universal</span>
-                    Essential KPIs Every Business Needs
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {recommendedKPIs.universal.map((kpi) => (
-                      <div key={kpi.id} className="p-4 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
-                        <div className="flex items-start justify-between mb-2">
-                          <span className={`text-xs font-medium px-2 py-1 rounded ${getTierColor(kpi.tier)}`}>
-                            {getTierLabel(kpi.tier)}
-                          </span>
-                          <span className="text-xs text-gray-500">{kpi.category}</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900 text-sm mb-1">{kpi.name}</h4>
-                        <p className="text-xs text-gray-600 mb-2">{kpi.friendlyName}</p>
-                        <p className="text-xs text-gray-500">{kpi.whyItMatters}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Engine KPIs */}
-              {recommendedKPIs.engine.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-sm">Engine Focus</span>
-                    KPIs for Your Weak Business Areas
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {recommendedKPIs.engine.map((kpi) => (
-                      <div key={kpi.id} className="p-4 rounded-lg border border-purple-200 bg-purple-50">
-                        <div className="flex items-start justify-between mb-2">
-                          <span className={`text-xs font-medium px-2 py-1 rounded ${getTierColor(kpi.tier)}`}>
-                            {kpi.businessFunction}
-                          </span>
-                          <span className="text-xs text-gray-500">{kpi.category}</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900 text-sm mb-1">{kpi.name}</h4>
-                        <p className="text-xs text-gray-600 mb-2">{kpi.friendlyName}</p>
-                        <p className="text-xs text-gray-500">{kpi.whyItMatters}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Industry KPIs */}
-              {recommendedKPIs.industry.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-sm">Industry</span>
-                    KPIs Specific to Your Business Type
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {recommendedKPIs.industry.map((kpi) => (
-                      <div key={kpi.id} className="p-4 rounded-lg border border-green-200 bg-green-50">
-                        <div className="flex items-start justify-between mb-2">
-                          <span className={`text-xs font-medium px-2 py-1 rounded ${getTierColor(kpi.tier)}`}>
-                            {getTierLabel(kpi.tier)}
-                          </span>
-                          <span className="text-xs text-gray-500">{kpi.category}</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900 text-sm mb-1">{kpi.name}</h4>
-                        <p className="text-xs text-gray-600 mb-2">{kpi.friendlyName}</p>
-                        <p className="text-xs text-gray-500">{kpi.whyItMatters}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="bg-gray-50 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
-                <p className="text-sm text-gray-600 mb-4">
-                  We've recommended {recommendedKPIs.total} KPIs based on your assessment:
-                  {recommendedKPIs.universal.length > 0 && ` ${recommendedKPIs.universal.length} universal,`}
-                  {recommendedKPIs.engine.length > 0 && ` ${recommendedKPIs.engine.length} for weak business engines,`}
-                  {recommendedKPIs.industry.length > 0 && ` ${recommendedKPIs.industry.length} industry-specific`}
-                </p>
-                <button
-                  onClick={() => router.push('/strategic-goals')}
-                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  Set Up Your Strategic Goals & KPIs
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <div className="text-gray-500 mb-4">No KPI recommendations available</div>
-              <button
-                onClick={() => generateKPIRecommendations(results, JSON.parse(localStorage.getItem('assessmentAnswers') || '{}'))}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Retry Loading Recommendations
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Next Steps */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-sm p-8 text-white">
-          <h2 className="text-2xl font-bold mb-4">What's Next?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="bg-white bg-opacity-20 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
-                <span className="text-xl font-bold">1</span>
-              </div>
-              <h3 className="font-semibold mb-2">Set Your Goals</h3>
-              <p className="text-sm opacity-90">Define specific, measurable targets for the next 90 days</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-white bg-opacity-20 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
-                <span className="text-xl font-bold">2</span>
-              </div>
-              <h3 className="font-semibold mb-2">Track KPIs</h3>
-              <p className="text-sm opacity-90">Monitor the recommended metrics to measure progress</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-white bg-opacity-20 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
-                <span className="text-xl font-bold">3</span>
-              </div>
-              <h3 className="font-semibold mb-2">Take Action</h3>
-              <p className="text-sm opacity-90">Implement changes based on your improvement areas</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
+  )
+}
+
+export default function AssessmentResults() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <ResultsContent />
+    </Suspense>
   )
 }

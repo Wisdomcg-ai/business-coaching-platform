@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, ChevronLeft, Check, AlertCircle } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 interface Question {
   id: string;
   text: string;
   type: 'radio' | 'checkbox' | 'text' | 'multiselect' | 'yesno-group';
   options?: { value: string; label: string; points?: number }[];
-  questions?: { id: string; text: string }[]; // For grouped yes/no questions
+  questions?: { id: string; text: string }[];
   section: string;
   subsection?: string;
 }
@@ -523,7 +524,7 @@ const questions: Question[] = [
     ]
   },
 
-  // SECTION 5: SUCCESS DISCIPLINES - Each discipline gets 5 yes/no questions on one page
+  // SECTION 5: SUCCESS DISCIPLINES
   {
     id: 'q50',
     text: 'Decision-Making Frameworks',
@@ -704,17 +705,14 @@ export default function AssessmentPage() {
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
   
-  // Get unique sections and current section info
   const sections = ['Business Foundation', 'Strategic Wheel', 'Profitability Health', 'Business Engines', 'Success Disciplines'];
   const currentSection = currentQuestion.section;
   const currentSectionIndex = sections.indexOf(currentSection);
 
-  // Add keyboard navigation
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         if (currentQuestion.type === 'yesno-group') {
-          // Check if all sub-questions are answered
           const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
           if (allAnswered) {
             if (currentQuestionIndex < questions.length - 1) {
@@ -749,7 +747,7 @@ export default function AssessmentPage() {
   }
 
   function handleYesNoGroup(questionId: string, value: 'yes' | 'no') {
-    const points = value === 'yes' ? 1.25 : 0; // Each yes/no in a group worth 1.25 points
+    const points = value === 'yes' ? 1.25 : 0;
     setAnswers({
       ...answers,
       [questionId]: { 
@@ -768,7 +766,6 @@ export default function AssessmentPage() {
 
   function goToNext() {
     if (currentQuestion.type === 'yesno-group') {
-      // Check if all sub-questions are answered
       const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
       if (allAnswered && currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -794,7 +791,6 @@ export default function AssessmentPage() {
       disciplines: 0
     };
 
-    // Calculate scores for each section based on answers
     Object.entries(answers).forEach(([questionId, answer]) => {
       const question = questions.find(q => q.id === questionId || 
         q.questions?.some(sq => sq.id === questionId));
@@ -830,12 +826,21 @@ export default function AssessmentPage() {
     setError(null);
 
     try {
-      // Calculate scores for each section
-      const sectionScores = calculateSectionScores();
+      const supabase = createClient();
       
-      // Calculate total score
+      // Get current user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        setError('Please log in to save your assessment');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Calculate scores
+      const sectionScores = calculateSectionScores();
       const totalScore = Object.values(sectionScores).reduce((sum, score) => sum + score, 0);
-      const maxScore = 290; // Maximum possible score
+      const maxScore = 290;
       const percentage = Math.round((totalScore / maxScore) * 100);
       
       // Determine health status
@@ -847,47 +852,46 @@ export default function AssessmentPage() {
       else if (percentage >= 50) healthStatus = 'STRUGGLING';
       else healthStatus = 'URGENT';
       
-      // Get revenue stage from first question
       const revenueStage = answers['q1']?.label || 'unknown';
-      
-      // Create assessment result object
-      const assessmentResult = {
-        id: `assessment-${Date.now()}`,
-        userId: 'temp-user-001',
-        completedAt: new Date().toISOString(),
-        totalScore,
-        maxScore,
-        percentage,
-        healthStatus,
-        revenueStage,
-        sectionScores,
-        answers
-      };
-      
-      // Save to localStorage
-      localStorage.setItem('latestAssessment', JSON.stringify(assessmentResult));
-      localStorage.setItem('assessmentAnswers', JSON.stringify(answers));
-      localStorage.setItem('assessmentResults', JSON.stringify({
-        totalScore,
-        percentage,
-        healthStatus,
-        revenueStage,
-        sections: [
-          { name: 'Business Foundation', score: sectionScores.foundation, max: 40, percentage: Math.round((sectionScores.foundation / 40) * 100) },
-          { name: 'Strategic Wheel', score: sectionScores.strategic_wheel, max: 60, percentage: Math.round((sectionScores.strategic_wheel / 60) * 100) },
-          { name: 'Profitability Health', score: sectionScores.profitability, max: 30, percentage: Math.round((sectionScores.profitability / 30) * 100) },
-          { name: 'Business Engines', score: sectionScores.engines, max: 100, percentage: Math.round((sectionScores.engines / 100) * 100) },
-          { name: 'Success Disciplines', score: sectionScores.disciplines, max: 60, percentage: Math.round((sectionScores.disciplines / 60) * 100) }
-        ]
-      }));
-      
-      // Get all assessments and add this one
-      const existingAssessments = JSON.parse(localStorage.getItem('assessments') || '[]');
-      existingAssessments.push(assessmentResult);
-      localStorage.setItem('assessments', JSON.stringify(existingAssessments));
-      
-      // Redirect to results page
-      router.push('/assessment/results');
+
+      // Save to Supabase database - ROUND ALL SCORES FOR INTEGER COLUMNS
+      const { data: assessment, error: dbError } = await supabase
+        .from('assessments')
+        .insert({
+          user_id: user.id,
+          answers: answers,
+          total_score: Math.round(totalScore),
+          percentage: percentage,
+          health_status: healthStatus,
+          revenue_stage: revenueStage,
+          foundation_score: Math.round(sectionScores.foundation),
+          strategic_wheel_score: Math.round(sectionScores.strategic_wheel),
+          profitability_score: Math.round(sectionScores.profitability),
+          engines_score: Math.round(sectionScores.engines),
+          disciplines_score: Math.round(sectionScores.disciplines),
+          foundation_max: 40,
+          strategic_wheel_max: 60,
+          profitability_max: 30,
+          engines_max: 100,
+          disciplines_max: 60,
+          total_max: maxScore,
+          completed_at: new Date().toISOString(),
+          status: 'completed'
+        })
+        .select()
+        .single();
+
+      if (dbError) {
+        console.error('Database error:', dbError);
+        setError('Failed to save assessment: ' + dbError.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log('✅ Assessment saved to database:', assessment.id);
+
+      // Redirect to results page with assessment ID
+      router.push(`/assessment/results?id=${assessment.id}`);
       
     } catch (error) {
       console.error('Error submitting assessment:', error);
@@ -898,7 +902,6 @@ export default function AssessmentPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header with exit button */}
       <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -916,7 +919,6 @@ export default function AssessmentPage() {
             </button>
           </div>
 
-          {/* Progress Information */}
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-gray-600">
@@ -939,10 +941,8 @@ export default function AssessmentPage() {
         </div>
       </div>
 
-      {/* Question Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-          {/* Question Header */}
           <div className="bg-gradient-to-r from-blue-500 to-purple-500 px-8 py-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-white/90 text-sm font-medium">
@@ -957,7 +957,6 @@ export default function AssessmentPage() {
             </h2>
           </div>
 
-          {/* Answer Options */}
           <div className="p-8">
             {currentQuestion.type === 'radio' && currentQuestion.options && (
               <div className="space-y-3">
@@ -1026,7 +1025,6 @@ export default function AssessmentPage() {
               </div>
             )}
 
-            {/* Error Message */}
             {error && (
               <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
                 <AlertCircle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -1035,7 +1033,6 @@ export default function AssessmentPage() {
             )}
           </div>
 
-          {/* Navigation */}
           <div className="px-8 py-6 bg-gray-50 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <button
@@ -1068,7 +1065,7 @@ export default function AssessmentPage() {
                   {isSubmitting ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
-                      Analyzing...
+                      Saving...
                     </>
                   ) : (
                     <>
