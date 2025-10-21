@@ -890,8 +890,8 @@ export default function AssessmentPage() {
 
       console.log('✅ Assessment saved to database:', assessment.id);
 
-      // Redirect to NEW results page location with assessment ID
-      router.push(`/dashboard/assessment-results?id=${assessment.id}`);
+      // Redirect to results page with assessment ID
+      router.push(`/assessment/results?id=${assessment.id}`);
       
     } catch (error) {
       console.error('Error submitting assessment:', error);

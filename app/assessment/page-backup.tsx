@@ -2,15 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { Database } from '@/types/database.types';
+import { saveAssessment } from '@/lib/assessment-service';
 import { ChevronRight, ChevronLeft, Check, AlertCircle } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 interface Question {
   id: string;
   text: string;
   type: 'radio' | 'checkbox' | 'text' | 'multiselect' | 'yesno-group';
   options?: { value: string; label: string; points?: number }[];
-  questions?: { id: string; text: string }[];
+  questions?: { id: string; text: string }[]; // For grouped yes/no questions
   section: string;
   subsection?: string;
 }
@@ -524,7 +526,7 @@ const questions: Question[] = [
     ]
   },
 
-  // SECTION 5: SUCCESS DISCIPLINES
+  // SECTION 5: SUCCESS DISCIPLINES - Each discipline gets 5 yes/no questions on one page
   {
     id: 'q50',
     text: 'Decision-Making Frameworks',
@@ -705,14 +707,19 @@ export default function AssessmentPage() {
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
   
+  // Get unique sections and current section info
   const sections = ['Business Foundation', 'Strategic Wheel', 'Profitability Health', 'Business Engines', 'Success Disciplines'];
   const currentSection = currentQuestion.section;
   const currentSectionIndex = sections.indexOf(currentSection);
+  const questionsInSection = questions.filter(q => q.section === currentSection).length;
+  const currentQuestionInSection = questions.filter((q, i) => q.section === currentSection && i <= currentQuestionIndex).length;
 
+  // Add keyboard navigation
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         if (currentQuestion.type === 'yesno-group') {
+          // Check if all sub-questions are answered
           const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
           if (allAnswered) {
             if (currentQuestionIndex < questions.length - 1) {
@@ -747,7 +754,7 @@ export default function AssessmentPage() {
   }
 
   function handleYesNoGroup(questionId: string, value: 'yes' | 'no') {
-    const points = value === 'yes' ? 1.25 : 0;
+    const points = value === 'yes' ? 1.25 : 0; // Each yes/no in a group worth 1.25 points (5 questions = max 6.25)
     setAnswers({
       ...answers,
       [questionId]: { 
@@ -766,6 +773,7 @@ export default function AssessmentPage() {
 
   function goToNext() {
     if (currentQuestion.type === 'yesno-group') {
+      // Check if all sub-questions are answered
       const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
       if (allAnswered && currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -782,119 +790,39 @@ export default function AssessmentPage() {
     return !!answers[currentQuestion.id];
   }
 
-  function calculateSectionScores() {
-    const sectionScores: Record<string, number> = {
-      foundation: 0,
-      strategic_wheel: 0,
-      profitability: 0,
-      engines: 0,
-      disciplines: 0
-    };
-
-    Object.entries(answers).forEach(([questionId, answer]) => {
-      const question = questions.find(q => q.id === questionId || 
-        q.questions?.some(sq => sq.id === questionId));
-      
-      if (question) {
-        const points = answer.points || 0;
-        
-        switch(question.section) {
-          case 'Business Foundation':
-            sectionScores.foundation += points;
-            break;
-          case 'Strategic Wheel':
-            sectionScores.strategic_wheel += points;
-            break;
-          case 'Profitability Health':
-            sectionScores.profitability += points;
-            break;
-          case 'Business Engines':
-            sectionScores.engines += points;
-            break;
-          case 'Success Disciplines':
-            sectionScores.disciplines += points;
-            break;
-        }
-      }
-    });
-
-    return sectionScores;
-  }
-
   async function handleSubmit() {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      const supabase = createClient();
-      
-      // Get current user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        setError('Please log in to save your assessment');
-        setIsSubmitting(false);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/auth/login');
         return;
       }
 
       // Calculate scores
-      const sectionScores = calculateSectionScores();
-      const totalScore = Object.values(sectionScores).reduce((sum, score) => sum + score, 0);
-      const maxScore = 290;
-      const percentage = Math.round((totalScore / maxScore) * 100);
-      
-      // Determine health status
-      let healthStatus = '';
-      if (percentage >= 90) healthStatus = 'THRIVING';
-      else if (percentage >= 80) healthStatus = 'STRONG';
-      else if (percentage >= 70) healthStatus = 'STABLE';
-      else if (percentage >= 60) healthStatus = 'BUILDING';
-      else if (percentage >= 50) healthStatus = 'STRUGGLING';
-      else healthStatus = 'URGENT';
-      
-      const revenueStage = answers['q1']?.label || 'unknown';
+      const totalScore = Object.values(answers).reduce((sum: number, answer: any) => 
+        sum + (answer.points || 0), 0
+      );
 
-      // Save to Supabase database - ROUND ALL SCORES FOR INTEGER COLUMNS
-      const { data: assessment, error: dbError } = await supabase
-        .from('assessments')
-        .insert({
-          user_id: user.id,
-          answers: answers,
-          total_score: Math.round(totalScore),
-          percentage: percentage,
-          health_status: healthStatus,
-          revenue_stage: revenueStage,
-          foundation_score: Math.round(sectionScores.foundation),
-          strategic_wheel_score: Math.round(sectionScores.strategic_wheel),
-          profitability_score: Math.round(sectionScores.profitability),
-          engines_score: Math.round(sectionScores.engines),
-          disciplines_score: Math.round(sectionScores.disciplines),
-          foundation_max: 40,
-          strategic_wheel_max: 60,
-          profitability_max: 30,
-          engines_max: 100,
-          disciplines_max: 60,
-          total_max: maxScore,
-          completed_at: new Date().toISOString(),
-          status: 'completed'
-        })
-        .select()
-        .single();
+      // Get revenue stage from first question
+      const revenueStage = answers['q1']?.value || 'unknown';
 
-      if (dbError) {
-        console.error('Database error:', dbError);
-        setError('Failed to save assessment: ' + dbError.message);
-        setIsSubmitting(false);
-        return;
-      }
+      // Save assessment
+      const assessmentId = await saveAssessment({
+        userId: user.id,
+        answers,
+        totalScore,
+        maxScore: 290,
+        completionPercentage: 100,
+        revenueStage
+      });
 
-      console.log('✅ Assessment saved to database:', assessment.id);
-
-      // Redirect to NEW results page location with assessment ID
-      router.push(`/dashboard/assessment-results?id=${assessment.id}`);
-      
-    } catch (error) {
-      console.error('Error submitting assessment:', error);
+      // Redirect to results page
+      router.push(`/assessment/${assessmentId}`);
+    } catch (err) {
+      console.error('Error submitting assessment:', err);
       setError('Failed to save assessment. Please try again.');
       setIsSubmitting(false);
     }
@@ -902,6 +830,7 @@ export default function AssessmentPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Header with exit button */}
       <div className="bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -919,6 +848,7 @@ export default function AssessmentPage() {
             </button>
           </div>
 
+          {/* Progress Information */}
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm mb-2">
               <span className="text-gray-600">
@@ -941,8 +871,10 @@ export default function AssessmentPage() {
         </div>
       </div>
 
+      {/* Question Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Question Header */}
           <div className="bg-gradient-to-r from-blue-500 to-purple-500 px-8 py-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-white/90 text-sm font-medium">
@@ -957,6 +889,7 @@ export default function AssessmentPage() {
             </h2>
           </div>
 
+          {/* Answer Options */}
           <div className="p-8">
             {currentQuestion.type === 'radio' && currentQuestion.options && (
               <div className="space-y-3">
@@ -1025,6 +958,7 @@ export default function AssessmentPage() {
               </div>
             )}
 
+            {/* Error Message */}
             {error && (
               <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
                 <AlertCircle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
@@ -1033,6 +967,7 @@ export default function AssessmentPage() {
             )}
           </div>
 
+          {/* Navigation */}
           <div className="px-8 py-6 bg-gray-50 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <button
@@ -1065,7 +1000,7 @@ export default function AssessmentPage() {
                   {isSubmitting ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
-                      Saving...
+                      Analyzing...
                     </>
                   ) : (
                     <>
@@ -1095,3 +1030,4 @@ export default function AssessmentPage() {
     </div>
   );
 }
+
