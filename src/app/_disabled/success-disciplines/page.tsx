@@ -175,7 +175,10 @@ export default function SuccessDisciplines() {
   const [hasAssessment, setHasAssessment] = useState(false)
   const [assessmentDate, setAssessmentDate] = useState<string>('')
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
   useEffect(() => {
     loadDisciplineData()

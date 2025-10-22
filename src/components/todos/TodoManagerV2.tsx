@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -420,7 +420,10 @@ function MorningRitual({
 // ============================================================================
 
 export default function TodoManagerV2({ userId, businessId, userRole }: TodoManagerV2Props) {
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
   
   // State
   const [todos, setTodos] = useState<Todo[]>([])

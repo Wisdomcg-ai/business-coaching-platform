@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { SwotItem, SwotActionItem, ActionType, Priority } from '@/lib/swot/types';
-import { createClientComponentClient } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/ssr';
 import { 
   Plus, 
   CheckCircle, 
@@ -24,7 +24,10 @@ export function SwotActionPanel({ swotAnalysisId, swotItems }: SwotActionPanelPr
   const [isCreating, setIsCreating] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SwotItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   
   // Form state for new action
   const [actionTitle, setActionTitle] = useState('');

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function VisionPurpose() {
   const [formData, setFormData] = useState({
@@ -15,7 +15,10 @@ export default function VisionPurpose() {
   const [saved, setSaved] = useState(false)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
   useEffect(() => {
     const loadData = async () => {

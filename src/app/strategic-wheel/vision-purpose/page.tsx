@@ -2,13 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr';
 import { ArrowLeft, ArrowRight, Save } from 'lucide-react'
 import { getNextSection, getPreviousSection } from '@/lib/strategic-wheel-navigation'
 
 export default function VisionPurposePage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
   const saveTimeoutRef = useRef<NodeJS.Timeout>()
   const lastSavedDataRef = useRef<string>('')
 

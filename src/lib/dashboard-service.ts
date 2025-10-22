@@ -11,7 +11,10 @@ export interface AssessmentData {
 }
 
 export async function saveAssessment(data: AssessmentData): Promise<string> {
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
   
   try {
     // Get the user's business ID

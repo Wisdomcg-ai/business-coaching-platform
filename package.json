@@ -14,7 +14,7 @@
     "@hookform/resolvers": "^5.2.1",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.7.0",
-    "@supabase/supabase-js": "^2.57.0",
+    "@supabase/supabase-js": "^2.76.1",
     "@types/uuid": "^10.0.0",
     "axios": "^1.11.0",
     "date-fns": "^4.1.0",

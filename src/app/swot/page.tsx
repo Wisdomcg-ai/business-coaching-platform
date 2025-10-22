@@ -2,27 +2,30 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  SwotAnalysis, 
-  SwotItem, 
-  SwotGridData, 
+import {
+  SwotAnalysis,
+  SwotItem,
+  SwotGridData,
   SwotCategory,
-  QuarterInfo, 
+  QuarterInfo,
   getCurrentQuarter,
   getCategoryColor,
-  getCategoryIcon 
+  getCategoryIcon
 } from '@/lib/swot/types';
 import { SwotGrid } from '@/components/swot/SwotGrid';
 import { QuarterSelector } from '@/components/swot/QuarterSelector';
 import { SwotActionPanel } from '@/components/swot/SwotActionPanel';
 import { SwotStatisticsCard } from '@/components/swot/SwotStatisticsCard';
-import { createClientComponentClient } from '@/lib/supabase';
+import { createBrowserClient } from '@supabase/ssr';
 import { Plus, Save, FileText, Clock, CheckCircle, AlertCircle, TrendingUp, Users, Download, History } from 'lucide-react';
 
 export default function SwotPage() {
   const router = useRouter();
-  const supabase = createClientComponentClient();
-  
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
   // State management
   const [currentQuarter, setCurrentQuarter] = useState<QuarterInfo>(getCurrentQuarter());
   const [swotAnalysis, setSwotAnalysis] = useState<SwotAnalysis | null>(null);
@@ -39,24 +42,24 @@ export default function SwotPage() {
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  
+
   // Get or create SWOT analysis for the selected quarter
   const loadSwotAnalysis = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         setError('Please log in to access SWOT analysis');
         return;
       }
-      
+
       // For demo purposes, using user.id as business_id
       // In production, get the actual business_id from user's profile
       const businessId = user.id;
-      
+
       // Check if SWOT exists for this quarter
       const { data: existingSwot, error: fetchError } = await supabase
         .from('swot_analyses')
@@ -81,12 +84,12 @@ export default function SwotPage() {
         .eq('year', currentQuarter.year)
         .eq('type', 'quarterly')
         .single();
-      
+
       if (fetchError && fetchError.code !== 'PGRST116') {
         // PGRST116 means no rows returned, which is fine
         throw fetchError;
       }
-      
+
       if (existingSwot) {
         setSwotAnalysis(existingSwot);
         organizeSwotItems(existingSwot.swot_items || []);
@@ -99,9 +102,9 @@ export default function SwotPage() {
             p_year: currentQuarter.year,
             p_created_by: user.id
           });
-        
+
         if (createError) throw createError;
-        
+
         // Fetch the newly created SWOT with its items
         const { data: createdSwot, error: refetchError } = await supabase
           .from('swot_analyses')
@@ -123,9 +126,9 @@ export default function SwotPage() {
           `)
           .eq('id', newSwot)
           .single();
-        
+
         if (refetchError) throw refetchError;
-        
+
         setSwotAnalysis(createdSwot);
         organizeSwotItems(createdSwot.swot_items || []);
       }
@@ -136,7 +139,7 @@ export default function SwotPage() {
       setLoading(false);
     }
   }, [currentQuarter, supabase]);
-  
+
   // Organize items into grid categories
   const organizeSwotItems = (items: SwotItem[]) => {
     const organized: SwotGridData = {
@@ -145,7 +148,7 @@ export default function SwotPage() {
       opportunities: [],
       threats: []
     };
-    
+
     items.forEach(item => {
       if (item.status === 'active' || item.status === 'carried-forward') {
         switch (item.category) {
@@ -164,39 +167,39 @@ export default function SwotPage() {
         }
       }
     });
-    
+
     // Sort by priority order
     Object.keys(organized).forEach(key => {
       organized[key as keyof SwotGridData].sort((a, b) => a.priority_order - b.priority_order);
     });
-    
+
     setSwotItems(organized);
   };
-  
+
   // Load data on component mount and quarter change
   useEffect(() => {
     loadSwotAnalysis();
   }, [loadSwotAnalysis]);
-  
+
   // Auto-save functionality
   useEffect(() => {
     if (!autoSaveEnabled || !swotAnalysis || saving) return;
-    
+
     const saveTimer = setTimeout(async () => {
       await handleSave();
     }, 5000); // Auto-save after 5 seconds of inactivity
-    
+
     return () => clearTimeout(saveTimer);
   }, [swotItems, autoSaveEnabled]);
-  
+
   // Handle adding new item
   const handleAddItem = async (category: SwotCategory, title: string, description?: string) => {
     if (!swotAnalysis) return;
-    
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
+
       const { data: newItem, error } = await supabase
         .from('swot_items')
         .insert({
@@ -212,15 +215,15 @@ export default function SwotPage() {
         })
         .select()
         .single();
-      
+
       if (error) throw error;
-      
+
       // Update local state
       const updatedItems = { ...swotItems };
       const categoryKey = `${category}s` as keyof SwotGridData;
       updatedItems[categoryKey] = [...updatedItems[categoryKey], newItem];
       setSwotItems(updatedItems);
-      
+
       // Show success message
       setLastSaved(new Date());
     } catch (err) {
@@ -228,7 +231,7 @@ export default function SwotPage() {
       setError('Failed to add item. Please try again.');
     }
   };
-  
+
   // Handle updating item
   const handleUpdateItem = async (itemId: string, updates: Partial<SwotItem>) => {
     try {
@@ -236,9 +239,9 @@ export default function SwotPage() {
         .from('swot_items')
         .update(updates)
         .eq('id', itemId);
-      
+
       if (error) throw error;
-      
+
       // Update local state
       const updatedItems = { ...swotItems };
       Object.keys(updatedItems).forEach(key => {
@@ -254,7 +257,7 @@ export default function SwotPage() {
       setError('Failed to update item. Please try again.');
     }
   };
-  
+
   // Handle deleting item
   const handleDeleteItem = async (itemId: string) => {
     try {
@@ -262,9 +265,9 @@ export default function SwotPage() {
         .from('swot_items')
         .update({ status: 'archived' })
         .eq('id', itemId);
-      
+
       if (error) throw error;
-      
+
       // Update local state
       const updatedItems = { ...swotItems };
       Object.keys(updatedItems).forEach(key => {
@@ -278,7 +281,7 @@ export default function SwotPage() {
       setError('Failed to delete item. Please try again.');
     }
   };
-  
+
   // Handle reordering items
   const handleReorderItems = async (category: SwotCategory, items: SwotItem[]) => {
     try {
@@ -287,7 +290,7 @@ export default function SwotPage() {
         id: item.id,
         priority_order: index
       }));
-      
+
       // Batch update
       for (const update of updates) {
         await supabase
@@ -295,7 +298,7 @@ export default function SwotPage() {
           .update({ priority_order: update.priority_order })
           .eq('id', update.id);
       }
-      
+
       // Update local state
       const updatedItems = { ...swotItems };
       const categoryKey = `${category}s` as keyof SwotGridData;
@@ -307,14 +310,14 @@ export default function SwotPage() {
       setError('Failed to reorder items. Please try again.');
     }
   };
-  
+
   // Handle saving SWOT
   const handleSave = async () => {
     if (!swotAnalysis) return;
-    
+
     try {
       setSaving(true);
-      
+
       // Calculate SWOT score
       const totalItems = Object.values(swotItems).flat().length;
       const strengthsScore = swotItems.strengths.length * 2;
@@ -323,7 +326,7 @@ export default function SwotPage() {
       const threatsScore = swotItems.threats.length * -1.5;
       const rawScore = strengthsScore + weaknessesScore + opportunitiesScore + threatsScore;
       const normalizedScore = Math.max(0, Math.min(100, 50 + (rawScore / totalItems) * 10));
-      
+
       // Update SWOT analysis
       const { error } = await supabase
         .from('swot_analyses')
@@ -333,9 +336,9 @@ export default function SwotPage() {
           updated_at: new Date().toISOString()
         })
         .eq('id', swotAnalysis.id);
-      
+
       if (error) throw error;
-      
+
       setLastSaved(new Date());
     } catch (err) {
       console.error('Error saving SWOT:', err);
@@ -344,20 +347,20 @@ export default function SwotPage() {
       setSaving(false);
     }
   };
-  
+
   // Handle finalizing SWOT
   const handleFinalize = async () => {
     if (!swotAnalysis) return;
-    
+
     const confirmed = window.confirm(
       'Are you sure you want to finalize this SWOT analysis? This will lock it from further edits.'
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
       setSaving(true);
-      
+
       const { error } = await supabase
         .from('swot_analyses')
         .update({
@@ -365,9 +368,9 @@ export default function SwotPage() {
           finalized_at: new Date().toISOString()
         })
         .eq('id', swotAnalysis.id);
-      
+
       if (error) throw error;
-      
+
       setSwotAnalysis({ ...swotAnalysis, status: 'final' });
       setLastSaved(new Date());
     } catch (err) {
@@ -377,14 +380,14 @@ export default function SwotPage() {
       setSaving(false);
     }
   };
-  
+
   // Handle exporting SWOT
   const handleExport = () => {
     // This would trigger the export component
     console.log('Exporting SWOT analysis...');
     // Implementation would use the SwotExport component
   };
-  
+
   // Calculate statistics
   const calculateStats = () => {
     const total = Object.values(swotItems).flat().length;
@@ -394,16 +397,16 @@ export default function SwotPage() {
       opportunities: swotItems.opportunities.length,
       threats: swotItems.threats.length
     };
-    
+
     return {
       total,
       byCategory,
       score: swotAnalysis?.swot_score || 0
     };
   };
-  
+
   const stats = calculateStats();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -414,7 +417,7 @@ export default function SwotPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -428,7 +431,7 @@ export default function SwotPage() {
                   Strategic analysis for {currentQuarter.label}
                 </p>
               </div>
-              
+
               <div className="flex items-center space-x-4">
                 {/* Auto-save indicator */}
                 {lastSaved && (
@@ -437,13 +440,13 @@ export default function SwotPage() {
                     Saved {lastSaved.toLocaleTimeString()}
                   </div>
                 )}
-                
+
                 {/* Quarter Selector */}
                 <QuarterSelector
                   currentQuarter={currentQuarter}
                   onQuarterChange={setCurrentQuarter}
                 />
-                
+
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-2">
                   <button
@@ -453,7 +456,7 @@ export default function SwotPage() {
                     <History className="h-4 w-4 mr-2" />
                     History
                   </button>
-                  
+
                   <button
                     onClick={() => router.push('/swot/compare')}
                     className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
@@ -461,7 +464,7 @@ export default function SwotPage() {
                     <TrendingUp className="h-4 w-4 mr-2" />
                     Compare
                   </button>
-                  
+
                   <button
                     onClick={handleExport}
                     className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
@@ -469,7 +472,7 @@ export default function SwotPage() {
                     <Download className="h-4 w-4 mr-2" />
                     Export
                   </button>
-                  
+
                   {swotAnalysis?.status !== 'final' && (
                     <>
                       <button
@@ -480,7 +483,7 @@ export default function SwotPage() {
                         <Save className="h-4 w-4 mr-2" />
                         {saving ? 'Saving...' : 'Save'}
                       </button>
-                      
+
                       <button
                         onClick={handleFinalize}
                         className="inline-flex items-center px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700"
@@ -496,7 +499,7 @@ export default function SwotPage() {
           </div>
         </div>
       </div>
-      
+
       {/* Error Alert */}
       {error && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
@@ -510,7 +513,7 @@ export default function SwotPage() {
           </div>
         </div>
       )}
-      
+
       {/* Status Banner */}
       {swotAnalysis?.status === 'final' && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
@@ -526,7 +529,7 @@ export default function SwotPage() {
           </div>
         </div>
       )}
-      
+
       {/* Statistics Cards */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -557,7 +560,7 @@ export default function SwotPage() {
           />
         </div>
       </div>
-      
+
       {/* Main SWOT Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 pb-12">
         <SwotGrid
@@ -569,7 +572,7 @@ export default function SwotPage() {
           isReadOnly={swotAnalysis?.status === 'final'}
         />
       </div>
-      
+
       {/* Action Panel (for converting items to actions) */}
       {swotAnalysis && (
         <SwotActionPanel

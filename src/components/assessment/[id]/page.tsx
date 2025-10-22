@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/database.types';
 import { calculateDetailedScores, SectionScore, HealthStatus, AssessmentInsight } from '@/lib/assessment-analytics';
 import { ArrowLeft, TrendingUp, TrendingDown, Target, Award, AlertTriangle, CheckCircle, XCircle, BarChart3, Download } from 'lucide-react';
@@ -18,7 +18,10 @@ export default function AssessmentResultsPage() {
   const [insights, setInsights] = useState<AssessmentInsight[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
   useEffect(() => {
     loadAssessmentResults();
