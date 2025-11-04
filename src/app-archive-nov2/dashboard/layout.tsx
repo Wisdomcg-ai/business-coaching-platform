@@ -310,7 +310,7 @@ function DashboardWrapper({ children }: { children: React.ReactNode }) {
 
         <div className="p-4 border-t bg-gray-50">
           <p className="text-xs text-gray-500 text-center">
-            © 2025 Business Coaching Platform
+            © 2024 Business Coaching Platform
           </p>
         </div>
       </div>
