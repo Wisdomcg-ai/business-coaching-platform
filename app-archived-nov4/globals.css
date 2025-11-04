@@ -1,0 +1,80 @@
+/* Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(var(--background-end-rgb))
+  )
+  rgb(var(--background-start-rgb));
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* BPMN-JS Styling */
+.bjs-container {
+  background: white;
+}
+
+.bjs-container .djs-shape text {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  fill: #1f2937;
+}
+
+.bjs-container .djs-shape rect {
+  fill: #f3f4f6;
+  stroke: #d1d5db;
+  stroke-width: 2px;
+}
+
+.bjs-container .djs-connection > .djs-visual > polyline {
+  stroke: #6b7280;
+  stroke-width: 2px;
+  fill: none;
+}
+
+/* Hide BPMN.io logo */
+.bjs-container a[href*="bpmn.io"],
+.bjs-container [data-test-id="bpmn-io-link"],
+.bjs-container svg[data-test-id="logo"] {
+  display: none !important;
+}
+
+/* Alternative: hide any bpmn.io branding elements */
+.bjs-container > svg > g > g:last-child {
+  display: none !important;
+}

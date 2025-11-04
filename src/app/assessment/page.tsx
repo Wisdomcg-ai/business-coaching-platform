@@ -8,83 +8,57 @@ import { createClient } from '@/lib/supabase/client';
 interface Question {
   id: string;
   text: string;
-  type: 'radio' | 'checkbox' | 'text' | 'multiselect' | 'yesno-group';
-  options?: { value: string; label: string; points?: number }[];
-  questions?: { id: string; text: string }[];
+  type: 'radio';
+  options: { value: string; label: string; points: number }[];
   section: string;
   subsection?: string;
 }
 
 const questions: Question[] = [
-  // SECTION 1: BUSINESS FOUNDATION (6 questions)
+  // ==========================================
+  // SECTION 1: BUSINESS FOUNDATION (5 questions, 50 points)
+  // ==========================================
+  
   {
     id: 'q1',
-    text: "What's your current annual revenue?",
-    type: 'radio',
-    section: 'Business Foundation',
-    options: [
-      { value: 'under_250k', label: 'Under $250K (Foundation Stage)', points: 2 },
-      { value: '250k_1m', label: '$250K - $1M (Traction Stage)', points: 4 },
-      { value: '1m_3m', label: '$1M - $3M (Scaling Stage)', points: 6 },
-      { value: '3m_5m', label: '$3M - $5M (Optimization Stage)', points: 8 },
-      { value: '5m_10m', label: '$5M - $10M (Leadership Stage)', points: 9 },
-      { value: 'over_10m', label: '$10M+ (Mastery Stage)', points: 10 }
-    ]
-  },
-  {
-    id: 'q2',
-    text: "What's your current profit margin?",
-    type: 'radio',
-    section: 'Business Foundation',
-    options: [
-      { value: 'losing', label: 'Losing money', points: 0 },
-      { value: 'breakeven', label: 'Breaking even (0-5%)', points: 2 },
-      { value: 'small_5_10', label: 'Small profit (5-10%)', points: 4 },
-      { value: 'healthy_10_15', label: 'Healthy profit (10-15%)', points: 6 },
-      { value: 'strong_15_20', label: 'Strong profit (15-20%)', points: 8 },
-      { value: 'exceptional_20_plus', label: 'Exceptional profit (20%+)', points: 10 }
-    ]
-  },
-  {
-    id: 'q3',
     text: 'Are you paying yourself a market-rate salary consistently?',
     type: 'radio',
     section: 'Business Foundation',
     options: [
       { value: 'no_rarely', label: 'No - rarely take money out', points: 0 },
-      { value: 'sometimes', label: 'Sometimes - when cash flow allows', points: 2 },
-      { value: 'yes_below', label: 'Yes - regular salary below market', points: 3 },
-      { value: 'yes_full', label: 'Yes - full market-rate salary', points: 4 },
-      { value: 'yes_plus_profit', label: 'Yes - salary plus profit distributions', points: 5 }
+      { value: 'sometimes', label: 'Sometimes - when cash flow allows', points: 3 },
+      { value: 'yes_below', label: 'Yes - regular salary below market', points: 5 },
+      { value: 'yes_full', label: 'Yes - full market-rate salary', points: 8 },
+      { value: 'yes_plus_profit', label: 'Yes - salary plus profit distributions', points: 10 }
     ]
   },
   {
-    id: 'q4',
+    id: 'q2',
     text: 'How many people work in your business?',
     type: 'radio',
     section: 'Business Foundation',
     options: [
-      { value: 'just_me', label: 'Just me', points: 1 },
-      { value: '2_5', label: '2-5 people', points: 2 },
-      { value: '6_15', label: '6-15 people', points: 3 },
-      { value: '16_50', label: '16-50 people', points: 4 },
-      { value: '50_plus', label: '50+ people', points: 5 }
+      { value: 'just_me', label: 'Just me', points: 2 },
+      { value: '2_5', label: '2-5 people', points: 4 },
+      { value: '6_15', label: '6-15 people', points: 6 },
+      { value: '16_50', label: '16-50 people', points: 8 },
+      { value: '50_plus', label: '50+ people', points: 10 }
     ]
   },
   {
-    id: 'q5',
+    id: 'q3',
     text: 'How dependent is the business on you personally?',
     type: 'radio',
     section: 'Business Foundation',
     options: [
       { value: 'completely', label: 'Completely - stops without me', points: 0 },
-      { value: 'very', label: 'Very - needs me for most decisions', points: 2 },
-      { value: 'somewhat', label: 'Somewhat - can run for short periods', points: 4 },
-      { value: 'minimal', label: 'Minimal - runs well without me', points: 5 }
+      { value: 'very', label: 'Very - needs me for most decisions', points: 3 },
+      { value: 'somewhat', label: 'Somewhat - can run for short periods', points: 7 },
+      { value: 'minimal', label: 'Minimal - runs well without me for weeks', points: 10 }
     ]
   },
   {
-    id: 'q6',
+    id: 'q4',
     text: 'How predictable is your monthly revenue?',
     type: 'radio',
     section: 'Business Foundation',
@@ -92,43 +66,43 @@ const questions: Question[] = [
       { value: 'unpredictable', label: 'Completely unpredictable - varies wildly', points: 0 },
       { value: 'somewhat_50', label: 'Somewhat predictable - within 50%', points: 3 },
       { value: 'very_25', label: 'Very predictable - within 25%', points: 7 },
-      { value: 'extremely_recurring', label: 'Extremely predictable - recurring revenue', points: 10 }
+      { value: 'extremely_recurring', label: 'Extremely predictable - recurring revenue model', points: 10 }
+    ]
+  },
+  {
+    id: 'q5',
+    text: 'If you wanted to sell your business tomorrow, could you?',
+    type: 'radio',
+    section: 'Business Foundation',
+    options: [
+      { value: 'no_dependent', label: 'No - too dependent on me', points: 0 },
+      { value: 'maybe_work', label: 'Maybe - but needs significant work', points: 3 },
+      { value: 'probably_prep', label: 'Probably - would need 6-12 months prep', points: 7 },
+      { value: 'yes_ready', label: 'Yes - it\'s sale-ready today', points: 10 }
     ]
   },
 
-  // SECTION 2: STRATEGIC WHEEL (14 questions)
+  // ==========================================
+  // SECTION 2: STRATEGIC CLARITY (7 questions, 70 points)
+  // ==========================================
+  
   {
-    id: 'q7',
+    id: 'q6',
     text: 'How clear and compelling is your business vision?',
     type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Vision & Purpose',
+    section: 'Strategic Clarity',
     options: [
       { value: 'very_unclear', label: 'Very unclear - no defined direction', points: 0 },
-      { value: 'somewhat_clear', label: 'Somewhat clear - general idea', points: 3 },
+      { value: 'somewhat_clear', label: 'Somewhat clear - general idea only', points: 3 },
       { value: 'clear', label: 'Clear - team understands it', points: 7 },
       { value: 'crystal_clear', label: 'Crystal clear - guides all decisions', points: 10 }
     ]
   },
   {
-    id: 'q8',
-    text: 'Does your team understand and believe in your purpose?',
+    id: 'q7',
+    text: 'How well-defined is your target market and ideal customer?',
     type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Vision & Purpose',
-    options: [
-      { value: 'no_understanding', label: 'No understanding or buy-in', points: 0 },
-      { value: 'some_understanding', label: 'Some understanding, limited buy-in', points: 3 },
-      { value: 'good_understanding', label: 'Good understanding and buy-in', points: 7 },
-      { value: 'complete_alignment', label: 'Complete alignment and passion', points: 10 }
-    ]
-  },
-  {
-    id: 'q9',
-    text: 'How well-defined is your target market and positioning?',
-    type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Strategy & Market',
+    section: 'Strategic Clarity',
     options: [
       { value: 'anyone', label: 'Serve anyone who will pay', points: 0 },
       { value: 'general', label: 'General target market defined', points: 3 },
@@ -137,38 +111,34 @@ const questions: Question[] = [
     ]
   },
   {
-    id: 'q10',
+    id: 'q8',
     text: 'Do you have a sustainable competitive advantage?',
     type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Strategy & Market',
+    section: 'Strategic Clarity',
     options: [
       { value: 'price_only', label: 'Compete mainly on price', points: 0 },
       { value: 'some_differentiation', label: 'Some differentiation', points: 3 },
       { value: 'clear_value', label: 'Clear unique value proposition', points: 7 },
-      { value: 'dominant', label: 'Dominant market position', points: 10 }
+      { value: 'dominant', label: 'Dominant position with defensible moats', points: 10 }
     ]
   },
   {
-    id: 'q11',
-    text: 'Have you clearly defined and do you actively use your Unique Selling Propositions (USPs)?',
+    id: 'q9',
+    text: 'When did you last launch a new product/service/offering?',
     type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Strategy & Market',
+    section: 'Strategic Clarity',
     options: [
-      { value: 'dont_know', label: "Don't know what makes us different", points: 0 },
-      { value: 'some_ideas', label: 'Have some ideas but not clearly defined', points: 3 },
-      { value: 'defined_not_used', label: 'USPs defined but not consistently used in marketing', points: 5 },
-      { value: 'clear_used', label: 'Clear USPs used across all marketing materials', points: 8 },
-      { value: 'powerful', label: 'Powerful USPs that immediately resonate with ideal clients', points: 10 }
+      { value: 'over_2years', label: 'Over 2 years ago or never', points: 0 },
+      { value: '1_2_years', label: '1-2 years ago', points: 3 },
+      { value: 'last_year', label: 'Within the last year', points: 7 },
+      { value: 'last_6months', label: 'Within the last 6 months', points: 10 }
     ]
   },
   {
-    id: 'q13',
+    id: 'q10',
     text: 'How strong is your team and culture?',
     type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'People & Culture',
+    section: 'Strategic Clarity',
     options: [
       { value: 'struggling', label: 'Struggling with people issues', points: 0 },
       { value: 'adequate', label: 'Adequate team, developing culture', points: 3 },
@@ -177,24 +147,10 @@ const questions: Question[] = [
     ]
   },
   {
-    id: 'q14',
-    text: 'How well-defined and lived are your core values?',
-    type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'People & Culture',
-    options: [
-      { value: 'none', label: 'No defined core values', points: 0 },
-      { value: 'exist_unused', label: "Values exist but aren't used", points: 3 },
-      { value: 'guide_some', label: 'Values guide some decisions', points: 7 },
-      { value: 'drive_all', label: 'Values drive all decisions and hiring', points: 10 }
-    ]
-  },
-  {
-    id: 'q15',
+    id: 'q11',
     text: 'How systematic is your business execution?',
     type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Systems & Execution',
+    section: 'Strategic Clarity',
     options: [
       { value: 'adhoc', label: 'Ad hoc, reactive approach', points: 0 },
       { value: 'some_systems', label: 'Some systems, inconsistent execution', points: 3 },
@@ -203,149 +159,38 @@ const questions: Question[] = [
     ]
   },
   {
-    id: 'q16',
-    text: 'Do you have effective meeting rhythms?',
+    id: 'q12',
+    text: 'How well do you track business performance with metrics?',
     type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Systems & Execution',
+    section: 'Strategic Clarity',
     options: [
-      { value: 'irregular', label: 'Irregular, unproductive meetings', points: 0 },
-      { value: 'some_meetings', label: 'Some meetings, limited value', points: 3 },
-      { value: 'weekly', label: 'Weekly team meetings with agendas', points: 7 },
-      { value: 'comprehensive', label: 'Daily huddles, weekly tactical, monthly strategic', points: 10 }
-    ]
-  },
-  {
-    id: 'q17',
-    text: 'How well do you track business performance with a dashboard?',
-    type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Money & Metrics',
-    options: [
-      { value: 'dont_track', label: "Don't track metrics systematically", points: 0 },
+      { value: 'dont_track', label: 'Don\'t track metrics systematically', points: 0 },
       { value: 'monthly', label: 'Track basic metrics monthly', points: 3 },
       { value: 'weekly', label: 'Weekly dashboard review', points: 7 },
       { value: 'daily', label: 'Real-time dashboard reviewed daily', points: 10 }
     ]
   },
-  {
-    id: 'q18',
-    text: 'Have you identified your "1 Number" that drives everything?',
-    type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Money & Metrics',
-    options: [
-      { value: 'no_idea', label: 'No idea what this means', points: 0 },
-      { value: 'many_metrics', label: 'Track many metrics, no focus', points: 3 },
-      { value: 'identified', label: 'Have identified key metric', points: 7 },
-      { value: 'drives_all', label: '"1 Number" drives all decisions', points: 10 }
-    ]
-  },
-  {
-    id: 'q19',
-    text: 'How aligned is your team around priorities?',
-    type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Communications & Alignment',
-    options: [
-      { value: 'no_alignment', label: 'Little to no alignment', points: 0 },
-      { value: 'some_alignment', label: 'Some alignment, poor communication', points: 3 },
-      { value: 'good_alignment', label: 'Good alignment and communication', points: 7 },
-      { value: 'perfect', label: 'Perfect alignment and rhythm', points: 10 }
-    ]
-  },
-  {
-    id: 'q20',
-    text: 'How organized are your team communications?',
-    type: 'radio',
-    section: 'Strategic Wheel',
-    subsection: 'Communications & Alignment',
-    options: [
-      { value: 'scattered', label: 'Scattered across email, texts, calls, and apps - very inefficient', points: 0 },
-      { value: 'multiple', label: 'Multiple channels but manageable', points: 3 },
-      { value: 'streamlined', label: 'Streamlined to 2-3 main channels', points: 7 },
-      { value: 'unified', label: 'One primary platform for all team communication', points: 10 }
-    ]
-  },
 
-  // SECTION 3: PROFITABILITY HEALTH (6 questions)
-  {
-    id: 'q22',
-    text: 'When did you last increase prices?',
-    type: 'radio',
-    section: 'Profitability Health',
-    options: [
-      { value: 'never_2years', label: 'Never or over 2 years ago', points: 0 },
-      { value: '1_2_years', label: '1-2 years ago', points: 3 },
-      { value: '6_12_months', label: '6-12 months ago', points: 7 },
-      { value: 'within_6', label: 'Within last 6 months', points: 10 }
-    ]
-  },
-  {
-    id: 'q23',
-    text: 'How confident are you in your pricing strategy?',
-    type: 'radio',
-    section: 'Profitability Health',
-    options: [
-      { value: 'very_unsure', label: 'Very unsure - often discount or apologize', points: 0 },
-      { value: 'somewhat', label: 'Somewhat confident - occasional doubts', points: 3 },
-      { value: 'confident', label: 'Confident - rarely questioned', points: 7 },
-      { value: 'very_confident', label: 'Very confident - optimal pricing achieved', points: 10 }
-    ]
-  },
-  {
-    id: 'q24',
-    text: 'How often do you review and audit your business expenses?',
-    type: 'radio',
-    section: 'Profitability Health',
-    options: [
-      { value: 'never_tight', label: 'Never or only when cash is tight', points: 0 },
-      { value: 'annually', label: 'Annually', points: 3 },
-      { value: 'quarterly', label: 'Quarterly', points: 7 },
-      { value: 'monthly', label: 'Monthly with action taken on findings', points: 10 }
-    ]
-  },
-  {
-    id: 'q25',
-    text: 'Do you regularly review and cancel unused subscriptions/services?',
-    type: 'radio',
-    section: 'Profitability Health',
-    options: [
-      { value: 'no_probably', label: "No - probably paying for things we don't use", points: 0 },
-      { value: 'occasionally', label: 'Occasionally when I notice something', points: 3 },
-      { value: 'annual', label: 'Annual review of all subscriptions', points: 7 },
-      { value: 'quarterly', label: 'Quarterly audit with immediate cancellations', points: 10 }
-    ]
-  },
-  {
-    id: 'q26',
-    text: 'When did you last negotiate with suppliers for better pricing?',
-    type: 'radio',
-    section: 'Profitability Health',
-    options: [
-      { value: 'never_2years', label: 'Never or over 2 years ago', points: 0 },
-      { value: 'within_2years', label: 'Within the last 2 years', points: 3 },
-      { value: 'within_year', label: 'Within the last year', points: 7 },
-      { value: 'within_6months', label: 'Within the last 6 months', points: 10 }
-    ]
-  },
+  // ==========================================
+  // SECTION 3: BUSINESS ENGINES (18 questions, 180 points)
+  // ==========================================
 
-  // SECTION 4: BUSINESS ENGINES - ATTRACT ENGINE
+  // ATTRACT ENGINE (3 questions, 30 points)
   {
-    id: 'q27',
+    id: 'q13',
     text: 'How many qualified leads do you generate monthly?',
     type: 'radio',
     section: 'Business Engines',
     subsection: 'Attract Engine',
     options: [
-      { value: 'under_20', label: 'Under 20 leads', points: 2 },
+      { value: 'under_20', label: 'Under 20 leads or don\'t track', points: 2 },
       { value: '20_50', label: '20-50 leads', points: 5 },
       { value: '50_100', label: '50-100 leads', points: 8 },
       { value: 'over_100', label: '100+ leads', points: 10 }
     ]
   },
   {
-    id: 'q28',
+    id: 'q14',
     text: 'How many reliable marketing channels generate leads?',
     type: 'radio',
     section: 'Business Engines',
@@ -358,95 +203,108 @@ const questions: Question[] = [
     ]
   },
   {
-    id: 'q30',
-    text: 'How systematic is your lead generation? (Answer Yes or No to each)',
-    type: 'yesno-group',
+    id: 'q15',
+    text: 'How sophisticated is your lead generation system?',
+    type: 'radio',
     section: 'Business Engines',
     subsection: 'Attract Engine',
-    questions: [
-      { id: 'q30a', text: 'We have a referral system generating 30%+ of business' },
-      { id: 'q30b', text: 'We email our database/leads regularly to nurture relationships' },
-      { id: 'q30c', text: 'We track ROI for each marketing channel' },
-      { id: 'q30d', text: 'We know our cost per lead and customer acquisition cost' }
+    options: [
+      { value: 'adhoc', label: 'Ad hoc/inconsistent', points: 0 },
+      { value: 'track_no_nurture', label: 'Track leads but no nurture system', points: 3 },
+      { value: 'crm_nurture', label: 'Have CRM + email nurture sequences', points: 7 },
+      { value: 'full_automation', label: 'Full marketing automation with attribution', points: 10 }
     ]
   },
 
-  // CONVERT ENGINE
+  // CONVERT ENGINE (3 questions, 30 points)
   {
-    id: 'q31',
-    text: "What's your lead-to-customer conversion rate?",
+    id: 'q16',
+    text: 'What\'s your lead-to-customer conversion rate?',
     type: 'radio',
     section: 'Business Engines',
     subsection: 'Convert Engine',
     options: [
-      { value: 'under_15', label: "Under 15% or don't track", points: 2 },
+      { value: 'under_15', label: 'Under 15% or don\'t track', points: 2 },
       { value: '15_25', label: '15-25%', points: 5 },
       { value: '25_40', label: '25-40%', points: 8 },
       { value: 'over_40', label: 'Over 40%', points: 10 }
     ]
   },
   {
-    id: 'q33',
-    text: 'How effective is your sales capability? (Answer Yes or No to each)',
-    type: 'yesno-group',
+    id: 'q17',
+    text: 'How long is your average sales cycle?',
+    type: 'radio',
     section: 'Business Engines',
     subsection: 'Convert Engine',
-    questions: [
-      { id: 'q33a', text: 'We follow up multiple times with interested prospects' },
-      { id: 'q33b', text: "We contact prospects who didn't sign after receiving proposals" },
-      { id: 'q33c', text: 'We have ready answers for common objections' },
-      { id: 'q33d', text: 'We always ask for the business rather than waiting' }
+    options: [
+      { value: 'dont_know', label: 'Don\'t know/varies wildly', points: 0 },
+      { value: 'over_6months', label: 'Over 6 months (long, complex)', points: 3 },
+      { value: '1_6months', label: '1-6 months (moderate)', points: 6 },
+      { value: 'under_1month', label: 'Under 1 month (efficient)', points: 8 },
+      { value: 'same_day', label: 'Same day/week (transactional)', points: 10 }
     ]
   },
   {
-    id: 'q34',
-    text: 'Do you maximize transaction value? (Answer Yes or No to each)',
-    type: 'yesno-group',
+    id: 'q18',
+    text: 'How effective is your sales process?',
+    type: 'radio',
     section: 'Business Engines',
     subsection: 'Convert Engine',
-    questions: [
-      { id: 'q34a', text: 'We offer different price points (basic, standard, premium)' },
-      { id: 'q34b', text: 'We regularly offer additional products/services to clients' },
-      { id: 'q34c', text: 'We can confidently explain our pricing without apologizing' },
-      { id: 'q34d', text: 'Our prices are based on value, not just costs' }
+    options: [
+      { value: 'no_process', label: 'No formal sales process', points: 0 },
+      { value: 'basic', label: 'Basic process, inconsistent follow-up', points: 3 },
+      { value: 'documented', label: 'Documented process with objection handling', points: 7 },
+      { value: 'optimized', label: 'Optimized process with upsells and tracking', points: 10 }
     ]
   },
 
-  // DELIVER ENGINE - CUSTOMER EXPERIENCE
+  // DELIVER ENGINE (5 questions, 50 points)
   {
-    id: 'q35',
+    id: 'q19',
     text: 'What percentage of customers are delighted with your delivery?',
     type: 'radio',
     section: 'Business Engines',
-    subsection: 'Deliver Engine - Customer',
+    subsection: 'Deliver Engine',
     options: [
-      { value: 'under_60', label: 'Under 60%', points: 0 },
+      { value: 'under_60', label: 'Under 60% or don\'t know', points: 0 },
       { value: '60_75', label: '60-75%', points: 3 },
       { value: '75_90', label: '75-90%', points: 7 },
       { value: 'over_90', label: 'Over 90%', points: 10 }
     ]
   },
   {
-    id: 'q39',
-    text: 'How exceptional is your customer journey? (Answer Yes or No to each)',
-    type: 'yesno-group',
+    id: 'q20',
+    text: 'How systematized is your customer experience?',
+    type: 'radio',
     section: 'Business Engines',
-    subsection: 'Deliver Engine - Customer',
-    questions: [
-      { id: 'q39a', text: 'Our onboarding experience impresses new customers' },
-      { id: 'q39b', text: "We've mapped every customer touchpoint" },
-      { id: 'q39c', text: 'Customers can easily reach us when needed' },
-      { id: 'q39d', text: 'We systematically review and improve the experience' }
+    subsection: 'Deliver Engine',
+    options: [
+      { value: 'wing_it', label: 'Wing it, reactive service', points: 0 },
+      { value: 'basic_onboarding', label: 'Basic onboarding process', points: 3 },
+      { value: 'mapped_journey', label: 'Mapped customer journey with touchpoints', points: 7 },
+      { value: 'measure_improve', label: 'Systematically measure and improve NPS', points: 10 }
     ]
   },
-
-  // DELIVER ENGINE - PEOPLE & TEAM
   {
-    id: 'q40',
+    id: 'q21',
+    text: 'What % of your revenue comes from repeat customers?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Deliver Engine',
+    options: [
+      { value: 'dont_know', label: 'I don\'t know', points: 0 },
+      { value: 'under_20', label: 'Under 20% (mostly transactional)', points: 2 },
+      { value: '20_40', label: '20-40% (some repeat business)', points: 5 },
+      { value: '40_60', label: '40-60% (good retention)', points: 8 },
+      { value: 'over_60', label: 'Over 60% (strong loyalty)', points: 10 }
+    ]
+  },
+  {
+    id: 'q22',
     text: 'How strategic is your approach to talent?',
     type: 'radio',
     section: 'Business Engines',
-    subsection: 'Deliver Engine - People',
+    subsection: 'Deliver Engine',
     options: [
       { value: 'reactive', label: 'Reactive hiring when desperate', points: 0 },
       { value: 'basic', label: 'Basic hiring process', points: 3 },
@@ -455,242 +313,111 @@ const questions: Question[] = [
     ]
   },
   {
-    id: 'q42',
-    text: 'How effectively do you develop and leverage your team? (Answer Yes or No to each)',
-    type: 'yesno-group',
-    section: 'Business Engines',
-    subsection: 'Deliver Engine - People',
-    questions: [
-      { id: 'q42a', text: 'Every role has documented responsibilities and KPIs' },
-      { id: 'q42b', text: 'We invest in team training and development' },
-      { id: 'q42c', text: 'We strategically outsource non-core activities' },
-      { id: 'q42d', text: 'Team is accountable for results' }
-    ]
-  },
-
-  // DELIVER ENGINE - SYSTEMS & PROCESS
-  {
-    id: 'q43',
+    id: 'q23',
     text: 'How comprehensive is your process documentation?',
     type: 'radio',
     section: 'Business Engines',
-    subsection: 'Deliver Engine - Systems',
+    subsection: 'Deliver Engine',
     options: [
-      { value: 'in_heads', label: "Most processes exist only in people's heads", points: 0 },
+      { value: 'in_heads', label: 'Most processes exist only in people\'s heads', points: 0 },
       { value: 'some_documented', label: 'Some processes documented', points: 3 },
       { value: 'most_documented', label: 'Most key processes documented', points: 7 },
       { value: 'all_optimized', label: 'All processes documented and optimized', points: 10 }
     ]
   },
-  {
-    id: 'q45',
-    text: 'How advanced is your operational infrastructure? (Answer Yes or No to each)',
-    type: 'yesno-group',
-    section: 'Business Engines',
-    subsection: 'Deliver Engine - Systems',
-    questions: [
-      { id: 'q45a', text: 'We have robust data backup and security systems' },
-      { id: 'q45b', text: 'We have documented customer retention/delight processes' },
-      { id: 'q45c', text: 'Our technology infrastructure is current and integrated' },
-      { id: 'q45d', text: 'We measure process efficiency and cycle times' }
-    ]
-  },
 
-  // FINANCE ENGINE
+  // FINANCE ENGINE (7 questions, 70 points)
   {
-    id: 'q46',
-    text: 'Do you have a comprehensive P&L budget/forecast?',
+    id: 'q24',
+    text: 'How would you describe your cash flow situation?',
     type: 'radio',
     section: 'Business Engines',
     subsection: 'Finance Engine',
     options: [
-      { value: 'no_budget', label: 'No budget or forecast', points: 0 },
-      { value: 'basic', label: 'Basic revenue/expense tracking', points: 3 },
-      { value: 'annual', label: 'Annual budget created', points: 7 },
-      { value: 'detailed', label: 'Detailed budget with monthly variance analysis', points: 10 }
+      { value: 'stressed', label: 'Constantly stressed about paying bills', points: 0 },
+      { value: 'occasional_crunches', label: 'Occasional cash crunches, tight months', points: 3 },
+      { value: 'stable', label: 'Generally stable, manageable fluctuations', points: 7 },
+      { value: 'strong_reserves', label: 'Strong reserves, never worry about cash', points: 10 }
     ]
   },
   {
-    id: 'q49',
-    text: 'How well do you manage profitability and working capital? (Answer Yes or No to each)',
-    type: 'yesno-group',
+    id: 'q25',
+    text: 'What % of revenue comes from your top 3 customers?',
+    type: 'radio',
     section: 'Business Engines',
     subsection: 'Finance Engine',
-    questions: [
-      { id: 'q49a', text: 'We maintain sufficient cash reserves (3+ months expenses)' },
-      { id: 'q49b', text: 'We actively manage our cash conversion cycle' },
-      { id: 'q49c', text: 'We know which products/services are most profitable' },
-      { id: 'q49d', text: 'We have increased prices in the last 12 months' }
-    ]
-  },
-
-  // SECTION 5: SUCCESS DISCIPLINES
-  {
-    id: 'q50',
-    text: 'Decision-Making Frameworks',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Decision-Making',
-    questions: [
-      { id: 'q50a', text: 'I have clear criteria for different types of decisions' },
-      { id: 'q50b', text: 'I make small decisions quickly without overthinking' },
-      { id: 'q50c', text: 'I know which decisions need deep analysis vs quick action' },
-      { id: 'q50d', text: 'I rarely procrastinate on important decisions' },
-      { id: 'q50e', text: 'I have defined decision-making authority levels' }
+    options: [
+      { value: 'dont_know', label: 'I don\'t know', points: 0 },
+      { value: 'over_50', label: 'More than 50% (high concentration risk)', points: 2 },
+      { value: '30_50', label: '30-50% (moderate concentration)', points: 5 },
+      { value: '20_30', label: '20-30% (healthy diversification)', points: 8 },
+      { value: 'under_20', label: 'Less than 20% (excellent diversification)', points: 10 }
     ]
   },
   {
-    id: 'q51',
-    text: 'Technology & AI Integration',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Technology & AI',
-    questions: [
-      { id: 'q51a', text: 'We use technology effectively for marketing automation' },
-      { id: 'q51b', text: 'We track and manage all customer interactions systematically' },
-      { id: 'q51c', text: 'We use AI for content creation or customer service' },
-      { id: 'q51d', text: 'We use AI for data analysis or insights' },
-      { id: 'q51e', text: 'We regularly evaluate new technology opportunities' }
+    id: 'q26',
+    text: 'When did you last increase prices?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Finance Engine',
+    options: [
+      { value: 'never_2years', label: 'Never or over 2 years ago', points: 0 },
+      { value: '1_2_years', label: '1-2 years ago', points: 3 },
+      { value: '6_12_months', label: '6-12 months ago', points: 7 },
+      { value: 'within_6', label: 'Within last 6 months', points: 10 }
     ]
   },
   {
-    id: 'q52',
-    text: 'Growth Mindset & Learning',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Growth Mindset',
-    questions: [
-      { id: 'q52a', text: 'I dedicate time weekly to learning new business skills' },
-      { id: 'q52b', text: 'I read business books or listen to podcasts regularly' },
-      { id: 'q52c', text: 'Our team has learning and development plans' },
-      { id: 'q52d', text: 'We document and share lessons from wins and failures' },
-      { id: 'q52e', text: 'We have a culture of continuous improvement' }
+    id: 'q27',
+    text: 'What\'s your revenue growth rate over the past 12 months?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Finance Engine',
+    options: [
+      { value: 'declining', label: 'Declining revenue', points: 0 },
+      { value: 'flat', label: 'Flat or minimal growth (0-10%)', points: 3 },
+      { value: 'moderate', label: 'Moderate growth (10-25%)', points: 6 },
+      { value: 'strong', label: 'Strong growth (25-50%)', points: 8 },
+      { value: 'rapid', label: 'Rapid growth (50%+)', points: 10 }
     ]
   },
   {
-    id: 'q53',
-    text: 'Leadership Development',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Leadership',
-    questions: [
-      { id: 'q53a', text: 'Others naturally follow my vision and direction' },
-      { id: 'q53b', text: "I'm developing other leaders in the business" },
-      { id: 'q53c', text: 'I delegate effectively and empower my team' },
-      { id: 'q53d', text: 'I regularly assess and improve my leadership skills' },
-      { id: 'q53e', text: 'I spend time working ON the business, not just IN it' }
+    id: 'q28',
+    text: 'What % of revenue do you invest in marketing?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Finance Engine',
+    options: [
+      { value: '0_2', label: '0-2% or don\'t know', points: 0 },
+      { value: '3_5', label: '3-5% (survival mode)', points: 3 },
+      { value: '6_10', label: '6-10% (growth oriented)', points: 7 },
+      { value: 'over_10', label: '10%+ (aggressive growth)', points: 10 }
     ]
   },
   {
-    id: 'q54',
-    text: 'Personal Mastery',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Personal Mastery',
-    questions: [
-      { id: 'q54a', text: 'I have a morning ritual including planning and goals review' },
-      { id: 'q54b', text: 'I can maintain deep focus for 2+ hours on important work' },
-      { id: 'q54c', text: 'I take at least 30 minutes daily for exercise/physical activity' },
-      { id: 'q54d', text: 'I plan each day in advance with specific outcomes' },
-      { id: 'q54e', text: 'I consistently maintain high energy throughout the workday' }
+    id: 'q29',
+    text: 'Do you know your Customer Acquisition Cost (CAC) vs Lifetime Value (LTV)?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Finance Engine',
+    options: [
+      { value: 'no_idea', label: 'No idea what these mean', points: 0 },
+      { value: 'heard_dont_track', label: 'Heard of them but don\'t track', points: 2 },
+      { value: 'track_poor', label: 'Track but ratio isn\'t great', points: 5 },
+      { value: 'yes_3x', label: 'Yes - LTV is 3x+ CAC', points: 10 }
     ]
   },
   {
-    id: 'q55',
-    text: 'Operational Excellence',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Operational Excellence',
-    questions: [
-      { id: 'q55a', text: 'We have standard operating procedures that everyone follows' },
-      { id: 'q55b', text: 'Our business could operate effectively without me for 6 weeks' },
-      { id: 'q55c', text: 'We regularly review and optimize our systems' },
-      { id: 'q55d', text: 'We measure and improve operational efficiency metrics' },
-      { id: 'q55e', text: 'We have quality control systems in place' }
-    ]
-  },
-  {
-    id: 'q56',
-    text: 'Resource Optimization',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Resource Optimization',
-    questions: [
-      { id: 'q56a', text: 'We maximize utilization of physical assets and space' },
-      { id: 'q56b', text: 'Our people are deployed in their highest-value roles' },
-      { id: 'q56c', text: "We've eliminated or outsourced non-core activities" },
-      { id: 'q56d', text: 'We regularly review and optimize all resource allocation' },
-      { id: 'q56e', text: 'We track ROI on all major investments and decisions' }
-    ]
-  },
-  {
-    id: 'q57',
-    text: 'Financial Acumen',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Financial Acumen',
-    questions: [
-      { id: 'q57a', text: 'I review financial metrics weekly' },
-      { id: 'q57b', text: 'I understand my profit per customer/job/unit sold' },
-      { id: 'q57c', text: 'We track budget vs actual with variance analysis' },
-      { id: 'q57d', text: 'I make decisions based on financial impact' },
-      { id: 'q57e', text: 'We actively manage cash flow to avoid surprises' }
-    ]
-  },
-  {
-    id: 'q58',
-    text: 'Accountability & Performance Management',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Accountability',
-    questions: [
-      { id: 'q58a', text: 'Every team member has clear KPIs and scorecards' },
-      { id: 'q58b', text: 'We conduct regular performance reviews' },
-      { id: 'q58c', text: 'People consistently do what they say they will do' },
-      { id: 'q58d', text: 'I hold myself accountable to my commitments' },
-      { id: 'q58e', text: 'We have a culture of ownership and responsibility' }
-    ]
-  },
-  {
-    id: 'q59',
-    text: 'Customer Experience',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Customer Experience',
-    questions: [
-      { id: 'q59a', text: 'Customers are delighted and become advocates (referrals/reviews)' },
-      { id: 'q59b', text: 'We systematically gather and act on customer feedback' },
-      { id: 'q59c', text: 'We maintain strong relationships beyond the initial transaction' },
-      { id: 'q59d', text: 'We exceed expectations at every touchpoint' },
-      { id: 'q59e', text: 'We have a customer success process, not just customer service' }
-    ]
-  },
-  {
-    id: 'q60',
-    text: 'Resilience & Renewal',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Resilience & Renewal',
-    questions: [
-      { id: 'q60a', text: 'I have scheduled breaks and renewal time' },
-      { id: 'q60b', text: 'I work less than 50 hours per week consistently' },
-      { id: 'q60c', text: "I've scheduled time off in the next 12 months" },
-      { id: 'q60d', text: 'I bounce back quickly from setbacks' },
-      { id: 'q60e', text: 'I maintain work-life integration that energizes me' }
-    ]
-  },
-  {
-    id: 'q61',
-    text: 'Time Management & Effectiveness',
-    type: 'yesno-group',
-    section: 'Success Disciplines',
-    subsection: 'Time Management',
-    questions: [
-      { id: 'q61a', text: 'I use a prioritization system (urgent/important matrix or similar)' },
-      { id: 'q61b', text: 'I maintain and work from organized to-do lists daily' },
-      { id: 'q61c', text: 'I calendar-block my most important activities' },
-      { id: 'q61d', text: 'I have a "Stop Doing List" to eliminate low-value activities' },
-      { id: 'q61e', text: 'I protect my time by saying no to non-essential requests' }
+    id: 'q30',
+    text: 'How sophisticated is your financial management?',
+    type: 'radio',
+    section: 'Business Engines',
+    subsection: 'Finance Engine',
+    options: [
+      { value: 'react_balance', label: 'React to bank balance, no forecasting or expense control', points: 0 },
+      { value: 'track_basic', label: 'Track P&L monthly, basic budgeting and expense reviews', points: 3 },
+      { value: 'forecast_variance', label: '13-week cash flow forecast, variance analysis, disciplined expenses', points: 7 },
+      { value: 'rolling_profitability', label: 'Rolling forecasts, profitability by product/customer, full visibility', points: 10 }
     ]
   }
 ];
@@ -705,28 +432,17 @@ export default function AssessmentPage() {
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
   
-  const sections = ['Business Foundation', 'Strategic Wheel', 'Profitability Health', 'Business Engines', 'Success Disciplines'];
+  const sections = ['Business Foundation', 'Strategic Clarity', 'Business Engines'];
   const currentSection = currentQuestion.section;
   const currentSectionIndex = sections.indexOf(currentSection);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        if (currentQuestion.type === 'yesno-group') {
-          const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
-          if (allAnswered) {
-            if (currentQuestionIndex < questions.length - 1) {
-              goToNext();
-            } else {
-              handleSubmit();
-            }
-          }
-        } else if (answers[currentQuestion.id]) {
-          if (currentQuestionIndex < questions.length - 1) {
-            goToNext();
-          } else {
-            handleSubmit();
-          }
+      if (e.key === 'Enter' && answers[currentQuestion.id]) {
+        if (currentQuestionIndex < questions.length - 1) {
+          goToNext();
+        } else {
+          handleSubmit();
         }
       }
     };
@@ -735,25 +451,13 @@ export default function AssessmentPage() {
     return () => window.removeEventListener('keypress', handleKeyPress);
   }, [currentQuestionIndex, answers, currentQuestion]);
 
-  function handleAnswer(value: string, points?: number) {
+  function handleAnswer(value: string, points: number) {
     setAnswers({
       ...answers,
       [currentQuestion.id]: { 
         value, 
-        points: points || 0,
-        question: currentQuestion.text 
-      }
-    });
-  }
-
-  function handleYesNoGroup(questionId: string, value: 'yes' | 'no') {
-    const points = value === 'yes' ? 1.25 : 0;
-    setAnswers({
-      ...answers,
-      [questionId]: { 
-        value, 
         points,
-        question: currentQuestion.questions?.find(q => q.id === questionId)?.text || ''
+        question: currentQuestion.text 
       }
     });
   }
@@ -765,35 +469,24 @@ export default function AssessmentPage() {
   }
 
   function goToNext() {
-    if (currentQuestion.type === 'yesno-group') {
-      const allAnswered = currentQuestion.questions?.every(q => answers[q.id]) || false;
-      if (allAnswered && currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1);
-      }
-    } else if (answers[currentQuestion.id] && currentQuestionIndex < questions.length - 1) {
+    if (answers[currentQuestion.id] && currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   }
 
   function isCurrentQuestionAnswered(): boolean {
-    if (currentQuestion.type === 'yesno-group') {
-      return currentQuestion.questions?.every(q => answers[q.id]) || false;
-    }
     return !!answers[currentQuestion.id];
   }
 
   function calculateSectionScores() {
     const sectionScores: Record<string, number> = {
-      foundation: 0,
-      strategic_wheel: 0,
-      profitability: 0,
-      engines: 0,
-      disciplines: 0
+      foundation: 0,      // Max: 50 points
+      strategic: 0,       // Max: 70 points
+      engines: 0          // Max: 180 points
     };
 
     Object.entries(answers).forEach(([questionId, answer]) => {
-      const question = questions.find(q => q.id === questionId || 
-        q.questions?.some(sq => sq.id === questionId));
+      const question = questions.find(q => q.id === questionId);
       
       if (question) {
         const points = answer.points || 0;
@@ -802,17 +495,11 @@ export default function AssessmentPage() {
           case 'Business Foundation':
             sectionScores.foundation += points;
             break;
-          case 'Strategic Wheel':
-            sectionScores.strategic_wheel += points;
-            break;
-          case 'Profitability Health':
-            sectionScores.profitability += points;
+          case 'Strategic Clarity':
+            sectionScores.strategic += points;
             break;
           case 'Business Engines':
             sectionScores.engines += points;
-            break;
-          case 'Success Disciplines':
-            sectionScores.disciplines += points;
             break;
         }
       }
@@ -828,7 +515,6 @@ export default function AssessmentPage() {
     try {
       const supabase = createClient();
       
-      // Get current user
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -840,7 +526,7 @@ export default function AssessmentPage() {
       // Calculate scores
       const sectionScores = calculateSectionScores();
       const totalScore = Object.values(sectionScores).reduce((sum, score) => sum + score, 0);
-      const maxScore = 290;
+      const maxScore = 300;
       const percentage = Math.round((totalScore / maxScore) * 100);
       
       // Determine health status
@@ -851,10 +537,8 @@ export default function AssessmentPage() {
       else if (percentage >= 60) healthStatus = 'BUILDING';
       else if (percentage >= 50) healthStatus = 'STRUGGLING';
       else healthStatus = 'URGENT';
-      
-      const revenueStage = answers['q1']?.label || 'unknown';
 
-      // Save to Supabase database - ROUND ALL SCORES FOR INTEGER COLUMNS
+      // Save to Supabase - using existing database columns
       const { data: assessment, error: dbError } = await supabase
         .from('assessments')
         .insert({
@@ -863,17 +547,16 @@ export default function AssessmentPage() {
           total_score: Math.round(totalScore),
           percentage: percentage,
           health_status: healthStatus,
-          revenue_stage: revenueStage,
           foundation_score: Math.round(sectionScores.foundation),
-          strategic_wheel_score: Math.round(sectionScores.strategic_wheel),
-          profitability_score: Math.round(sectionScores.profitability),
+          strategic_wheel_score: Math.round(sectionScores.strategic),
+          profitability_score: 0,
           engines_score: Math.round(sectionScores.engines),
-          disciplines_score: Math.round(sectionScores.disciplines),
-          foundation_max: 40,
-          strategic_wheel_max: 60,
-          profitability_max: 30,
-          engines_max: 100,
-          disciplines_max: 60,
+          disciplines_score: 0,
+          foundation_max: 50,
+          strategic_wheel_max: 70,
+          profitability_max: 0,
+          engines_max: 180,
+          disciplines_max: 0,
           total_max: maxScore,
           completed_at: new Date().toISOString(),
           status: 'completed'
@@ -888,9 +571,7 @@ export default function AssessmentPage() {
         return;
       }
 
-      console.log('✅ Assessment saved to database:', assessment.id);
-
-      // Redirect to NEW results page location with assessment ID
+      console.log('✅ Assessment saved:', assessment.id);
       router.push(`/dashboard/assessment-results?id=${assessment.id}`);
       
     } catch (error) {
@@ -906,9 +587,9 @@ export default function AssessmentPage() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Business Development Assessment</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Business Assessment</h1>
               <p className="text-sm text-gray-600 mt-1">
-                Comprehensive evaluation of your business health and opportunities
+                30 questions • 12-15 minutes
               </p>
             </div>
             <button
@@ -958,72 +639,38 @@ export default function AssessmentPage() {
           </div>
 
           <div className="p-8">
-            {currentQuestion.type === 'radio' && currentQuestion.options && (
-              <div className="space-y-3">
-                {currentQuestion.options.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => handleAnswer(option.value, option.points)}
-                    className={`w-full text-left p-5 rounded-xl border-2 transition-all duration-200 group ${
+            <div className="space-y-3">
+              {currentQuestion.options.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => handleAnswer(option.value, option.points)}
+                  className={`w-full text-left p-5 rounded-xl border-2 transition-all duration-200 group ${
+                    answers[currentQuestion.id]?.value === option.value
+                      ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg transform scale-[1.02]'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center transition-all ${
                       answers[currentQuestion.id]?.value === option.value
-                        ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg transform scale-[1.02]'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center">
-                      <div className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center transition-all ${
-                        answers[currentQuestion.id]?.value === option.value
-                          ? 'border-blue-500 bg-blue-500'
-                          : 'border-gray-400 group-hover:border-gray-500'
-                      }`}>
-                        {answers[currentQuestion.id]?.value === option.value && (
-                          <div className="w-3 h-3 bg-white rounded-full" />
-                        )}
-                      </div>
-                      <span className={`text-lg ${
-                        answers[currentQuestion.id]?.value === option.value
-                          ? 'text-gray-900 font-medium'
-                          : 'text-gray-700'
-                      }`}>
-                        {option.label}
-                      </span>
+                        ? 'border-blue-500 bg-blue-500'
+                        : 'border-gray-400 group-hover:border-gray-500'
+                    }`}>
+                      {answers[currentQuestion.id]?.value === option.value && (
+                        <div className="w-3 h-3 bg-white rounded-full" />
+                      )}
                     </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {currentQuestion.type === 'yesno-group' && currentQuestion.questions && (
-              <div className="space-y-4">
-                {currentQuestion.questions.map((q) => (
-                  <div key={q.id} className="flex items-center justify-between py-4 px-5 rounded-xl bg-gray-50/70 hover:bg-gray-100/70 transition-all border border-gray-200/50">
-                    <p className="text-gray-700 text-lg flex-1 pr-6">{q.text}</p>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => handleYesNoGroup(q.id, 'yes')}
-                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                          answers[q.id]?.value === 'yes'
-                            ? 'bg-green-500 text-white shadow-md transform scale-105'
-                            : 'bg-white border-2 border-gray-300 text-gray-600 hover:border-green-400 hover:text-green-600'
-                        }`}
-                      >
-                        YES
-                      </button>
-                      <button
-                        onClick={() => handleYesNoGroup(q.id, 'no')}
-                        className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                          answers[q.id]?.value === 'no'
-                            ? 'bg-red-500 text-white shadow-md transform scale-105'
-                            : 'bg-white border-2 border-gray-300 text-gray-600 hover:border-red-400 hover:text-red-600'
-                        }`}
-                      >
-                        NO
-                      </button>
-                    </div>
+                    <span className={`text-lg ${
+                      answers[currentQuestion.id]?.value === option.value
+                        ? 'text-gray-900 font-medium'
+                        : 'text-gray-700'
+                    }`}>
+                      {option.label}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
+                </button>
+              ))}
+            </div>
 
             {error && (
               <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
