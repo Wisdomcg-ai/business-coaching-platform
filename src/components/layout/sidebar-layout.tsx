@@ -45,9 +45,9 @@ import {
   ChevronRight,
   ChevronUp,
   ChevronDown,
-  Menu,
-  X,
   LogOut,
+  User,
+  ChevronDown as DropdownChevron,
 } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -116,7 +116,7 @@ const getNavigation = (userRole: 'coach' | 'client'): NavSection[] => {
       items: [
         { label: 'Vision, Mission & Values', href: '/vision-mission', icon: Target },
         { label: 'Business Roadmap', href: '/business-roadmap', icon: Compass },
-        { label: 'SWOT Analysis', href: '/swot-launch', icon: FileText },
+        { label: 'SWOT Analysis', href: '/swot', icon: FileText },
         { label: 'Goals & Targets', href: '/goals', icon: Award },
         { label: '90-Day Planning', href: '/90-day-planning', icon: Mountain },
         { label: 'One-Page Plan', href: '/one-page-plan', icon: FileText },
@@ -129,25 +129,32 @@ const getNavigation = (userRole: 'coach' | 'client'): NavSection[] => {
       title: 'FINANCES',
       defaultOpen: true,
       items: [
-        { label: 'Business Dashboard', href: '/finances/dashboard', icon: BarChart3 },
         { label: 'Financial Forecast', href: '/finances/forecast', icon: TrendingUp },
         { label: 'Budget vs Actual', href: '/finances/budget', icon: FileText },
         { label: '13-Week Cashflow', href: '/finances/cashflow', icon: Banknote, disabled: true },
       ],
     },
 
-    // EXECUTE & GROW - Daily execution, Open Loops, Issues, KPIs
+    // EXECUTE & GROW - Daily execution, KPIs, accountability
     {
       title: 'EXECUTE & GROW',
       defaultOpen: true,
       items: [
         { label: 'Daily Disciplines', href: '/daily-disciplines', icon: CheckSquare },
         { label: 'Business Dashboard', href: '/business-dashboard', icon: BarChart3 },
+        { label: 'Accountability Chart', href: '/accountability-chart', icon: Network },
+      ],
+    },
+
+    // PRODUCTIVITY - Task and workflow management
+    {
+      title: 'PRODUCTIVITY',
+      defaultOpen: true,
+      items: [
         { label: 'Open Loops', href: '/open-loops', icon: Layers },
         { label: 'Issues List', href: '/issues-list', icon: AlertCircle },
-        { label: 'To-Do List', href: '/todo-list', icon: ListTodo },
+        { label: 'To-Do List', href: '/todo/client', icon: ListTodo },
         { label: 'Stop Doing List', href: '/stop-doing', icon: XCircle },
-        { label: 'Accountability Chart', href: '/accountability-chart', icon: Network },
       ],
     },
 
@@ -162,7 +169,7 @@ const getNavigation = (userRole: 'coach' | 'client'): NavSection[] => {
       ],
     },
 
-    // GROW - KPIs, scorecards, team performance
+    // INSIGHTS - KPIs, scorecards, team performance
     {
       title: 'INSIGHTS',
       defaultOpen: false,
@@ -224,15 +231,8 @@ const getNavigation = (userRole: 'coach' | 'client'): NavSection[] => {
   return navigation
 }
 
-// Bottom navigation items (Settings & Help)
-const bottomNavigation: NavItem[] = [
-  { label: 'Account Settings', href: '/account', icon: Settings },
-  { label: 'Integrations', href: '/integrations', icon: Zap },
-  { label: 'Help & Support', href: '/help', icon: HelpCircle },
-]
-
 // ═══════════════════════════════════════════════════════════════════════════
-// MAIN LAYOUT COMPONENT
+// MAIN LAYOUT COMPONENT - DESKTOP ONLY
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface SidebarLayoutProps {
@@ -245,13 +245,13 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
   // State Management
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<string[]>([
     'DASHBOARD',
     'START HERE',
     'STRATEGY',
     'FINANCES',
     'EXECUTE & GROW',
+    'PRODUCTIVITY',
   ])
   const [navigation, setNavigation] = useState<NavSection[]>([])
   const [businessData, setBusinessData] = useState<BusinessData>({
@@ -261,6 +261,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
     revenueTarget: 0,
     profitTarget: 0,
   })
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   // Load business data on component mount
   useEffect(() => {
@@ -318,14 +319,14 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* ═════════════════════════════════════════════════════════════════════
-          DESKTOP SIDEBAR - Hidden on mobile, shown on lg+ screens
+          DESKTOP SIDEBAR - Always visible, fixed width 64 or 20
           ═════════════════════════════════════════════════════════════════════ */}
       <div
         className={`
         ${sidebarOpen ? 'w-64' : 'w-20'}
         bg-white border-r border-gray-200 flex flex-col h-screen
         transition-all duration-200 ease-in-out
-        hidden lg:flex fixed left-0 top-0 z-40
+        fixed left-0 top-0 z-40
       `}
       >
         {/* SIDEBAR HEADER - Logo and collapse button */}
@@ -452,192 +453,117 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
           ))}
         </nav>
 
-        {/* SIDEBAR FOOTER - Account info and sign out */}
+        {/* SIDEBAR FOOTER - Sign Out Only */}
         <div className="border-t border-gray-200 p-4">
-          {sidebarOpen ? (
-            <div className="space-y-2">
-              {bottomNavigation.map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-center text-sm text-gray-600 hover:text-gray-900 py-1"
-                  >
-                    <Icon className="h-4 w-4 mr-3 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-              <button
-                onClick={handleSignOut}
-                className="flex items-center text-sm text-gray-600 hover:text-red-600 py-1 w-full transition-colors"
-              >
-                <LogOut className="h-4 w-4 mr-3 flex-shrink-0" />
-                <span>Sign Out</span>
-              </button>
-              <div className="pt-2 mt-2 border-t border-gray-100">
-                <p className="text-xs text-gray-500">User Account</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center space-y-2">
-              <button
-                onClick={handleSignOut}
-                className="p-2 text-gray-600 hover:text-red-600 transition-colors"
-                title="Sign Out"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
-            </div>
-          )}
+          <button
+            onClick={handleSignOut}
+            className="flex items-center text-sm text-gray-600 hover:text-red-600 py-1 w-full transition-colors"
+          >
+            <LogOut className="h-4 w-4 mr-3 flex-shrink-0" />
+            {sidebarOpen && <span>Sign Out</span>}
+          </button>
         </div>
       </div>
 
       {/* ═════════════════════════════════════════════════════════════════════
-          MOBILE SIDEBAR - Overlay sidebar for mobile devices
+          MAIN CONTENT AREA - Desktop layout with fixed sidebar
           ═════════════════════════════════════════════════════════════════════ */}
-      {mobileSidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 flex">
-          {/* Backdrop overlay */}
-          <div
-            className="fixed inset-0 bg-gray-600 bg-opacity-75"
-            onClick={() => setMobileSidebarOpen(false)}
-          />
-
-          {/* Mobile sidebar panel */}
-          <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white shadow-lg">
-            <div className="absolute top-0 right-0 -mr-12 pt-2">
-              <button
-                onClick={() => setMobileSidebarOpen(false)}
-                className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-              >
-                <X className="h-6 w-6 text-white" />
-              </button>
-            </div>
-
-            {/* Mobile sidebar header */}
-            <div className="h-16 border-b border-gray-200 flex items-center px-4">
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">Business Portal</h1>
-                {businessData.name && businessData.name !== 'My Business' && (
-                  <p className="text-xs text-gray-500 truncate">{businessData.name}</p>
-                )}
+      <div className="flex-1 flex flex-col" style={{ marginLeft: sidebarOpen ? '16rem' : '5rem' }}>
+        {/* TOP BAR - Metrics and User Menu */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4">
+          <div className="flex items-center justify-between gap-6">
+            {/* METRICS BAR */}
+            <div className="grid grid-cols-4 gap-6 flex-1">
+              <div className="text-center">
+                <p className="text-xs uppercase text-blue-200 mb-1">Assessment</p>
+                <p className="text-2xl font-bold">{businessData.assessmentScore}%</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs uppercase text-blue-200 mb-1">Stage</p>
+                <p className="text-2xl font-bold">{businessData.stage}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs uppercase text-blue-200 mb-1">Rev Target</p>
+                <p className="text-2xl font-bold">{formatCurrency(businessData.revenueTarget)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs uppercase text-blue-200 mb-1">Net Profit Target</p>
+                <p className="text-2xl font-bold">{formatCurrency(businessData.profitTarget)}</p>
               </div>
             </div>
 
-            {/* Mobile navigation */}
-            <nav className="flex-1 overflow-y-auto py-4">
-              {navigation.map((section) => (
-                <div key={section.title} className="mb-2">
-                  <button
-                    onClick={() => toggleSection(section.title)}
-                    className="w-full px-4 py-2 flex items-center justify-between text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50"
-                  >
-                    <span>{section.title}</span>
-                    {expandedSections.includes(section.title) ? (
-                      <ChevronUp className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
-                    )}
-                  </button>
-                  {expandedSections.includes(section.title) && (
-                    <div className="mt-1">
-                      {section.items.map((item) => {
-                        const Icon = item.icon
-                        const isActive = pathname === item.href
-
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.disabled ? '#' : item.href}
-                            className={`
-                              flex items-center px-4 py-2 text-sm
-                              ${
-                                isActive
-                                  ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                                  : 'text-gray-700 hover:bg-gray-50'
-                              }
-                              ${item.disabled ? 'opacity-50 cursor-not-allowed' : ''}
-                            `}
-                            onClick={(e) => {
-                              if (!item.disabled) {
-                                setMobileSidebarOpen(false)
-                              } else {
-                                e.preventDefault()
-                              }
-                            }}
-                          >
-                            <Icon className="h-4 w-4 mr-3 flex-shrink-0" />
-                            <span className="flex-1">{item.label}</span>
-                            {item.badge && (
-                              <span
-                                className={`text-xs px-2 py-0.5 rounded ${
-                                  item.badge === 'Private'
-                                    ? 'bg-gray-100 text-gray-600'
-                                    : 'bg-blue-100 text-blue-700'
-                                }`}
-                              >
-                                {item.badge}
-                              </span>
-                            )}
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </nav>
-
-            {/* Mobile footer */}
-            <div className="border-t border-gray-200 p-4">
+            {/* USER MENU */}
+            <div className="relative">
               <button
-                onClick={handleSignOut}
-                className="flex items-center text-sm text-gray-600 hover:text-red-600 w-full transition-colors"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 px-3 py-2 rounded hover:bg-blue-500 transition-colors"
               >
-                <LogOut className="h-4 w-4 mr-3" />
-                <span>Sign Out</span>
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <User className="h-4 w-4" />
+                </div>
+                <DropdownChevron className="h-4 w-4" />
               </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ═════════════════════════════════════════════════════════════════════
-          MAIN CONTENT AREA
-          ═════════════════════════════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col lg:ml-64">
-        {/* MOBILE HEADER - Menu button and title for mobile */}
-        <div className="lg:hidden bg-white border-b border-gray-200 h-16 flex items-center px-4 gap-4">
-          <button
-            onClick={() => setMobileSidebarOpen(true)}
-            className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-            title="Open menu"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-900">Business Portal</h1>
-        </div>
+              {/* USER DROPDOWN MENU */}
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  {/* User Info */}
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-semibold text-gray-900">User Account</p>
+                    <p className="text-xs text-gray-500">user@example.com</p>
+                  </div>
 
-        {/* METRICS BAR - Shows key business metrics */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 md:px-6 py-4 hidden md:block">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            <div className="text-center">
-              <p className="text-xs uppercase text-blue-200 mb-1">Assessment</p>
-              <p className="text-2xl font-bold">{businessData.assessmentScore}%</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs uppercase text-blue-200 mb-1">Stage</p>
-              <p className="text-2xl font-bold">{businessData.stage}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs uppercase text-blue-200 mb-1">Rev Target</p>
-              <p className="text-2xl font-bold">{formatCurrency(businessData.revenueTarget)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs uppercase text-blue-200 mb-1">Net Profit Target</p>
-              <p className="text-2xl font-bold">{formatCurrency(businessData.profitTarget)}</p>
+                  {/* Menu Items */}
+                  <div className="py-1">
+                    <Link
+                      href="/account"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Settings className="h-4 w-4 mr-3" />
+                      Account Settings
+                    </Link>
+                    <Link
+                      href="/integrations"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <Zap className="h-4 w-4 mr-3" />
+                      Integrations
+                    </Link>
+                    <Link
+                      href="/help"
+                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <HelpCircle className="h-4 w-4 mr-3" />
+                      Help & Support
+                    </Link>
+                  </div>
+
+                  {/* Sign Out */}
+                  <div className="border-t border-gray-100 py-1">
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        handleSignOut()
+                      }}
+                      className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4 mr-3" />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Backdrop to close menu */}
+              {userMenuOpen && (
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setUserMenuOpen(false)}
+                />
+              )}
             </div>
           </div>
         </div>
