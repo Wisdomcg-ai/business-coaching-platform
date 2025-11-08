@@ -1,9 +1,14 @@
+<<<<<<< HEAD
 'use client';
 
+=======
+// app/layout.tsx
+>>>>>>> 0d18a6a9a2c74811fe3ea5ca9a4527e23ecef037
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'sonner';
+<<<<<<< HEAD
 import { KPIInitializer } from '@/components/KPIInitializer';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -347,6 +352,15 @@ function DashboardWrapper({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+=======
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'Business Coaching Platform',
+  description: 'Strategic planning and coaching platform with world-class KPI system',
+};
+>>>>>>> 0d18a6a9a2c74811fe3ea5ca9a4527e23ecef037
 
 export default function RootLayout({
   children,
@@ -356,10 +370,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+<<<<<<< HEAD
         <KPIInitializer />
         <DashboardWrapper>
           {children}
         </DashboardWrapper>
+=======
+        {children}
+>>>>>>> 0d18a6a9a2c74811fe3ea5ca9a4527e23ecef037
         <Toaster
           position="bottom-right"
           toastOptions={{
