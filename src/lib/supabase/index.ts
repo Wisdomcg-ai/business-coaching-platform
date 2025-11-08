@@ -1,1 +1,1 @@
-export { createClientComponentClient } from './client';
+export { createClient } from './client';

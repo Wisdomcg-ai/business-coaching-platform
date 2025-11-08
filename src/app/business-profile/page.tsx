@@ -8,26 +8,25 @@ import {
   ArrowRight, 
   Save, 
   Building2, 
+  User,
   DollarSign, 
   Users, 
-  Package, 
-  Users2, 
   Target,
   CheckCircle,
   AlertCircle,
   Globe,
   Instagram,
   Facebook,
-  Linkedin
+  Linkedin,
+  X
 } from 'lucide-react'
 
 const STEPS = [
   { id: 1, name: 'Company Information', icon: Building2 },
-  { id: 2, name: 'Financial Snapshot', icon: DollarSign },
-  { id: 3, name: 'Team & Organisation', icon: Users },
-  { id: 4, name: 'Products & Services', icon: Package },
-  { id: 5, name: 'Customer Segments', icon: Users2 },
-  { id: 6, name: 'Current Situation', icon: Target },
+  { id: 2, name: 'Owner Info', icon: User },
+  { id: 3, name: 'Financial Snapshot', icon: DollarSign },
+  { id: 4, name: 'Team & Organisation', icon: Users },
+  { id: 5, name: 'Current Situation', icon: Target },
 ]
 
 // Simplified industry list with most common options
@@ -69,15 +68,6 @@ const BUSINESS_MODELS = [
   'Franchise',
 ]
 
-// Simplified product/service types
-const OFFERING_TYPES = [
-  'Physical Product',
-  'Service',
-  'Digital Product',
-  'Subscription',
-  'Project-Based',
-]
-
 export default function EnhancedBusinessProfile() {
   const router = useRouter()
   const supabase = createClient()
@@ -98,34 +88,33 @@ export default function EnhancedBusinessProfile() {
   const loadBusiness = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      
       if (!user) {
         router.push('/auth/login')
         return
       }
 
-      // FIXED: Get ALL businesses for the user and use the first one
+      // Get ALL businesses for the user and use the first one
       const { data: businesses, error } = await supabase
         .from('businesses')
         .select('*')
         .eq('owner_id', user.id)
-        .order('created_at', { ascending: true }) // Get oldest first
+        .order('created_at', { ascending: true })
 
       if (error) {
         console.error('Error fetching businesses:', error)
       }
 
       if (businesses && businesses.length > 0) {
-        // Use the first (oldest) business
         const existingBusiness = businesses[0]
         console.log(`Found ${businesses.length} business(es), using: ${existingBusiness.name}`)
-        
         setBusiness(existingBusiness)
         setBusinessId(existingBusiness.id)
         
         if (existingBusiness.profile_updated_at) {
           setLastSaved(new Date(existingBusiness.profile_updated_at))
         }
-        
+
         // Initialize empty key_roles if not present
         if (!existingBusiness.key_roles || (existingBusiness.key_roles as any[]).length === 0) {
           setBusiness((prev: any) => ({
@@ -138,7 +127,6 @@ export default function EnhancedBusinessProfile() {
           }))
         }
       } else {
-        // Only create a new business if NONE exist
         console.log('No businesses found, creating first business')
         const { data: newBusiness, error: createError } = await supabase
           .from('businesses')
@@ -151,7 +139,8 @@ export default function EnhancedBusinessProfile() {
               { title: '', name: '', status: '' },
               { title: '', name: '', status: '' },
               { title: '', name: '', status: '' }
-            ]
+            ],
+            owner_info: {}
           })
           .select()
           .single()
@@ -173,8 +162,9 @@ export default function EnhancedBusinessProfile() {
   // Auto-save function
   const autoSave = useCallback(async () => {
     if (!businessId) return
-
+    
     setSaveStatus('saving')
+    
     try {
       const { error } = await supabase
         .from('businesses')
@@ -258,8 +248,11 @@ export default function EnhancedBusinessProfile() {
     if (business.locations && business.locations.length > 0) filledFields++
     if (business.gross_margin) filledFields++
     if (business.net_margin) filledFields++
-    if (business.products_services) filledFields++
-    if (business.customer_segments) filledFields++
+    
+    const ownerInfo = business.owner_info || {}
+    if (ownerInfo.owner_name) filledFields++
+    if (ownerInfo.primary_goal) filledFields++
+    
     if (business.top_challenges && business.top_challenges.length > 0) filledFields++
     if (business.growth_opportunities && business.growth_opportunities.length > 0) filledFields++
     
@@ -295,6 +288,8 @@ export default function EnhancedBusinessProfile() {
 
   // Get social media data or initialize empty
   const socialMedia = (business as any)?.social_media || {}
+  const ownerInfo = (business as any)?.owner_info || {}
+  const partners = ownerInfo.partners || []
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
@@ -453,7 +448,6 @@ export default function EnhancedBusinessProfile() {
               {/* Online Presence */}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-medium text-gray-800 mb-4">Online Presence</h3>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -522,22 +516,6 @@ export default function EnhancedBusinessProfile() {
                       placeholder="https://instagram.com/..."
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      TikTok
-                    </label>
-                    <input
-                      type="url"
-                      value={socialMedia.tiktok || ''}
-                      onChange={(e) => {
-                        const updated = { ...socialMedia, tiktok: e.target.value }
-                        handleJsonFieldChange('social_media', updated)
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="https://tiktok.com/@..."
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -577,8 +555,580 @@ export default function EnhancedBusinessProfile() {
             </div>
           )}
 
-          {/* Step 2: Financial Snapshot */}
+          {/* Step 2: Owner Info */}
           {currentStep === 2 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Owner Info</h2>
+              
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-purple-800">
+                  Understanding your personal goals and who owns the business helps us provide coaching tailored to what YOU want.
+                </p>
+              </div>
+
+              {/* Primary Owner Information */}
+              <div className="border-b pb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Primary Owner / Founder</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Owner/Founder Name
+                    </label>
+                    <input
+                      type="text"
+                      value={ownerInfo.owner_name || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, owner_name: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Your name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ownership %
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={ownerInfo.ownership_percentage || ''}
+                        onChange={(e) => {
+                          const updated = { ...ownerInfo, ownership_percentage: parseFloat(e.target.value) || 0 }
+                          handleJsonFieldChange('owner_info', updated)
+                        }}
+                        className="w-full pr-8 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        min="0"
+                        max="100"
+                        placeholder="100"
+                      />
+                      <span className="absolute right-3 top-2 text-gray-500">%</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Total Years in Business (Any Business)
+                    </label>
+                    <input
+                      type="number"
+                      value={ownerInfo.total_years_business || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, total_years_business: parseInt(e.target.value) || 0 }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      min="0"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Years in THIS Business
+                    </label>
+                    <input
+                      type="number"
+                      value={ownerInfo.years_this_business || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, years_this_business: parseInt(e.target.value) || 0 }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      min="0"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      How Did You Start This Business?
+                    </label>
+                    <select
+                      value={ownerInfo.business_origin || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, business_origin: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select...</option>
+                      <option value="Started from scratch">Started from scratch</option>
+                      <option value="Bought existing business">Bought existing business</option>
+                      <option value="Inherited/Family business">Inherited/Family business</option>
+                      <option value="Partnership">Partnership</option>
+                      <option value="Franchise">Franchise</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Age Range
+                    </label>
+                    <select
+                      value={ownerInfo.age_range || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, age_range: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select...</option>
+                      <option value="20s">20s</option>
+                      <option value="30s">30s</option>
+                      <option value="40s">40s</option>
+                      <option value="50s">50s</option>
+                      <option value="60+">60+</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Your Key Strengths/Expertise
+                    </label>
+                    <textarea
+                      value={ownerInfo.key_expertise || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, key_expertise: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      rows={2}
+                      placeholder="e.g., Sales, Operations, Technical expertise, Finance..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Business Partners */}
+              <div className="border-b pb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800">Business Partners</h3>
+                    <p className="text-sm text-gray-600">Additional owners or partners in the business</p>
+                  </div>
+                </div>
+
+                {partners.length === 0 ? (
+                  <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600 mb-4">No business partners added yet</p>
+                    <button
+                      onClick={() => {
+                        const updated = { 
+                          ...ownerInfo, 
+                          partners: [{ 
+                            name: '', 
+                            ownership_percentage: 0, 
+                            role: '', 
+                            involvement: '',
+                            years_with_business: 0,
+                            responsibilities: ''
+                          }] 
+                        }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      + Add First Partner
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {partners.map((partner: any, index: number) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                        <div className="flex justify-between items-start mb-4">
+                          <h4 className="font-medium text-gray-900">Partner {index + 1}</h4>
+                          <button
+                            onClick={() => {
+                              const updatedPartners = partners.filter((_: any, i: number) => i !== index)
+                              const updated = { ...ownerInfo, partners: updatedPartners }
+                              handleJsonFieldChange('owner_info', updated)
+                            }}
+                            className="text-red-600 hover:text-red-700 text-sm flex items-center gap-1"
+                          >
+                            <X className="w-4 h-4" />
+                            Remove
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Partner Name
+                            </label>
+                            <input
+                              type="text"
+                              value={partner.name || ''}
+                              onChange={(e) => {
+                                const updatedPartners = [...partners]
+                                updatedPartners[index] = { ...partner, name: e.target.value }
+                                const updated = { ...ownerInfo, partners: updatedPartners }
+                                handleJsonFieldChange('owner_info', updated)
+                              }}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Partner's name"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Ownership %
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                value={partner.ownership_percentage || ''}
+                                onChange={(e) => {
+                                  const updatedPartners = [...partners]
+                                  updatedPartners[index] = { ...partner, ownership_percentage: parseFloat(e.target.value) || 0 }
+                                  const updated = { ...ownerInfo, partners: updatedPartners }
+                                  handleJsonFieldChange('owner_info', updated)
+                                }}
+                                className="w-full pr-8 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                min="0"
+                                max="100"
+                                placeholder="0"
+                              />
+                              <span className="absolute right-3 top-2 text-gray-500">%</span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Role/Title
+                            </label>
+                            <input
+                              type="text"
+                              value={partner.role || ''}
+                              onChange={(e) => {
+                                const updatedPartners = [...partners]
+                                updatedPartners[index] = { ...partner, role: e.target.value }
+                                const updated = { ...ownerInfo, partners: updatedPartners }
+                                handleJsonFieldChange('owner_info', updated)
+                              }}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="e.g., Co-Founder, CFO"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Active Involvement
+                            </label>
+                            <select
+                              value={partner.involvement || ''}
+                              onChange={(e) => {
+                                const updatedPartners = [...partners]
+                                updatedPartners[index] = { ...partner, involvement: e.target.value }
+                                const updated = { ...ownerInfo, partners: updatedPartners }
+                                handleJsonFieldChange('owner_info', updated)
+                              }}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="">Select...</option>
+                              <option value="Full-time active">Full-time active</option>
+                              <option value="Part-time active">Part-time active</option>
+                              <option value="Advisory only">Advisory only</option>
+                              <option value="Silent partner">Silent partner</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Years with Business
+                            </label>
+                            <input
+                              type="number"
+                              value={partner.years_with_business || ''}
+                              onChange={(e) => {
+                                const updatedPartners = [...partners]
+                                updatedPartners[index] = { ...partner, years_with_business: parseInt(e.target.value) || 0 }
+                                const updated = { ...ownerInfo, partners: updatedPartners }
+                                handleJsonFieldChange('owner_info', updated)
+                              }}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              min="0"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Key Responsibilities
+                            </label>
+                            <textarea
+                              value={partner.responsibilities || ''}
+                              onChange={(e) => {
+                                const updatedPartners = [...partners]
+                                updatedPartners[index] = { ...partner, responsibilities: e.target.value }
+                                const updated = { ...ownerInfo, partners: updatedPartners }
+                                handleJsonFieldChange('owner_info', updated)
+                              }}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              rows={2}
+                              placeholder="What does this partner focus on?"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      onClick={() => {
+                        const updatedPartners = [
+                          ...partners,
+                          { 
+                            name: '', 
+                            ownership_percentage: 0, 
+                            role: '', 
+                            involvement: '',
+                            years_with_business: 0,
+                            responsibilities: ''
+                          }
+                        ]
+                        const updated = { ...ownerInfo, partners: updatedPartners }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                    >
+                      + Add Another Partner
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Business Goals */}
+              <div className="border-b pb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">What You Want From This Business</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Primary Business Goal
+                    </label>
+                    <select
+                      value={ownerInfo.primary_goal || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, primary_goal: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select your main goal...</option>
+                      <option value="Build income & wealth">Build income & wealth</option>
+                      <option value="Create freedom & lifestyle">Create freedom & lifestyle</option>
+                      <option value="Make an impact">Make an impact</option>
+                      <option value="Build to sell">Build to sell</option>
+                      <option value="Create legacy">Create legacy</option>
+                      <option value="Survive & stabilize">Survive & stabilize</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Time Horizon
+                    </label>
+                    <select
+                      value={ownerInfo.time_horizon || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, time_horizon: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">How long do you plan to run this?</option>
+                      <option value="1-2 years">1-2 years</option>
+                      <option value="3-5 years">3-5 years</option>
+                      <option value="5-10 years">5-10 years</option>
+                      <option value="10+ years">10+ years</option>
+                      <option value="Forever/retirement">Forever/until retirement</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Exit Strategy
+                    </label>
+                    <select
+                      value={ownerInfo.exit_strategy || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, exit_strategy: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">What's your exit plan?</option>
+                      <option value="Sell to third party">Sell to third party</option>
+                      <option value="Pass to family">Pass to family</option>
+                      <option value="Management buyout">Management buyout</option>
+                      <option value="Run forever">No exit - run forever</option>
+                      <option value="Haven't thought about it">Haven't thought about it</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Working Style */}
+              <div className="border-b pb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Your Working Style</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Current Hours Per Week
+                    </label>
+                    <input
+                      type="number"
+                      value={ownerInfo.current_hours || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, current_hours: parseInt(e.target.value) || 0 }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      min="0"
+                      placeholder="40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Desired Hours Per Week
+                    </label>
+                    <input
+                      type="number"
+                      value={ownerInfo.desired_hours || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, desired_hours: parseInt(e.target.value) || 0 }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      min="0"
+                      placeholder="30"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Desired Role in Business
+                    </label>
+                    <select
+                      value={ownerInfo.desired_role || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, desired_role: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select...</option>
+                      <option value="Working IN - doing the work">Working IN - doing the work</option>
+                      <option value="Working ON - building systems">Working ON - building systems</option>
+                      <option value="Mix of both">Mix of both</option>
+                      <option value="Strategic only - minimal operations">Strategic only - minimal operations</option>
+                      <option value="Want to step back completely">Want to step back completely</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      What You LOVE Doing
+                    </label>
+                    <textarea
+                      value={ownerInfo.love_doing || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, love_doing: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      rows={2}
+                      placeholder="What gives you energy?"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      What You HATE Doing
+                    </label>
+                    <textarea
+                      value={ownerInfo.hate_doing || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, hate_doing: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      rows={2}
+                      placeholder="What drains your energy?"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial Needs */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Personal Financial Needs</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Minimum Income Needed (Annual)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        value={ownerInfo.minimum_income || ''}
+                        onChange={(e) => {
+                          const updated = { ...ownerInfo, minimum_income: parseFloat(e.target.value) || 0 }
+                          handleJsonFieldChange('owner_info', updated)
+                        }}
+                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="100000"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Target Income Desired (Annual)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        value={ownerInfo.target_income || ''}
+                        onChange={(e) => {
+                          const updated = { ...ownerInfo, target_income: parseFloat(e.target.value) || 0 }
+                          handleJsonFieldChange('owner_info', updated)
+                        }}
+                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="250000"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Risk Tolerance
+                    </label>
+                    <select
+                      value={ownerInfo.risk_tolerance || ''}
+                      onChange={(e) => {
+                        const updated = { ...ownerInfo, risk_tolerance: e.target.value }
+                        handleJsonFieldChange('owner_info', updated)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select...</option>
+                      <option value="Conservative - Minimize risk">Conservative - Minimize risk</option>
+                      <option value="Moderate - Balanced approach">Moderate - Balanced approach</option>
+                      <option value="Aggressive - High growth focus">Aggressive - High growth focus</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Financial Snapshot */}
+          {currentStep === 3 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Financial Snapshot</h2>
               
@@ -699,8 +1249,8 @@ export default function EnhancedBusinessProfile() {
             </div>
           )}
 
-          {/* Step 3: Team & Organisation */}
-          {currentStep === 3 && (
+          {/* Step 4: Team & Organisation */}
+          {currentStep === 4 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Team & Organisation</h2>
               
@@ -724,7 +1274,7 @@ export default function EnhancedBusinessProfile() {
                 </div>
               </div>
 
-              {/* Key Roles - Always show 3 rows minimum */}
+              {/* Key Roles */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Team Members
@@ -802,22 +1352,8 @@ export default function EnhancedBusinessProfile() {
             </div>
           )}
 
-          {/* Steps 4-6 remain the same - truncated for space */}
-          {currentStep === 4 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Products & Services</h2>
-              <p className="text-gray-600">Configure your products and services...</p>
-            </div>
-          )}
-
+          {/* Step 5: Current Situation */}
           {currentStep === 5 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Customer Segments</h2>
-              <p className="text-gray-600">Define your customer segments...</p>
-            </div>
-          )}
-
-          {currentStep === 6 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Situation</h2>
               
@@ -884,6 +1420,26 @@ export default function EnhancedBusinessProfile() {
                   ))}
                 </div>
               </div>
+
+              {/* Additional Context - NEW SECTION */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Anything Else We Should Know?
+                </label>
+                <p className="text-xs text-gray-600 mb-2">
+                  Any other context, goals, constraints, or information that would help us support you better
+                </p>
+                <textarea
+                  value={ownerInfo.additional_context || ''}
+                  onChange={(e) => {
+                    const updated = { ...ownerInfo, additional_context: e.target.value }
+                    handleJsonFieldChange('owner_info', updated)
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={4}
+                  placeholder="Share any additional information that might be helpful for your coaching journey..."
+                />
+              </div>
             </div>
           )}
 
@@ -919,16 +1475,16 @@ export default function EnhancedBusinessProfile() {
                 <ArrowRight className="w-5 h-5" />
               </button>
             )}
-            
+
             {currentStep === STEPS.length && (
               <button
                 onClick={() => {
                   manualSave()
-                  router.push('/goals')
+                  router.push('/dashboard')
                 }}
                 className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium transition-all"
               >
-                Save & Go to Goals
+                Complete Profile
                 <CheckCircle className="w-5 h-5" />
               </button>
             )}

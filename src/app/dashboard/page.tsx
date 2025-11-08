@@ -12,6 +12,7 @@ import {
   CheckSquare,
   XCircle
 } from 'lucide-react';
+import ExecutionStatusCard from '@/components/dashboard/ExecutionStatusCard';
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
@@ -70,7 +71,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Goals and Rocks Grid */}
+      {/* Goals and Rocks Grid - MOVED UP */}
       <div className="grid grid-cols-3 gap-6 mb-6">
         {/* Annual Goals */}
         <div className="bg-white rounded-lg shadow p-6">
@@ -126,6 +127,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Execution Status Card - MOVED DOWN */}
+      <ExecutionStatusCard />
 
       {/* Review Cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
