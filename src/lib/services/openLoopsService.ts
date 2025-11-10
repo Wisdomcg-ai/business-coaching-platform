@@ -1,203 +1,224 @@
 import { createClient } from '@/lib/supabase/client';
-import type { WeeklyReview, WeeklyReviewGoal } from '@/lib/types/weekly-review';
 
-/**
- * Get current week's dates (Monday to Sunday)
- */
-export function getWeekDates(date: Date = new Date()) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  
-  const monday = new Date(d.setDate(diff));
-  const sunday = new Date(monday);
-  sunday.setDate(sunday.getDate() + 6);
-  
-  const formatDate = (dateObj: Date) => dateObj.toISOString().split('T')[0];
-  
-  return {
-    week_starting: formatDate(monday),
-    week_ending: formatDate(sunday),
-  };
+export interface OpenLoop {
+  id: string;
+  user_id: string;
+  title: string;
+  start_date: string;
+  expected_completion_date: string | null;
+  owner: string;
+  status: 'in-progress' | 'stuck' | 'on-hold';
+  blocker: string | null;
+  completed_date: string | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-/**
- * Fetch this week's review for a business
- */
-export async function getThisWeeksReview(businessId: string): Promise<WeeklyReview | null> {
+export interface CreateOpenLoopInput {
+  title: string;
+  start_date: string;
+  expected_completion_date: string | null;
+  owner: string;
+  status: 'in-progress' | 'stuck' | 'on-hold';
+  blocker: string | null;
+}
+
+const supabase = createClient();
+
+// Get all open loops for current user (not archived)
+export async function getOpenLoops(status?: string) {
   try {
-    const supabase = createClient();
-    const { week_starting } = getWeekDates();
-    
-    const { data, error } = await supabase
-      .from('weekly_reviews')
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    let query = supabase
+      .from('open_loops')
       .select('*')
-      .eq('business_id', businessId)
-      .eq('week_starting', week_starting)
+      .eq('user_id', user.id)
+      .eq('archived', false)
+      .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    return data as OpenLoop[];
+  } catch (error) {
+    console.error('Error fetching open loops:', error);
+    throw error;
+  }
+}
+
+// Get completed loops (archived)
+export async function getCompletedLoops() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('open_loops')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('archived', true)
+      .order('completed_date', { ascending: false });
+
+    if (error) throw error;
+    return data as OpenLoop[];
+  } catch (error) {
+    console.error('Error fetching completed loops:', error);
+    throw error;
+  }
+}
+
+// Get all loops including archived
+export async function getAllLoops() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('open_loops')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data as OpenLoop[];
+  } catch (error) {
+    console.error('Error fetching all loops:', error);
+    throw error;
+  }
+}
+
+// Create a new open loop
+export async function createOpenLoop(input: CreateOpenLoopInput) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('open_loops')
+      .insert([
+        {
+          user_id: user.id,
+          ...input,
+          archived: false
+        }
+      ])
+      .select()
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null;
-      }
-      console.error('Error fetching this week review:', error);
-      return null;
-    }
-
-    return data as WeeklyReview;
+    if (error) throw error;
+    return data as OpenLoop;
   } catch (error) {
-    console.error('Error in getThisWeeksReview:', error);
-    return null;
+    console.error('Error creating open loop:', error);
+    throw error;
   }
 }
 
-/**
- * Fetch review history (last 8 weeks)
- */
-export async function getReviewHistory(businessId: string, limit: number = 8): Promise<WeeklyReview[]> {
+// Update an open loop
+export async function updateOpenLoop(id: string, updates: Partial<CreateOpenLoopInput>) {
   try {
-    const supabase = createClient();
     const { data, error } = await supabase
-      .from('weekly_reviews')
-      .select('*')
-      .eq('business_id', businessId)
-      .order('week_starting', { ascending: false })
-      .limit(limit);
+      .from('open_loops')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
 
-    if (error) {
-      console.error('Error fetching review history:', error);
-      return [];
-    }
-
-    return (data || []) as WeeklyReview[];
+    if (error) throw error;
+    return data as OpenLoop;
   } catch (error) {
-    console.error('Error in getReviewHistory:', error);
-    return [];
+    console.error('Error updating open loop:', error);
+    throw error;
   }
 }
 
-/**
- * Create or update a weekly review
- */
-export async function saveWeeklyReview(
-  businessId: string,
-  userId: string,
-  review: Partial<WeeklyReview>
-): Promise<{ success: boolean; data?: WeeklyReview; error?: string }> {
+// Mark loop as completed and archived
+export async function completeOpenLoop(id: string) {
   try {
-    const supabase = createClient();
-    const existing = await getThisWeeksReview(businessId);
+    const { data, error } = await supabase
+      .from('open_loops')
+      .update({
+        archived: true,
+        completed_date: new Date().toISOString().split('T')[0],
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
 
-    if (existing) {
-      const { data, error } = await supabase
-        .from('weekly_reviews')
-        .update({
-          ...review,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating review:', error);
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, data: data as WeeklyReview };
-    } else {
-      const { week_starting, week_ending } = getWeekDates();
-
-      const { data, error } = await supabase
-        .from('weekly_reviews')
-        .insert([
-          {
-            business_id: businessId,
-            user_id: userId,
-            week_starting,
-            week_ending,
-            ...review,
-          },
-        ])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating review:', error);
-        return { success: false, error: error.message };
-      }
-
-      return { success: true, data: data as WeeklyReview };
-    }
+    if (error) throw error;
+    return data as OpenLoop;
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in saveWeeklyReview:', error);
-    return { success: false, error: message };
+    console.error('Error completing open loop:', error);
+    throw error;
   }
 }
 
-/**
- * Delete a weekly review
- */
-export async function deleteWeeklyReview(reviewId: string): Promise<{ success: boolean; error?: string }> {
+// Delete an open loop
+export async function deleteOpenLoop(id: string) {
   try {
-    const supabase = createClient();
     const { error } = await supabase
-      .from('weekly_reviews')
+      .from('open_loops')
       .delete()
-      .eq('id', reviewId);
+      .eq('id', id);
 
-    if (error) {
-      console.error('Error deleting review:', error);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true };
+    if (error) throw error;
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in deleteWeeklyReview:', error);
-    return { success: false, error: message };
+    console.error('Error deleting open loop:', error);
+    throw error;
   }
 }
 
-/**
- * Format goals for display
- */
-export function formatGoals(goals: WeeklyReviewGoal[] | null): WeeklyReviewGoal[] {
-  if (!goals || !Array.isArray(goals)) {
-    return [
-      { order: 1, goal: '', achieved: false, comment: '' },
-      { order: 2, goal: '', achieved: false, comment: '' },
-      { order: 3, goal: '', achieved: false, comment: '' },
-    ];
+// Update status
+export async function updateOpenLoopStatus(id: string, status: 'in-progress' | 'stuck' | 'on-hold') {
+  try {
+    return await updateOpenLoop(id, { status });
+  } catch (error) {
+    console.error('Error updating status:', error);
+    throw error;
   }
-  return goals;
 }
 
-/**
- * Validate review before saving
- */
-export function validateWeeklyReview(review: Partial<WeeklyReview>): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  if (!review.wins || review.wins.length < 3) {
-    errors.push('Please add at least 3 wins');
+// Get stats
+export async function getOpenLoopsStats() {
+  try {
+    const loops = await getOpenLoops();
+    
+    return {
+      total: loops.length,
+      inProgress: loops.filter(l => l.status === 'in-progress').length,
+      stuck: loops.filter(l => l.status === 'stuck').length,
+      onHold: loops.filter(l => l.status === 'on-hold').length
+    };
+  } catch (error) {
+    console.error('Error getting stats:', error);
+    throw error;
   }
+}
 
-  if (!review.challenges || review.challenges.trim() === '') {
-    errors.push('Please describe at least 1 challenge');
-  }
+// Calculate days open
+export function calculateDaysOpen(startDate: string): number {
+  const start = new Date(startDate);
+  const today = new Date();
+  const diffTime = Math.abs(today.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+}
 
-  if (!review.week_quality_score || review.week_quality_score < 1 || review.week_quality_score > 10) {
-    errors.push('Please rate your week 1-10');
-  }
-
-  if (!review.next_week_focus_goals || review.next_week_focus_goals.length < 3) {
-    errors.push('Please add 3 focus goals for next week');
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
+// Format date
+export function formatDate(date: string): string {
+  return new Date(date).toLocaleDateString('en-AU', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
 }
